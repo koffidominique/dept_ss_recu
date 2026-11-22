@@ -1,0 +1,20 @@
+node_modules/
+build/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+.env*
+!.env.example
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Rust / Tauri build artifacts
+target/
+src-tauri/gen/
+__pycache__/

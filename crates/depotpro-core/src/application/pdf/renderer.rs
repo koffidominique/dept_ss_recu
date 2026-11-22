@@ -1,0 +1,362 @@
+// ============================================================================
+// Orchestration du rendu PDF multipage (en-tête, lignes, récapitulatif)
+// ============================================================================
+
+use crate::application::reports::AppSettingsDto;
+
+use super::encoding_and_layout::{format_fcfa_ascii, wrap_text};
+use super::header_section::draw_header_and_party;
+use super::primitives::{
+    assemble_pdf_bytes, decode_logo_jpeg, draw_line, draw_table_header, draw_text, draw_text_right,
+    start_page, MARGIN, PAGE_H, RIGHT,
+};
+use super::summary_section::draw_summary_section;
+use super::{DocumentPdfInput, DocumentPdfLine};
+
+pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> Vec<u8> {
+    if matches!(
+        doc.doc_type.as_str(),
+        "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION" | "REÇU DE COMMANDE"
+    ) {
+        return super::receipt_renderer::render_order_receipt_pdf(company, doc);
+    }
+    let mut pages: Vec<Vec<String>> = Vec::new();
+    let mut y: f64 = PAGE_H - MARGIN;
+
+    let logo = doc.company_logo_jpeg.as_deref().and_then(decode_logo_jpeg);
+
+    let company_name = if company.company_name.trim().is_empty() {
+        "DEPOTPRO"
+    } else {
+        company.company_name.trim()
+    };
+
+    start_page(&mut pages, &mut y);
+    {
+        let cmds = pages.last_mut().unwrap();
+        draw_header_and_party(cmds, &mut y, company, company_name, doc, logo.as_ref());
+    }
+
+    let fallback_lines = vec![DocumentPdfLine {
+        label: "Aucune ligne".to_string(),
+        sublabel: None,
+        quantity: "—".to_string(),
+        unit_price: None,
+        total: None,
+        ..Default::default()
+    }];
+    let rows = if doc.lines.is_empty() {
+        &fallback_lines
+    } else {
+        &doc.lines
+    };
+
+    for line in rows {
+        let label_lines = wrap_text(&line.label, 250.0, 8.5, true);
+        let mut combined_sub = Vec::new();
+        if let Some(sub) = line.sublabel.as_deref().filter(|s| !s.trim().is_empty()) {
+            combined_sub.push(sub.trim().to_string());
+        }
+        let mut incident_parts = Vec::new();
+        if let Some(ord) = line.ordered_quantity.as_deref().filter(|s| !s.is_empty()) {
+            incident_parts.push(format!("Commandé : {ord}"));
+        }
+        if let Some(m) = line.missing_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+            incident_parts.push(format!("Manquant : {m}"));
+        }
+        if let Some(d) = line.damaged_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+            incident_parts.push(format!("Abîmé : {d}"));
+        }
+        if let Some(r) = line.refused_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+            incident_parts.push(format!("Refusé : {r}"));
+        }
+        if let Some(reason) = line.discrepancy_reason.as_deref().filter(|s| !s.trim().is_empty()) {
+            incident_parts.push(format!("Motif écart : {}", reason.trim()));
+        }
+        if !incident_parts.is_empty() {
+            combined_sub.push(incident_parts.join(" · "));
+        }
+        let sub_text = combined_sub.join(" · ");
+        let sub_lines = if sub_text.is_empty() {
+            Vec::new()
+        } else {
+            wrap_text(&sub_text, 250.0, 7.3, false)
+        };
+        let row_h =
+            (8.0 + label_lines.len() as f64 * 10.5 + sub_lines.len() as f64 * 9.0).max(20.0);
+
+        if y - row_h < 72.0 {
+            start_page(&mut pages, &mut y);
+            let cmds = pages.last_mut().unwrap();
+            draw_text(
+                cmds,
+                MARGIN,
+                y - 10.0,
+                &format!(
+                    "{company_name} · {} ({}) — Suite",
+                    doc.doc_type, doc.reference
+                ),
+                9.0,
+                true,
+                (0.063, 0.106, 0.2),
+            );
+            y -= 20.0;
+            draw_line(cmds, MARGIN, y, RIGHT, y, (0.886, 0.91, 0.941), 0.8);
+            y -= 10.0;
+            draw_table_header(cmds, &mut y);
+        }
+
+        let cmds = pages.last_mut().unwrap();
+        let mut ly = y - 11.0;
+        for ll in &label_lines {
+            draw_text(cmds, MARGIN + 82.0, ly, ll, 8.5, true, (0.094, 0.133, 0.188));
+            ly -= 10.5;
+        }
+        for sl in &sub_lines {
+            draw_text(cmds, MARGIN + 82.0, ly, sl, 7.3, false, (0.4, 0.439, 0.522));
+            ly -= 9.0;
+        }
+
+        let qty_txt = if line.quantity.is_empty() {
+            "—"
+        } else {
+            line.quantity.as_str()
+        };
+        draw_text_right(
+            cmds,
+            MARGIN + 68.0,
+            y - 11.0,
+            qty_txt,
+            8.5,
+            false,
+            (0.094, 0.133, 0.188),
+        );
+        let unit_str = line
+            .unit_price
+            .map(format_fcfa_ascii)
+            .unwrap_or_else(|| "—".to_string());
+        draw_text_right(
+            cmds,
+            MARGIN + 425.0,
+            y - 11.0,
+            &unit_str,
+            8.5,
+            false,
+            (0.094, 0.133, 0.188),
+        );
+        let tot_str = line
+            .total
+            .map(format_fcfa_ascii)
+            .unwrap_or_else(|| "—".to_string());
+        draw_text_right(
+            cmds,
+            RIGHT - 6.0,
+            y - 11.0,
+            &tot_str,
+            8.5,
+            true,
+            (0.094, 0.133, 0.188),
+        );
+
+        let row_bottom = y - row_h;
+        for x in [MARGIN + 75.0, MARGIN + 350.0, MARGIN + 435.0] {
+            draw_line(cmds, x, y, x, row_bottom, (0.72, 0.72, 0.72), 0.55);
+        }
+        y = row_bottom;
+        draw_line(cmds, MARGIN, y, RIGHT, y, (0.72, 0.72, 0.72), 0.6);
+    }
+
+    if !doc.packaging_lines.is_empty() {
+        let is_po = matches!(
+            doc.doc_type.as_str(),
+            "BON DE COMMANDE" | "BON DE COMMANDE FOURNISSEUR"
+        );
+        let is_rec = matches!(
+            doc.doc_type.as_str(),
+            "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR"
+        );
+        let title = if is_po {
+            "Emballages vides à préparer pour le fournisseur"
+        } else if is_rec {
+            "Emballages vides remis au fournisseur (échange physique)"
+        } else if doc.doc_type == "REÇU DE VENTE" {
+            "Emballages consignés remis au client"
+        } else {
+            "Emballages consignés / échange d'emballages"
+        };
+        let draw_packaging_header = |cmds: &mut Vec<String>, y: &mut f64, continued: bool| {
+            let page_title = if continued {
+                format!("{company_name} · {} ({}) — Suite emballages", doc.doc_type, doc.reference)
+            } else {
+                title.to_string()
+            };
+            draw_text(cmds, MARGIN, *y - 10.0, &page_title, 9.0, true, (0.063, 0.106, 0.2));
+            *y -= 18.0;
+            draw_text(cmds, MARGIN + 5.0, *y - 8.0, "Composant / statut", 7.0, true, (0.094, 0.133, 0.188));
+            draw_text_right(cmds, MARGIN + 345.0, *y - 8.0, "Attendu", 7.0, true, (0.094, 0.133, 0.188));
+            draw_text_right(cmds, MARGIN + 425.0, *y - 8.0, "Remis", 7.0, true, (0.094, 0.133, 0.188));
+            draw_text_right(cmds, RIGHT - 5.0, *y - 8.0, "Retourné", 7.0, true, (0.094, 0.133, 0.188));
+            *y -= 15.0;
+            draw_line(cmds, MARGIN, *y, RIGHT, *y, (0.55, 0.6, 0.68), 0.7);
+        };
+        if y - 54.0 < 70.0 { start_page(&mut pages, &mut y); }
+        draw_packaging_header(pages.last_mut().unwrap(), &mut y, false);
+        for item in &doc.packaging_lines {
+            let kind_label = match item.kind.as_str() {
+                "bottle" => "bouteilles",
+                "crate" => "casiers / plastiques",
+                _ => "autres emballages",
+            };
+            let component = format!("{} · {}", item.label, kind_label);
+            let component_lines = wrap_text(&component, 235.0, 7.5, false);
+            let status = if is_po && item.issued_quantity.is_none() {
+                "À remettre au fournisseur".to_string()
+            } else {
+                item.status_label.clone()
+            };
+            let status_lines = wrap_text(&status, 235.0, 7.0, false);
+            let detail_lines = item.detail.as_deref()
+                .map(|detail| wrap_text(detail, 235.0, 6.8, false)).unwrap_or_default();
+            let row_height = (6.0 + component_lines.len() as f64 * 9.0
+                + status_lines.len() as f64 * 8.0 + detail_lines.len() as f64 * 7.5).max(22.0);
+            if y - row_height < 64.0 {
+                start_page(&mut pages, &mut y);
+                draw_packaging_header(pages.last_mut().unwrap(), &mut y, true);
+            }
+            let cmds = pages.last_mut().unwrap();
+            let mut text_y = y - 9.0;
+            for text in &component_lines {
+                draw_text(cmds, MARGIN + 5.0, text_y, text, 7.5, true, (0.094, 0.133, 0.188));
+                text_y -= 9.0;
+            }
+            for text in status_lines.iter().chain(detail_lines.iter()) {
+                draw_text(cmds, MARGIN + 9.0, text_y, text, 7.0, false, (0.4, 0.439, 0.522));
+                text_y -= 8.0;
+            }
+            draw_text_right(cmds, MARGIN + 345.0, y - 9.0, &item.expected_quantity.to_string(), 7.5, false, (0.094, 0.133, 0.188));
+            draw_text_right(cmds, MARGIN + 425.0, y - 9.0,
+                &item.issued_quantity.map(|value| value.to_string()).unwrap_or_else(|| if is_po { "À remettre".to_string() } else { "—".to_string() }),
+                7.5, false, (0.094, 0.133, 0.188));
+            draw_text_right(cmds, RIGHT - 5.0, y - 9.0,
+                &item.returned_quantity.map(|value| value.to_string()).unwrap_or_else(|| "—".to_string()),
+                7.5, false, (0.094, 0.133, 0.188));
+            y -= row_height;
+            draw_line(cmds, MARGIN, y, RIGHT, y, (0.886, 0.91, 0.941), 0.5);
+        }
+    }
+    y -= 14.0;
+
+    let mut combined_notes = Vec::new();
+    if let Some(terms) = doc.payment_terms_label.as_deref().filter(|s| !s.trim().is_empty()) {
+        combined_notes.push(format!("Conditions règlement : {}", terms.trim()));
+    }
+    if let Some(cond) = doc.commercial_conditions.as_deref().filter(|s| !s.trim().is_empty()) {
+        combined_notes.push(format!("Conditions commerciales : {}", cond.trim()));
+    }
+    if let Some(ext) = doc.external_references.as_ref().filter(|v| !v.is_empty()) {
+        combined_notes.push(format!("Réf. transaction(s) externe(s) : {}", ext.join(", ")));
+    }
+    if let Some(n) = doc.notes.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        combined_notes.push(format!("Observation : {n}"));
+    }
+    let note_lines = if combined_notes.is_empty() {
+        Vec::new()
+    } else {
+        wrap_text(&combined_notes.join(" · "), 230.0, 7.6, false)
+    };
+    let pay_count = doc.payments.as_ref().map(|p| p.len()).unwrap_or(0);
+    let left_h = (if pay_count > 0 {
+        24.0 + pay_count as f64 * 12.0 + 8.0
+    } else {
+        0.0
+    }) + (if !note_lines.is_empty() {
+        14.0 + note_lines.len() as f64 * 9.5 + 8.0
+    } else {
+        0.0
+    });
+    let right_h = (16.0 + doc.summary_rows.len() as f64 * 15.0).max(32.0);
+    let section_h = left_h.max(right_h);
+
+    if y - section_h < 64.0 {
+        start_page(&mut pages, &mut y);
+        let cmds = pages.last_mut().unwrap();
+        draw_text(
+            cmds,
+            MARGIN,
+            y - 10.0,
+            &format!(
+                "{company_name} · {} ({}) — Récapitulatif",
+                doc.doc_type, doc.reference
+            ),
+            9.0,
+            true,
+            (0.063, 0.106, 0.2),
+        );
+        y -= 24.0;
+    }
+
+    {
+        let cmds = pages.last_mut().unwrap();
+        draw_summary_section(cmds, y, doc, &note_lines, right_h);
+        let sig_bottom = y - section_h - 42.0;
+        let needs_signature = matches!(
+            doc.doc_type.as_str(),
+            "BON DE COMMANDE"
+                | "BON DE COMMANDE FOURNISSEUR"
+                | "BON DE RÉCEPTION"
+                | "BON DE RÉCEPTION FOURNISSEUR"
+                | "REÇU DE PAIEMENT"
+        );
+        if needs_signature && sig_bottom >= 54.0 {
+            let box_w = (CONTENT_W - 14.0) / 2.0;
+            let sy_top = y - section_h - 8.0;
+            let sy_bot = sy_top - 32.0;
+            let (left_title, right_title) = match doc.doc_type.as_str() {
+                "REÇU DE PAIEMENT" => ("Cachet / Signature Caissier", "Signature Client / Payeur"),
+                "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR" => {
+                    ("Visa Réceptionnaire Dépôt", "Signature Livreur / Fournisseur")
+                }
+                _ => ("Visa Émetteur / Direction", "Accord Fournisseur / Cachet"),
+            };
+            for (idx, title) in [(0usize, left_title), (1usize, right_title)] {
+                let bx = MARGIN + idx as f64 * (box_w + 14.0);
+                super::primitives::draw_rect_fill_stroke(
+                    cmds,
+                    bx,
+                    sy_bot,
+                    box_w,
+                    32.0,
+                    (0.985, 0.99, 0.995),
+                    (0.796, 0.835, 0.882),
+                    0.6,
+                );
+                draw_text(cmds, bx + 8.0, sy_top - 10.0, title, 7.2, true, (0.25, 0.30, 0.38));
+            }
+        }
+    }
+
+    let total_pages = pages.len();
+    for (idx, cmds) in pages.iter_mut().enumerate() {
+        draw_line(cmds, MARGIN, 44.0, RIGHT, 44.0, (0.886, 0.91, 0.941), 0.75);
+        draw_text(
+            cmds,
+            MARGIN,
+            31.0,
+            &format!("{company_name} · Document généré localement sans recalcul rétroactif"),
+            7.5,
+            false,
+            (0.4, 0.439, 0.522),
+        );
+        draw_text_right(
+            cmds,
+            RIGHT,
+            31.0,
+            &format!("Réf. {} · Page {}/{}", doc.reference, idx + 1, total_pages),
+            7.5,
+            false,
+            (0.4, 0.439, 0.522),
+        );
+    }
+
+    assemble_pdf_bytes(&pages, logo.as_ref())
+}
