@@ -5,17 +5,7 @@ use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
 
 /// Ligne de commande fournisseur brute lue en base (tuples SQLx).
-type SupplierOrderLineRow = (
-    String,
-    String,
-    i64,
-    String,
-    i64,
-    i64,
-    i64,
-    String,
-    String,
-);
+type SupplierOrderLineRow = (String, String, i64, String, i64, i64, i64, String, String);
 /// Ligne de reception fournisseur brute lue en base (tuples SQLx).
 type SupplierReceiptLineRow = (
     String,

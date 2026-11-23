@@ -140,7 +140,7 @@ async fn seed_all_14_entities(db: &DepotDb) {
                     received_quantity: "10".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }]
+                }],
             },
         )
         .await
@@ -206,7 +206,7 @@ async fn seed_all_14_entities(db: &DepotDb) {
                 }],
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 2_800
+                    amount: 2_800,
                 }],
                 due_date: None,
                 ..Default::default()
@@ -269,7 +269,7 @@ async fn seed_all_14_entities(db: &DepotDb) {
                 note: None,
                 parts: vec![sales::PaymentPartInput {
                     method_code: "wave".to_string(),
-                    amount: 1_500
+                    amount: 1_500,
                 }],
                 ..Default::default()
             },

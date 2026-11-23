@@ -254,11 +254,11 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
             payments: vec![
                 sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 10_000
+                    amount: 10_000,
                 },
                 sales::PaymentPartInput {
                     method_code: "wave".to_string(),
-                    amount: 4_350
+                    amount: 4_350,
                 },
             ],
             due_date: None,
