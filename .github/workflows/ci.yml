@@ -299,11 +299,14 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app
   # Job utilitaire : applique le vrai rustfmt sur un runner GitHub puis pousse
-  # le resultat sur la branche. Lancable uniquement a la main (workflow_dispatch),
-  # il evite toute approximation locale quand l'outil n'est pas disponible.
+  # le resultat sur la branche. Ne s'execute que sur demande explicite
+  # (workflow_dispatch) ou quand le message du commit contient [rustfmt].
+  # Il evite toute approximation locale quand l'outil n'est pas disponible.
   rustfmt-apply:
     name: 13. Appliquer rustfmt (manuel)
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[rustfmt]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -311,7 +314,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
