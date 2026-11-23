@@ -298,3 +298,33 @@ jobs:
             target/release/bundle/macos/*.app
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app
+  # Job utilitaire : applique le vrai rustfmt sur un runner GitHub puis pousse
+  # le resultat sur la branche. Lancable uniquement a la main (workflow_dispatch),
+  # il evite toute approximation locale quand l'outil n'est pas disponible.
+  rustfmt-apply:
+    name: 13. Appliquer rustfmt (manuel)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Appliquer le formatage
+        run: cargo fmt --all
+      - name: Publier le resultat si necessaire
+        run: |
+          if git diff --quiet; then
+            echo "Aucun fichier a reformater : le depot est conforme."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Rust : appliquer rustfmt sur l'ensemble du depot (job manuel)"
+          git push origin "HEAD:${{ github.ref_name }}"

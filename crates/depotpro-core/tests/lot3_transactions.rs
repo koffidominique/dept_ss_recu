@@ -169,7 +169,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                     },
                 ),
             );
-                assert_eq!(usize::from(s1.is_ok()) + usize::from(s2.is_ok()), 1);
+            assert_eq!(usize::from(s1.is_ok()) + usize::from(s2.is_ok()), 1);
             let stock_after_sales: i64 =
                 sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
                     .bind(prod_id)
@@ -232,11 +232,12 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                 ),
             );
             assert_eq!(usize::from(r1.is_ok()) + usize::from(r2.is_ok()), 1);
-            let stock_after_rec: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
-                .bind(prod_id)
-                .fetch_one(&db.pool)
-                .await
-                .unwrap();
+            let stock_after_rec: i64 =
+                sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+                    .bind(prod_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
             assert_eq!(stock_after_rec, 48_000);
 
             // 3. Deux mouvements de stock concurrents (+12 et -5 -> solde exact 55)
@@ -263,11 +264,12 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                 ),
             );
             assert!(m1.is_ok() && m2.is_ok());
-            let stock_after_adj: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
-                .bind(prod_id)
-                .fetch_one(&db.pool)
-                .await
-                .unwrap();
+            let stock_after_adj: i64 =
+                sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+                    .bind(prod_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
             assert_eq!(stock_after_adj, 55_000);
 
             // 4. Vente et paiement de créance simultanés

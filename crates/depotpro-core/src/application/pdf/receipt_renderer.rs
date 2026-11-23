@@ -39,10 +39,7 @@ fn time_part(date: &str) -> String {
         .map(|(_, time)| time)
         .unwrap_or("");
     let time = time.trim_end_matches('Z');
-    let time = time
-        .split(['+', '-'])
-        .next()
-        .unwrap_or(time);
+    let time = time.split(['+', '-']).next().unwrap_or(time);
     if time.len() >= 5 {
         format!("{} h {}", &time[..2], &time[3..5])
     } else {
