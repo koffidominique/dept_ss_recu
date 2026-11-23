@@ -79,7 +79,7 @@ export function PosCatalogPanel({
               }
             }}
             clearable
-            placeholder="Scanner code-barres + Entrée ou chercher (F2)..."
+            placeholder="Scanner code-barres ou chercher (F2)..."
             className="w-full"
             inputClassName="py-2.5"
           />
