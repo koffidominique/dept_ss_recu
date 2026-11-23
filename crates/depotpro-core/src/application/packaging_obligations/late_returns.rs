@@ -104,11 +104,13 @@ pub async fn register_late_return(
     .bind(after_stock)
     .execute(&mut **tx)
     .await?;
-    sqlx::query("UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?")
-        .bind(capped)
-        .bind(rid)
-        .execute(&mut **tx)
-        .await?;
+    sqlx::query(
+        "UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?",
+    )
+    .bind(capped)
+    .bind(rid)
+    .execute(&mut **tx)
+    .await?;
     sqlx::query(
         "INSERT INTO returnable_stock_movements
             (request_key, packaging_id, movement_type, quantity, stock_before, stock_after,

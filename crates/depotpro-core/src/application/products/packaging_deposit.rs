@@ -6,7 +6,9 @@ use sqlx::{Sqlite, Transaction};
 
 use crate::error::{CoreError, CoreResult};
 
-use super::{create_packagings::is_non_consignable_packaging, DepositComponentInput, PackagingInput};
+use super::{
+    create_packagings::is_non_consignable_packaging, DepositComponentInput, PackagingInput,
+};
 
 pub(crate) async fn record_packaging_price_changes_tx(
     tx: &mut Transaction<'_, Sqlite>,

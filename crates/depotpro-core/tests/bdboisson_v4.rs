@@ -290,9 +290,7 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
         .await
         .unwrap();
 
-    let sale = sales::create_sale_v4(&db, payload)
-    .await
-    .unwrap();
+    let sale = sales::create_sale_v4(&db, payload).await.unwrap();
 
     assert_eq!(sale.sale.total_merchandise, 4_100);
     assert_eq!(sale.sale.total_deposit, 1_400);

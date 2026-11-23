@@ -90,7 +90,11 @@ pub(crate) async fn issue_order_receipt(
     };
     let db = state.db().await;
     match auth::with_actor(actor, orders::issue_or_get_customer_order_receipt(&db, id)).await {
-        Ok(snapshot) => (StatusCode::OK, Json(serde_json::to_value(snapshot).unwrap())).into_response(),
+        Ok(snapshot) => (
+            StatusCode::OK,
+            Json(serde_json::to_value(snapshot).unwrap()),
+        )
+            .into_response(),
         Err(e) => map_err(e).into_response(),
     }
 }
@@ -105,7 +109,12 @@ pub(crate) async fn list_order_receipts(
         Err(e) => return e.into_response(),
     };
     let db = state.db().await;
-    match auth::with_actor(actor, orders::list_customer_order_receipt_snapshots(&db, id)).await {
+    match auth::with_actor(
+        actor,
+        orders::list_customer_order_receipt_snapshots(&db, id),
+    )
+    .await
+    {
         Ok(items) => (StatusCode::OK, Json(serde_json::to_value(items).unwrap())).into_response(),
         Err(e) => map_err(e).into_response(),
     }
@@ -128,7 +137,11 @@ pub(crate) async fn revise_order_receipt(
     )
     .await
     {
-        Ok(snapshot) => (StatusCode::CREATED, Json(serde_json::to_value(snapshot).unwrap())).into_response(),
+        Ok(snapshot) => (
+            StatusCode::CREATED,
+            Json(serde_json::to_value(snapshot).unwrap()),
+        )
+            .into_response(),
         Err(e) => map_err(e).into_response(),
     }
 }

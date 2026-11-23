@@ -80,15 +80,17 @@ pub async fn declare_loss(
     }
     let mut g = db.begin_write().await?;
     let tx = &mut g.1;
-    let (pieces_due, client_id, di_status): (i64, Option<i64>, String) =
-        sqlx::query_as("SELECT pieces, client_id, COALESCE(status, 'pending') FROM deposit_issues WHERE id = ?")
-            .bind(input.deposit_issue_id)
-            .fetch_optional(&mut **tx)
-            .await?
-            .ok_or_else(|| {
-                CoreError::Validation("Obligation d'emballage introuvable.".to_string())
-            })?;
-    if matches!(di_status.as_str(), "returned" | "settled" | "cancelled" | "converted") {
+    let (pieces_due, client_id, di_status): (i64, Option<i64>, String) = sqlx::query_as(
+        "SELECT pieces, client_id, COALESCE(status, 'pending') FROM deposit_issues WHERE id = ?",
+    )
+    .bind(input.deposit_issue_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| CoreError::Validation("Obligation d'emballage introuvable.".to_string()))?;
+    if matches!(
+        di_status.as_str(),
+        "returned" | "settled" | "cancelled" | "converted"
+    ) {
         return Err(CoreError::Validation(
             "Impossible de déclarer une perte sur une obligation déjà soldée ou clôturée."
                 .to_string(),
@@ -177,14 +179,15 @@ pub async fn validate_loss_declaration(
             "Cette déclaration a déjà été traitée.".to_string(),
         ));
     }
-    let (unit_value, returnable_id, pieces_due, already_out): (i64, i64, i64, i64) = sqlx::query_as(
-        "SELECT unit_value, returnable_id, pieces,
+    let (unit_value, returnable_id, pieces_due, already_out): (i64, i64, i64, i64) =
+        sqlx::query_as(
+            "SELECT unit_value, returnable_id, pieces,
                 returned_pieces + lost_pieces + destroyed_pieces + converted_pieces
          FROM deposit_issues WHERE id = ?",
-    )
-    .bind(issue_id)
-    .fetch_one(&mut **tx)
-    .await?;
+        )
+        .bind(issue_id)
+        .fetch_one(&mut **tx)
+        .await?;
     if pieces > (pieces_due - already_out).max(0) {
         return Err(CoreError::Validation(
             "La quantité déclarée dépasse désormais le reliquat ouvert sur cette obligation."

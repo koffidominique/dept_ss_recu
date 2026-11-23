@@ -119,7 +119,9 @@ pub async fn cancel_sale(
     .bind(sale_id)
     .fetch_all(&mut *tx)
     .await?;
-    for (di_id, cid_opt, rid, pieces, returned_pieces, other_out, unit_value, amount, di_status) in deposits {
+    for (di_id, cid_opt, rid, pieces, returned_pieces, other_out, unit_value, amount, di_status) in
+        deposits
+    {
         if di_status == "returned" {
             if let Some(cid) = cid_opt {
                 let restored_amount = if amount > 0 {

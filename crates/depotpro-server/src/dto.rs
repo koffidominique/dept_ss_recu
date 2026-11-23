@@ -141,4 +141,3 @@ pub(crate) struct TogglePaymentMethodPayload {
 pub(crate) struct PackagingLateReturnPayload {
     pub(crate) pieces: i64,
 }
-

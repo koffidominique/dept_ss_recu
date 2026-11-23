@@ -121,7 +121,12 @@ async fn seed_full(db: &DepotDb) -> (i64, i64, i64, i64) {
     }).await
 }
 
-async fn make_sale_input(client_id: i64, product_id: i64, packaging_id: i64, received: Vec<ReceivedReturnableInput>) -> CreateSaleV4Input {
+async fn make_sale_input(
+    client_id: i64,
+    product_id: i64,
+    packaging_id: i64,
+    received: Vec<ReceivedReturnableInput>,
+) -> CreateSaleV4Input {
     CreateSaleV4Input {
         request_key: format!("rk-sale-ret-{}", uuid::Uuid::new_v4()),
         client_id: Some(client_id),
@@ -237,14 +242,24 @@ async fn test_insufficient_balance_returns_error() {
         let db = fresh_db("insuff").await;
         let (client_id, rid, product_id, packaging_id) = seed_full(&db).await;
 
-        let input = make_sale_input(client_id, product_id, packaging_id, vec![ReceivedReturnableInput {
-            returnable_id: rid,
-            pieces: 15,
-        }]).await;
+        let input = make_sale_input(
+            client_id,
+            product_id,
+            packaging_id,
+            vec![ReceivedReturnableInput {
+                returnable_id: rid,
+                pieces: 15,
+            }],
+        )
+        .await;
 
         let err = create_sale_v4(&db, input).await.unwrap_err();
-        assert!(err.to_string().contains("Solde insuffisant"), "Erreur solde insuffisant attendue");
-    }).await;
+        assert!(
+            err.to_string().contains("Solde insuffisant"),
+            "Erreur solde insuffisant attendue"
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

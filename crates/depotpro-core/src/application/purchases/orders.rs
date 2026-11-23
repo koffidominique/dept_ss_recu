@@ -43,7 +43,9 @@ fn format_milli(milli: i64) -> String {
     if frac == 0 {
         whole.to_string()
     } else {
-        format!("{whole}.{frac:03}").trim_end_matches('0').to_string()
+        format!("{whole}.{frac:03}")
+            .trim_end_matches('0')
+            .to_string()
     }
 }
 
@@ -134,7 +136,11 @@ pub(crate) async fn persist_purchase_document_snapshot_tx(
                 format_milli(l.coefficient_milli),
                 l.base_unit
             )),
-            quantity: format!("{} {}", format_milli(l.ordered_quantity_milli), l.packaging_name),
+            quantity: format!(
+                "{} {}",
+                format_milli(l.ordered_quantity_milli),
+                l.packaging_name
+            ),
             unit_price: Some(l.unit_price),
             total: Some(l.line_total),
             packaging_info: Some(l.packaging_name.clone()),
@@ -222,10 +228,18 @@ pub(crate) async fn persist_purchase_document_snapshot_tx(
 
     let mut sup_details = vec![format!("Code : {}", po.supplier_code)];
     sup_details.push(format!("Tél. : {}", po.supplier_phone));
-    if let Some(addr) = po.supplier_address.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(addr) = po
+        .supplier_address
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         sup_details.push(format!("Adresse : {}", addr.trim()));
     }
-    if let Some(mail) = po.supplier_email.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(mail) = po
+        .supplier_email
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         sup_details.push(mail.trim().to_string());
     }
 
@@ -426,20 +440,20 @@ pub async fn create_purchase_order(
         let line_total = Money(qty.compute_line_fcfa(unit_price.value())?);
         subtotal_amount = subtotal_amount.checked_add(line_total, "Sous-total commande")?;
 
-        let (deposit_mode,): (String,) = sqlx::query_as(
-            "SELECT mode FROM deposit_packaging_profiles WHERE packaging_id = ?",
-        )
-        .bind(pkg_id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| {
-            CoreError::Validation(format!(
-                "Profil d'emballage non configuré pour {pname} ({pkg_name})."
-            ))
-        })?;
-        let packaging_components: Vec<(i64, i64, String, String, String)> =
-            if deposit_mode == "deposit" {
-                sqlx::query_as(
+        let (deposit_mode,): (String,) =
+            sqlx::query_as("SELECT mode FROM deposit_packaging_profiles WHERE packaging_id = ?")
+                .bind(pkg_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .ok_or_else(|| {
+                    CoreError::Validation(format!(
+                        "Profil d'emballage non configuré pour {pname} ({pkg_name})."
+                    ))
+                })?;
+        let packaging_components: Vec<(i64, i64, String, String, String)> = if deposit_mode
+            == "deposit"
+        {
+            sqlx::query_as(
                     "SELECT dpc.returnable_id, SUM(dpc.pieces_per_pack), rpt.code, rpt.name, rpt.kind
                      FROM deposit_packaging_components dpc JOIN returnable_packaging_types rpt ON rpt.id = dpc.returnable_id
                      WHERE dpc.packaging_id = ?
@@ -448,13 +462,13 @@ pub async fn create_purchase_order(
                 .bind(pkg_id)
                 .fetch_all(&mut *tx)
                 .await?
-            } else if deposit_mode == "none" {
-                Vec::new()
-            } else {
-                return Err(CoreError::Validation(format!(
-                    "Profil d'emballage inconnu : {deposit_mode}."
-                )));
-            };
+        } else if deposit_mode == "none" {
+            Vec::new()
+        } else {
+            return Err(CoreError::Validation(format!(
+                "Profil d'emballage inconnu : {deposit_mode}."
+            )));
+        };
         if deposit_mode == "deposit" && packaging_components.is_empty() {
             return Err(CoreError::Validation(format!(
                 "Le conditionnement {pkg_name} est consigné mais ne possède aucun composant d'emballage configuré."
@@ -464,7 +478,9 @@ pub async fn create_purchase_order(
         for (returnable_id, pieces_per_pack, code, name, kind) in packaging_components {
             let numerator = (qty.milli_units as i128)
                 .checked_mul(pieces_per_pack as i128)
-                .ok_or_else(|| CoreError::Validation("Débordement du calcul d'emballages.".into()))?;
+                .ok_or_else(|| {
+                    CoreError::Validation("Débordement du calcul d'emballages.".into())
+                })?;
             if numerator % 1000 != 0 {
                 return Err(CoreError::Validation(format!(
                     "La quantité commandée pour {pname} produit une quantité physique fractionnaire d'emballages ({code})."
@@ -485,14 +501,18 @@ pub async fn create_purchase_order(
             .bind(returnable_id)
             .fetch_one(&mut *tx)
             .await?;
-            let staged = *staged_packaging_reservations.get(&returnable_id).unwrap_or(&0);
+            let staged = *staged_packaging_reservations
+                .get(&returnable_id)
+                .unwrap_or(&0);
             let available = physical.saturating_sub(reserved).saturating_sub(staged);
             if available < required {
                 return Err(CoreError::InsufficientStock(format!(
                     "Emballages fournisseur insuffisants ({code}: disponible {available}, requis {required})."
                 )));
             }
-            *staged_packaging_reservations.entry(returnable_id).or_default() += required;
+            *staged_packaging_reservations
+                .entry(returnable_id)
+                .or_default() += required;
             requirements.push((returnable_id, code, name, kind, pieces_per_pack, required));
         }
         let (brand, brewery, variant, volume_ml): (
@@ -578,7 +598,13 @@ pub async fn create_purchase_order(
     .bind(input.supplier_id)
     .bind(net_total.value())
     .bind(expected_date)
-    .bind(input.notes.as_deref().map(str::trim).filter(|s| !s.is_empty()))
+    .bind(
+        input
+            .notes
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
     .bind(
         input
             .payment_terms_label
@@ -711,7 +737,9 @@ pub async fn update_purchase_order(
             .fetch_one(&mut *tx)
             .await?;
     if supplier_exists == 0 {
-        return Err(CoreError::Validation("Fournisseur absent ou inactif.".into()));
+        return Err(CoreError::Validation(
+            "Fournisseur absent ou inactif.".into(),
+        ));
     }
     sqlx::query(
         "DELETE FROM purchase_order_packaging_requirements WHERE purchase_order_line_id IN (SELECT id FROM purchase_order_lines WHERE purchase_order_id = ?)",
@@ -934,11 +962,36 @@ pub async fn update_purchase_order(
     )
     .bind(input.supplier_id)
     .bind(total.value())
-    .bind(next_expected.as_deref().map(str::trim).filter(|s| !s.is_empty()))
-    .bind(next_notes.as_deref().map(str::trim).filter(|s| !s.is_empty()))
-    .bind(next_terms.as_deref().map(str::trim).filter(|s| !s.is_empty()))
-    .bind(next_delivery.as_deref().map(str::trim).filter(|s| !s.is_empty()))
-    .bind(next_conditions.as_deref().map(str::trim).filter(|s| !s.is_empty()))
+    .bind(
+        next_expected
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
+    .bind(
+        next_notes
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
+    .bind(
+        next_terms
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
+    .bind(
+        next_delivery
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
+    .bind(
+        next_conditions
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty()),
+    )
     .bind(discount.value())
     .bind(tax.value())
     .bind(fees.value())

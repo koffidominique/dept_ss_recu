@@ -153,7 +153,15 @@ pub(crate) fn draw_header_and_party(
     .flatten()
     .collect();
     if !legal_ids.is_empty() {
-        draw_text(cmds, comp_x, comp_y, &legal_ids.join(" · "), 7.5, false, muted);
+        draw_text(
+            cmds,
+            comp_x,
+            comp_y,
+            &legal_ids.join(" · "),
+            7.5,
+            false,
+            muted,
+        );
         comp_y -= 10.0;
     }
 
@@ -188,7 +196,11 @@ pub(crate) fn draw_header_and_party(
         muted,
     );
     right_y -= 11.0;
-    if let Some(ref linked) = doc.linked_document_ref.as_deref().or(doc.order_reference.as_deref()) {
+    if let Some(ref linked) = doc
+        .linked_document_ref
+        .as_deref()
+        .or(doc.order_reference.as_deref())
+    {
         if !linked.trim().is_empty() {
             draw_text_right(
                 cmds,
@@ -238,12 +250,9 @@ pub(crate) fn draw_header_and_party(
     if let Some(ref party_name) = doc.party_name {
         let party_details = [
             doc.party_details.as_deref(),
-            doc.party_phone.as_deref().filter(|phone| {
-                !doc.party_details
-                    .as_deref()
-                    .unwrap_or("")
-                    .contains(*phone)
-            }),
+            doc.party_phone
+                .as_deref()
+                .filter(|phone| !doc.party_details.as_deref().unwrap_or("").contains(*phone)),
         ]
         .into_iter()
         .flatten()
@@ -334,9 +343,34 @@ pub(crate) fn draw_header_and_party(
         } else if !party_name.trim().is_empty() {
             let details_lines = wrap_text(&party_details, CONTENT_W - 20.0, 8.0, false);
             let box_h = 38.0 + details_lines.len() as f64 * 10.0;
-            draw_rect_fill_stroke(cmds, MARGIN, *y - box_h, CONTENT_W, box_h, (0.973, 0.98, 0.988), (0.886, 0.91, 0.941), 0.75);
-            draw_text(cmds, MARGIN + 10.0, *y - 14.0, doc.party_title.as_deref().unwrap_or("Tiers"), 8.5, true, muted);
-            draw_text(cmds, MARGIN + 10.0, *y - 27.0, party_name.trim(), 9.0, true, (0.094, 0.133, 0.188));
+            draw_rect_fill_stroke(
+                cmds,
+                MARGIN,
+                *y - box_h,
+                CONTENT_W,
+                box_h,
+                (0.973, 0.98, 0.988),
+                (0.886, 0.91, 0.941),
+                0.75,
+            );
+            draw_text(
+                cmds,
+                MARGIN + 10.0,
+                *y - 14.0,
+                doc.party_title.as_deref().unwrap_or("Tiers"),
+                8.5,
+                true,
+                muted,
+            );
+            draw_text(
+                cmds,
+                MARGIN + 10.0,
+                *y - 27.0,
+                party_name.trim(),
+                9.0,
+                true,
+                (0.094, 0.133, 0.188),
+            );
             let mut dy = *y - 38.0;
             for line in details_lines {
                 draw_text(cmds, MARGIN + 10.0, dy, &line, 8.0, false, muted);

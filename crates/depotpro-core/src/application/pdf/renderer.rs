@@ -61,16 +61,32 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
         if let Some(ord) = line.ordered_quantity.as_deref().filter(|s| !s.is_empty()) {
             incident_parts.push(format!("Commandé : {ord}"));
         }
-        if let Some(m) = line.missing_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+        if let Some(m) = line
+            .missing_quantity
+            .as_deref()
+            .filter(|s| !s.is_empty() && *s != "0")
+        {
             incident_parts.push(format!("Manquant : {m}"));
         }
-        if let Some(d) = line.damaged_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+        if let Some(d) = line
+            .damaged_quantity
+            .as_deref()
+            .filter(|s| !s.is_empty() && *s != "0")
+        {
             incident_parts.push(format!("Abîmé : {d}"));
         }
-        if let Some(r) = line.refused_quantity.as_deref().filter(|s| !s.is_empty() && *s != "0") {
+        if let Some(r) = line
+            .refused_quantity
+            .as_deref()
+            .filter(|s| !s.is_empty() && *s != "0")
+        {
             incident_parts.push(format!("Refusé : {r}"));
         }
-        if let Some(reason) = line.discrepancy_reason.as_deref().filter(|s| !s.trim().is_empty()) {
+        if let Some(reason) = line
+            .discrepancy_reason
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
             incident_parts.push(format!("Motif écart : {}", reason.trim()));
         }
         if !incident_parts.is_empty() {
@@ -109,7 +125,15 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
         let cmds = pages.last_mut().unwrap();
         let mut ly = y - 11.0;
         for ll in &label_lines {
-            draw_text(cmds, MARGIN + 82.0, ly, ll, 8.5, true, (0.094, 0.133, 0.188));
+            draw_text(
+                cmds,
+                MARGIN + 82.0,
+                ly,
+                ll,
+                8.5,
+                true,
+                (0.094, 0.133, 0.188),
+            );
             ly -= 10.5;
         }
         for sl in &sub_lines {
@@ -186,20 +210,65 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
         };
         let draw_packaging_header = |cmds: &mut Vec<String>, y: &mut f64, continued: bool| {
             let page_title = if continued {
-                format!("{company_name} · {} ({}) — Suite emballages", doc.doc_type, doc.reference)
+                format!(
+                    "{company_name} · {} ({}) — Suite emballages",
+                    doc.doc_type, doc.reference
+                )
             } else {
                 title.to_string()
             };
-            draw_text(cmds, MARGIN, *y - 10.0, &page_title, 9.0, true, (0.063, 0.106, 0.2));
+            draw_text(
+                cmds,
+                MARGIN,
+                *y - 10.0,
+                &page_title,
+                9.0,
+                true,
+                (0.063, 0.106, 0.2),
+            );
             *y -= 18.0;
-            draw_text(cmds, MARGIN + 5.0, *y - 8.0, "Composant / statut", 7.0, true, (0.094, 0.133, 0.188));
-            draw_text_right(cmds, MARGIN + 345.0, *y - 8.0, "Attendu", 7.0, true, (0.094, 0.133, 0.188));
-            draw_text_right(cmds, MARGIN + 425.0, *y - 8.0, "Remis", 7.0, true, (0.094, 0.133, 0.188));
-            draw_text_right(cmds, RIGHT - 5.0, *y - 8.0, "Retourné", 7.0, true, (0.094, 0.133, 0.188));
+            draw_text(
+                cmds,
+                MARGIN + 5.0,
+                *y - 8.0,
+                "Composant / statut",
+                7.0,
+                true,
+                (0.094, 0.133, 0.188),
+            );
+            draw_text_right(
+                cmds,
+                MARGIN + 345.0,
+                *y - 8.0,
+                "Attendu",
+                7.0,
+                true,
+                (0.094, 0.133, 0.188),
+            );
+            draw_text_right(
+                cmds,
+                MARGIN + 425.0,
+                *y - 8.0,
+                "Remis",
+                7.0,
+                true,
+                (0.094, 0.133, 0.188),
+            );
+            draw_text_right(
+                cmds,
+                RIGHT - 5.0,
+                *y - 8.0,
+                "Retourné",
+                7.0,
+                true,
+                (0.094, 0.133, 0.188),
+            );
             *y -= 15.0;
             draw_line(cmds, MARGIN, *y, RIGHT, *y, (0.55, 0.6, 0.68), 0.7);
         };
-        if y - 54.0 < 70.0 { start_page(&mut pages, &mut y); }
+        if y - 54.0 < 70.0 {
+            start_page(&mut pages, &mut y);
+        }
         draw_packaging_header(pages.last_mut().unwrap(), &mut y, false);
         for item in &doc.packaging_lines {
             let kind_label = match item.kind.as_str() {
@@ -215,10 +284,16 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
                 item.status_label.clone()
             };
             let status_lines = wrap_text(&status, 235.0, 7.0, false);
-            let detail_lines = item.detail.as_deref()
-                .map(|detail| wrap_text(detail, 235.0, 6.8, false)).unwrap_or_default();
-            let row_height = (6.0 + component_lines.len() as f64 * 9.0
-                + status_lines.len() as f64 * 8.0 + detail_lines.len() as f64 * 7.5).max(22.0);
+            let detail_lines = item
+                .detail
+                .as_deref()
+                .map(|detail| wrap_text(detail, 235.0, 6.8, false))
+                .unwrap_or_default();
+            let row_height = (6.0
+                + component_lines.len() as f64 * 9.0
+                + status_lines.len() as f64 * 8.0
+                + detail_lines.len() as f64 * 7.5)
+                .max(22.0);
             if y - row_height < 64.0 {
                 start_page(&mut pages, &mut y);
                 draw_packaging_header(pages.last_mut().unwrap(), &mut y, true);
@@ -226,20 +301,68 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
             let cmds = pages.last_mut().unwrap();
             let mut text_y = y - 9.0;
             for text in &component_lines {
-                draw_text(cmds, MARGIN + 5.0, text_y, text, 7.5, true, (0.094, 0.133, 0.188));
+                draw_text(
+                    cmds,
+                    MARGIN + 5.0,
+                    text_y,
+                    text,
+                    7.5,
+                    true,
+                    (0.094, 0.133, 0.188),
+                );
                 text_y -= 9.0;
             }
             for text in status_lines.iter().chain(detail_lines.iter()) {
-                draw_text(cmds, MARGIN + 9.0, text_y, text, 7.0, false, (0.4, 0.439, 0.522));
+                draw_text(
+                    cmds,
+                    MARGIN + 9.0,
+                    text_y,
+                    text,
+                    7.0,
+                    false,
+                    (0.4, 0.439, 0.522),
+                );
                 text_y -= 8.0;
             }
-            draw_text_right(cmds, MARGIN + 345.0, y - 9.0, &item.expected_quantity.to_string(), 7.5, false, (0.094, 0.133, 0.188));
-            draw_text_right(cmds, MARGIN + 425.0, y - 9.0,
-                &item.issued_quantity.map(|value| value.to_string()).unwrap_or_else(|| if is_po { "À remettre".to_string() } else { "—".to_string() }),
-                7.5, false, (0.094, 0.133, 0.188));
-            draw_text_right(cmds, RIGHT - 5.0, y - 9.0,
-                &item.returned_quantity.map(|value| value.to_string()).unwrap_or_else(|| "—".to_string()),
-                7.5, false, (0.094, 0.133, 0.188));
+            draw_text_right(
+                cmds,
+                MARGIN + 345.0,
+                y - 9.0,
+                &item.expected_quantity.to_string(),
+                7.5,
+                false,
+                (0.094, 0.133, 0.188),
+            );
+            draw_text_right(
+                cmds,
+                MARGIN + 425.0,
+                y - 9.0,
+                &item
+                    .issued_quantity
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| {
+                        if is_po {
+                            "À remettre".to_string()
+                        } else {
+                            "—".to_string()
+                        }
+                    }),
+                7.5,
+                false,
+                (0.094, 0.133, 0.188),
+            );
+            draw_text_right(
+                cmds,
+                RIGHT - 5.0,
+                y - 9.0,
+                &item
+                    .returned_quantity
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "—".to_string()),
+                7.5,
+                false,
+                (0.094, 0.133, 0.188),
+            );
             y -= row_height;
             draw_line(cmds, MARGIN, y, RIGHT, y, (0.886, 0.91, 0.941), 0.5);
         }
@@ -262,19 +385,39 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
     y -= 14.0;
 
     let mut combined_notes = Vec::new();
-    if let Some(terms) = doc.payment_terms_label.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(terms) = doc
+        .payment_terms_label
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         combined_notes.push(format!("Conditions règlement : {}", terms.trim()));
     }
-    if let Some(cond) = doc.commercial_conditions.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(cond) = doc
+        .commercial_conditions
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         combined_notes.push(format!("Conditions commerciales : {}", cond.trim()));
     }
     if let Some(ext) = doc.external_references.as_ref().filter(|v| !v.is_empty()) {
-        combined_notes.push(format!("Réf. transaction(s) externe(s) : {}", ext.join(", ")));
+        combined_notes.push(format!(
+            "Réf. transaction(s) externe(s) : {}",
+            ext.join(", ")
+        ));
     }
-    if let Some(n) = doc.notes.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(n) = doc
+        .notes
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         combined_notes.push(format!("Observation : {n}"));
     }
-    if let Some(missing) = doc.missing_packaging_note.as_deref().filter(|s| !s.is_empty()) {
+    if let Some(missing) = doc
+        .missing_packaging_note
+        .as_deref()
+        .filter(|s| !s.is_empty())
+    {
         combined_notes.push(format!("Défaut emballages vides : {missing}"));
     }
     let note_lines = if combined_notes.is_empty() {
@@ -331,9 +474,10 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
             let sy_bot = sy_top - 32.0;
             let (left_title, right_title) = match doc.doc_type.as_str() {
                 "REÇU DE PAIEMENT" => ("Cachet / Signature Caissier", "Signature Client / Payeur"),
-                "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR" => {
-                    ("Visa Réceptionnaire Dépôt", "Signature Livreur / Fournisseur")
-                }
+                "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR" => (
+                    "Visa Réceptionnaire Dépôt",
+                    "Signature Livreur / Fournisseur",
+                ),
                 _ => ("Visa Émetteur / Direction", "Accord Fournisseur / Cachet"),
             };
             for (idx, title) in [(0usize, left_title), (1usize, right_title)] {
@@ -348,7 +492,15 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
                     (0.796, 0.835, 0.882),
                     0.6,
                 );
-                draw_text(cmds, bx + 8.0, sy_top - 10.0, title, 7.2, true, (0.25, 0.30, 0.38));
+                draw_text(
+                    cmds,
+                    bx + 8.0,
+                    sy_top - 10.0,
+                    title,
+                    7.2,
+                    true,
+                    (0.25, 0.30, 0.38),
+                );
             }
         }
     }

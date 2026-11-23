@@ -48,15 +48,12 @@ pub const V3_MIGRATION_0021_SQL: &str =
 pub const V3_MIGRATION_0022_SQL: &str = include_str!(
     "../../../../../migrations/sqlite/0022_document_snapshots_supplier_packaging_reservations.sql"
 );
-pub const V3_MIGRATION_0023_SQL: &str = include_str!(
-    "../../../../../migrations/sqlite/0023_customer_order_receipt_snapshots.sql"
-);
-pub const V3_MIGRATION_0024_SQL: &str = include_str!(
-    "../../../../../migrations/sqlite/0024_documents_refactor_premium.sql"
-);
-pub const V3_MIGRATION_0025_SQL: &str = include_str!(
-    "../../../../../migrations/sqlite/0025_deposit_issues_sale_line_id_nullable.sql"
-);
+pub const V3_MIGRATION_0023_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0023_customer_order_receipt_snapshots.sql");
+pub const V3_MIGRATION_0024_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0024_documents_refactor_premium.sql");
+pub const V3_MIGRATION_0025_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0025_deposit_issues_sale_line_id_nullable.sql");
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {

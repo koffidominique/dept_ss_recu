@@ -302,7 +302,9 @@ async fn build_and_insert_snapshot_tx(
     .bind(version)
     .fetch_optional(&mut **tx)
     .await?
-    .ok_or_else(|| CoreError::NotFound("Snapshot du reçu de commande introuvable après émission.".into()))
+    .ok_or_else(|| {
+        CoreError::NotFound("Snapshot du reçu de commande introuvable après émission.".into())
+    })
 }
 
 pub(crate) async fn ensure_order_receipt_v1_tx(

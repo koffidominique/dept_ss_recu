@@ -50,13 +50,12 @@ pub async fn create_bottle_profile(
 pub async fn get_bottle_profile(db: &DepotDb, profile_id: i64) -> CoreResult<BottleProfileDto> {
     require_current_actor_permission(Permission::CatalogRead)?;
 
-    let profile = sqlx::query_as::<_, BottleProfileDto>(&format!(
-        "{SELECT_BOTTLE_PROFILE_SQL} WHERE id = ?"
-    ))
-    .bind(profile_id)
-    .fetch_optional(&db.pool)
-    .await?
-    .ok_or_else(|| CoreError::NotFound("Profil de bouteille introuvable.".to_string()))?;
+    let profile =
+        sqlx::query_as::<_, BottleProfileDto>(&format!("{SELECT_BOTTLE_PROFILE_SQL} WHERE id = ?"))
+            .bind(profile_id)
+            .fetch_optional(&db.pool)
+            .await?
+            .ok_or_else(|| CoreError::NotFound("Profil de bouteille introuvable.".to_string()))?;
 
     Ok(profile)
 }
