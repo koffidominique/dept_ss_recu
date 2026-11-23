@@ -740,6 +740,7 @@ pub async fn get_document_detail(
                 .await?;
             lines = sqlx::query_as::<
                 _,
+                #[allow(clippy::type_complexity)]
                 (String, String, i64, String, i64, i64, i64, String, String),
             >(
                 "SELECT product_name, packaging_name, ordered_quantity_milli, base_unit, coefficient_milli,
@@ -858,6 +859,7 @@ pub async fn get_document_detail(
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
+            #[allow(clippy::type_complexity)]
             lines = sqlx::query_as::<
                 _,
                 (

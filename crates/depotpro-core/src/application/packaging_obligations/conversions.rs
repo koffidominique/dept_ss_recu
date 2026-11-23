@@ -25,6 +25,7 @@ pub async fn list_obligations(
     db: &DepotDb,
     client_id: Option<i64>,
 ) -> CoreResult<Vec<PackagingObligationDto>> {
+    #[allow(clippy::type_complexity)]
     let rows = sqlx::query_as::<
         _,
         (
