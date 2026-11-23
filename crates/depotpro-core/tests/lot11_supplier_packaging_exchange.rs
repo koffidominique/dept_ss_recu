@@ -1,6 +1,7 @@
 //! Test 7 du MAJ.md : réapprovisionnement fournisseur avec échange d'emballages
 //! vides par type exact — aucune dette financière d'emballages automatique.
 
+use depotpro_core::application::auth::{self, Role, SessionIdentity};
 use depotpro_core::application::{consignments, products, purchases};
 use depotpro_core::infrastructure::db::DepotDb;
 
@@ -216,19 +217,24 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
 
     // Les stocks physiques couvrent le CMD (25 casiers 33 cl disponibles, 12 casiers 50 cl).
     // Cette réception partielle porte sur 10 casiers 33 cl et 5 casiers 50 cl.
-    let rec_partial = purchases::receive_purchase_order(
-        &db,
-        po.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "t7-rec-partial".to_string(),
-            notes: None,
-            lines: vec![
-                purchases::ReceiveLineInput { purchase_order_line_id: line33, received_quantity: "10".to_string(), discrepancy_reason: None, ..Default::default() },
-                purchases::ReceiveLineInput { purchase_order_line_id: line50, received_quantity: "5".to_string(), discrepancy_reason: None, ..Default::default() },
-            ],
-            ..Default::default()
-        },
-    ).await.unwrap();
+    let rec_partial = auth::with_actor(
+        SessionIdentity::from_role("1", "owner", "Propriétaire", Role::Owner),
+        purchases::receive_purchase_order(
+            &db,
+            po.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "t7-rec-partial".to_string(),
+                notes: None,
+                lines: vec![
+                    purchases::ReceiveLineInput { purchase_order_line_id: line33, received_quantity: "10".to_string(), discrepancy_reason: None, ..Default::default() },
+                    purchases::ReceiveLineInput { purchase_order_line_id: line50, received_quantity: "5".to_string(), discrepancy_reason: None, ..Default::default() },
+                ],
+                ..Default::default()
+            },
+        ),
+    )
+    .await
+    .unwrap();
     assert_eq!(rec_partial.receipt.lines.len(), 2);
     assert_eq!(rec_partial.receipt.packaging_exchanges.iter().map(|e| e.pieces_issued).sum::<i64>(), 15);
     let partial_reserved: i64 = sqlx::query_scalar(
@@ -237,19 +243,24 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
     ).bind(po.id).fetch_one(&db.pool).await.unwrap();
     assert_eq!(partial_reserved, 15, "Le reliquat reste réservé après réception partielle");
 
-    let rec = purchases::receive_purchase_order(
-        &db,
-        po.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "t7-rec-final".to_string(),
-            notes: None,
-            lines: vec![
-                purchases::ReceiveLineInput { purchase_order_line_id: line33, received_quantity: "10".to_string(), discrepancy_reason: None, ..Default::default() },
-                purchases::ReceiveLineInput { purchase_order_line_id: line50, received_quantity: "5".to_string(), discrepancy_reason: None, ..Default::default() },
-            ],
-            ..Default::default()
-        },
-    ).await.unwrap();
+    let rec = auth::with_actor(
+        SessionIdentity::from_role("1", "owner", "Propriétaire", Role::Owner),
+        purchases::receive_purchase_order(
+            &db,
+            po.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "t7-rec-final".to_string(),
+                notes: None,
+                lines: vec![
+                    purchases::ReceiveLineInput { purchase_order_line_id: line33, received_quantity: "10".to_string(), discrepancy_reason: None, ..Default::default() },
+                    purchases::ReceiveLineInput { purchase_order_line_id: line50, received_quantity: "5".to_string(), discrepancy_reason: None, ..Default::default() },
+                ],
+                ..Default::default()
+            },
+        ),
+    )
+    .await
+    .unwrap();
     assert_eq!(rec.total_amount, 10 * 9000 + 5 * 11000);
     assert_eq!(rec.order.id, po.id);
     assert_eq!(rec.receipt.lines.len(), 2, "Le REC ne contient que les lignes réellement reçues");
@@ -406,18 +417,23 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
     let movement_count_before: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM returnable_stock_movements WHERE movement_type = 'supplier_exchange'",
     ).fetch_one(&db.pool).await.unwrap();
-    let no_deposit_receipt = purchases::receive_purchase_order(
-        &db, no_deposit_order.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "t7-rec-no-deposit".to_string(), notes: None,
-            lines: vec![purchases::ReceiveLineInput {
-                purchase_order_line_id: no_deposit_order.lines[0].id,
-                received_quantity: "1".to_string(), discrepancy_reason: None,
+    let no_deposit_receipt = auth::with_actor(
+        SessionIdentity::from_role("1", "owner", "Propriétaire", Role::Owner),
+        purchases::receive_purchase_order(
+            &db, no_deposit_order.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "t7-rec-no-deposit".to_string(), notes: None,
+                lines: vec![purchases::ReceiveLineInput {
+                    purchase_order_line_id: no_deposit_order.lines[0].id,
+                    received_quantity: "1".to_string(), discrepancy_reason: None,
+                    ..Default::default()
+                }],
                 ..Default::default()
-            }],
-            ..Default::default()
-        },
-    ).await.unwrap();
+            },
+        ),
+    )
+    .await
+    .unwrap();
     assert!(no_deposit_receipt.receipt.packaging_exchanges.is_empty());
     let movement_count_after: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM returnable_stock_movements WHERE movement_type = 'supplier_exchange'",

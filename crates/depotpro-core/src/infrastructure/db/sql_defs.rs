@@ -54,6 +54,9 @@ pub const V3_MIGRATION_0023_SQL: &str = include_str!(
 pub const V3_MIGRATION_0024_SQL: &str = include_str!(
     "../../../../../migrations/sqlite/0024_documents_refactor_premium.sql"
 );
+pub const V3_MIGRATION_0025_SQL: &str = include_str!(
+    "../../../../../migrations/sqlite/0025_deposit_issues_sale_line_id_nullable.sql"
+);
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {
@@ -183,10 +186,15 @@ pub const MIGRATIONS: &[MigrationDef] = &[
         name: "0024_documents_refactor_premium",
         sql: V3_MIGRATION_0024_SQL,
     },
+    MigrationDef {
+        version: 25,
+        name: "0025_deposit_issues_sale_line_id_nullable",
+        sql: V3_MIGRATION_0025_SQL,
+    },
 ];
 
 pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = 1;
-pub const CURRENT_SCHEMA_VERSION: i64 = 24;
+pub const CURRENT_SCHEMA_VERSION: i64 = 25;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationRunReport {

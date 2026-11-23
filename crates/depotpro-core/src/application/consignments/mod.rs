@@ -11,7 +11,7 @@ mod return_helpers;
 mod types_and_stock;
 
 pub use client_returns::return_client_empties;
-pub use overview::get_overview;
+pub use overview::{get_client_packaging_balances, get_overview};
 pub use types_and_stock::{adjust_returnable_stock, create_returnable_type};
 
 #[derive(Debug, Serialize, FromRow)]

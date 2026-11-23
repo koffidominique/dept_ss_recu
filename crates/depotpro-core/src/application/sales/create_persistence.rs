@@ -9,6 +9,7 @@ use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
 
 use super::create_helpers::PreparedSaleLine;
+use super::dtos::ReceivedReturnableInput;
 
 pub(crate) struct SalePersistCtx<'a> {
     pub sale_id: i64,
@@ -21,6 +22,7 @@ pub(crate) struct SalePersistCtx<'a> {
     pub paid_amount: Money,
     pub credit_amount: i64,
     pub external_reference: Option<&'a str>,
+    pub received_returnables: Option<&'a [ReceivedReturnableInput]>,
 }
 
 pub(crate) async fn persist_sale_lines_and_deposits_tx(
@@ -85,17 +87,24 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         .await?
         .last_insert_rowid();
 
-        let cur_stock: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+        // Mise à jour atomique : rejette la vente si le stock n'est plus suffisant
+        // au moment de l'écriture (protection contre les ventes simultanées).
+        let updated = sqlx::query(
+            "UPDATE products SET stock_milli = stock_milli - ? WHERE id = ? AND stock_milli >= ?",
+        )
+        .bind(line.base_qty_milli)
+        .bind(line.product_id)
+        .bind(line.base_qty_milli)
+        .execute(&mut **tx)
+        .await?;
+        if updated.rows_affected() != 1 {
+            return Err(CoreError::InsufficientStock(format!(
+                "Stock insuffisant pour \"{}\" lors de l'enregistrement."
+            , line.product_name)));
+        }
+        let next_stock: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
             .bind(line.product_id)
             .fetch_one(&mut **tx)
-            .await?;
-        let next_stock = cur_stock.checked_sub(line.base_qty_milli).ok_or_else(|| {
-            CoreError::Validation("Débordement stock lors de la vente.".to_string())
-        })?;
-        sqlx::query("UPDATE products SET stock_milli = ? WHERE id = ?")
-            .bind(next_stock)
-            .bind(line.product_id)
-            .execute(&mut **tx)
             .await?;
 
         crate::application::inventory::sync_stock_balance_tx(tx, line.product_id, next_stock)
@@ -108,7 +117,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         .bind(line.product_id)
         .bind(line.variant_id)
         .bind(-line.base_qty_milli)
-        .bind(cur_stock)
+        .bind(next_stock + line.base_qty_milli)
         .bind(next_stock)
         .bind(format!(
             "Vente {} ({})",
@@ -177,6 +186,88 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
             }
         }
     }
+
+    // Confirmation de réception des emballages retours : réduction du compte emballage client
+    if let Some(cid) = ctx.client_id {
+        if let Some(received) = ctx.received_returnables {
+            for rr in received {
+                if rr.pieces <= 0 {
+                    continue;
+                }
+                let rt_exists: Option<(String,)> = sqlx::query_as(
+                    "SELECT name FROM returnable_packaging_types WHERE id = ?",
+                )
+                .bind(rr.returnable_id)
+                .fetch_optional(&mut **tx)
+                .await?;
+                let rt_name = rt_exists.map(|(n,)| n).unwrap_or_else(|| rr.returnable_id.to_string());
+
+                // Créer un enregistrement de retour dans deposit_issues
+                let due_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                sqlx::query(
+                    "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id, pieces, unit_value, amount, due_date, policy_id, status)
+                     VALUES (?, NULL, ?, ?, ?, 0, 0, ?, NULL, 'returned')",
+                )
+                .bind(ctx.sale_id)
+                .bind(cid)
+                .bind(rr.returnable_id)
+                .bind(rr.pieces)
+                .bind(&due_date)
+                .execute(&mut **tx)
+                .await?;
+
+                // Réduire le solde du compte emballage client
+                let updated = sqlx::query(
+                    "UPDATE customer_packaging_accounts
+                     SET balance_pieces = balance_pieces - ?
+                     WHERE client_id = ? AND returnable_id = ? AND balance_pieces >= ?",
+                )
+                .bind(rr.pieces)
+                .bind(cid)
+                .bind(rr.returnable_id)
+                .bind(rr.pieces)
+                .execute(&mut **tx)
+                .await?;
+                if updated.rows_affected() == 0 {
+                    return Err(CoreError::Validation(format!(
+                        "Solde insuffisant d'emballages consignés pour \"{rt_name}\" (client {cid})."
+                    )));
+                }
+
+                // Mise à jour du stock d'emballages vides du sous-dépôt
+                let before_stock: i64 = sqlx::query_scalar(
+                    "SELECT COALESCE(quantity, 0) FROM returnable_stock_balances WHERE packaging_id = ?",
+                )
+                .bind(rr.returnable_id)
+                .fetch_one(&mut **tx)
+                .await?;
+                let after_stock = before_stock + rr.pieces;
+                let updated_stock = sqlx::query(
+                    "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
+                     ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
+                )
+                .bind(rr.returnable_id)
+                .bind(after_stock)
+                .execute(&mut **tx)
+                .await?;
+                let _ = updated_stock.last_insert_rowid();
+                sqlx::query(
+                    "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document)
+                     VALUES (?, ?, 'entry', ?, ?, ?, ?, ?)",
+                )
+                .bind(format!("ret-retour-{}-{}", ctx.request_key, rr.returnable_id))
+                .bind(rr.returnable_id)
+                .bind(rr.pieces)
+                .bind(before_stock)
+                .bind(after_stock)
+                .bind(format!("Retour emballage client {cid} - vente {}", ctx.sale_ref))
+                .bind(ctx.sale_ref)
+                .execute(&mut **tx)
+                .await?;
+            }
+        }
+    }
+
     Ok(())
 }
 

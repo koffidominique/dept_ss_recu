@@ -173,6 +173,7 @@ pub fn run() {
             commands::consignments_and_obligations::return_client_empties,
             commands::consignments_and_obligations::list_packaging_obligations,
             commands::consignments_and_obligations::get_packaging_dashboard,
+            commands::consignments_and_obligations::get_client_packaging_balances,
             commands::consignments_and_obligations::pay_packaging_debt,
             commands::catalogue_v3::set_catalogue_product_active_pc,
             commands::catalogue_v3::set_catalogue_reference_price_pc,

@@ -17,6 +17,8 @@ async fn seed_fixture(db: &DepotDb) -> (i64, i64) {
     // Client + type d'emballage + une obligation de 5 casiers à 3600 FCFA, échue hier.
     let mut g = db.begin_write().await.unwrap();
     let tx = &mut g.1;
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
+        .execute(&mut **tx).await.unwrap();
     sqlx::query("INSERT INTO clients (code, name, client_type) VALUES ('CLI-TEST', 'Client Test', 'particulier')")
         .execute(&mut **tx).await.unwrap();
     let client_id: i64 = sqlx::query_scalar("SELECT id FROM clients WHERE code = 'CLI-TEST'")

@@ -81,6 +81,7 @@ interface UsePosMutationsOptions {
   posCart: CartItem[];
   paymentRows: Array<{ method_code: string; amount: number }>;
   totals: SaleCalculationResult;
+  receivedReturnables: Array<{ returnable_id: number; pieces: number }>;
   onSaleSuccess: (sale: SaleDetail) => void;
   onSaleError: (message: string) => void;
   onQuickClientSuccess: (clientId: number) => void;
@@ -97,6 +98,7 @@ export function usePosMutations({
   posCart,
   paymentRows,
   totals,
+  receivedReturnables,
   onSaleSuccess,
   onSaleError,
   onQuickClientSuccess,
@@ -126,6 +128,12 @@ export function usePosMutations({
           discount_amount: c.discountAmount,
         })),
         payments: filteredPayments,
+        received_returnables: receivedReturnables
+          .filter((r) => r.pieces > 0)
+          .map((r) => ({
+            returnable_id: r.returnable_id,
+            pieces: r.pieces,
+          })),
       });
     },
     onSuccess: (sale) => {

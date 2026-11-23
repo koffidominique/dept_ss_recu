@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { apiClient } from '../services/api/createApiClient.ts';
@@ -23,7 +23,7 @@ import {
 import { usePosShortcuts } from '../features/sales/hooks/usePosShortcuts.ts';
 import { PosCatalogPanel } from '../features/sales/components/PosCatalogPanel.tsx';
 import { PosCartPanel } from '../features/sales/components/PosCartPanel.tsx';
-import { ValidatedSaleBanner } from '../features/sales/components/ValidatedSaleBanner.tsx';
+import { ValidatedSaleBanner, buildMissingPackagingNote } from '../features/sales/components/ValidatedSaleBanner.tsx';
 import { HeldSalesModal } from '../features/sales/components/HeldSalesModal.tsx';
 import { QuickClientModal } from '../features/sales/components/QuickClientModal.tsx';
 import type {
@@ -33,6 +33,15 @@ import type {
   ProductSalesUnit,
   SaleDetail,
 } from '../types/erp.ts';
+
+interface ClientReturnableBalance {
+  returnable_id: number;
+  packaging_name: string;
+  packaging_code: string;
+  deposit_value: number;
+  balance_pieces: number;
+  deposit_held_amount: number;
+}
 
 export function SalesPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -49,6 +58,8 @@ export function SalesPage() {
   const [heldModalOpen, setHeldModalOpen] = useState(false);
   const [quickClientOpen, setQuickClientOpen] = useState(false);
   const [quickClientError, setQuickClientError] = useState<string | null>(null);
+  const [clientReturnables, setClientReturnables] = useState<ClientReturnableBalance[]>([]);
+  const [receivedReturnables, setReceivedReturnables] = useState<Array<{ returnable_id: number; pieces: number }>>([]);
 
   const {
     posCart,
@@ -74,6 +85,22 @@ export function SalesPage() {
     [posCart, globalDiscount, paymentRows]
   );
 
+  useEffect(() => {
+    if (!posClientId) return;
+    apiClient
+      .getClientPackagingBalances(posClientId)
+      .then((balances) => {
+        setClientReturnables(balances);
+        setReceivedReturnables(
+          balances.map((b) => ({ returnable_id: b.returnable_id, pieces: 0 }))
+        );
+      })
+      .catch(() => {
+        setClientReturnables([]);
+        setReceivedReturnables([]);
+      });
+  }, [posClientId]);
+
   const { createSaleMutation, quickClientMutation } = usePosMutations({
     requestKey,
     posClientId,
@@ -84,6 +111,7 @@ export function SalesPage() {
     posCart,
     paymentRows,
     totals,
+    receivedReturnables,
     onSaleSuccess: (sale) => {
       setValidatedSale(sale);
       clearCart();
@@ -233,10 +261,21 @@ export function SalesPage() {
             setQuickClientOpen(true);
           }}
           onSubmitSale={() => createSaleMutation.mutate()}
+          clientReturnables={clientReturnables}
+          receivedReturnables={receivedReturnables}
+          onReceivedReturnableChange={(returnableId, pieces) => {
+            setReceivedReturnables((prev) => {
+              const next = [...prev];
+              const idx = next.findIndex((r) => r.returnable_id === returnableId);
+              if (idx >= 0) next[idx].pieces = pieces;
+              else next.push({ returnable_id: returnableId, pieces });
+              return next;
+            });
+          }}
         />
       </div>
 
-      {validatedSale && <ValidatedSaleBanner sale={validatedSale} onPrint={setPrintDoc} onClose={() => setValidatedSale(null)} />}
+      {validatedSale && <ValidatedSaleBanner sale={validatedSale} onPrint={setPrintDoc} onClose={() => setValidatedSale(null)} missingPackagingNote={buildMissingPackagingNote(validatedSale.deposits)} />}
       <HeldSalesModal
         open={heldModalOpen}
         onOpenChange={setHeldModalOpen}

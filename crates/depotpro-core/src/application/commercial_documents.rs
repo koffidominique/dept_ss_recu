@@ -248,6 +248,22 @@ fn actor_db_id(actor: &auth::SessionIdentity) -> Option<i64> {
     actor.user_id.parse::<i64>().ok()
 }
 
+/// Résout l'identifiant DB de l'acteur; retourne NULL si l'utilisateur n'existe
+/// pas dans la base (évite d'enfreindre les clés étrangères du workflow).
+async fn actor_db_id_resolved(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    actor: &auth::SessionIdentity,
+) -> CoreResult<Option<i64>> {
+    let Some(candidate) = actor_db_id(actor) else {
+        return Ok(None);
+    };
+    let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = ?")
+        .bind(candidate)
+        .fetch_one(&mut **tx)
+        .await?;
+    Ok((exists > 0).then_some(candidate))
+}
+
 fn check_document_type(document_type: &str) -> CoreResult<()> {
     if matches!(document_type, "customer_order" | "purchase_order") {
         Ok(())
@@ -1406,7 +1422,7 @@ pub async fn submit_for_approval(
         ));
     }
     let snapshot = document_snapshot(&mut tx, document_type, document_id).await?;
-    let submitted_by = actor_db_id(&actor);
+    let submitted_by = actor_db_id_resolved(&mut tx, &actor).await?;
     sqlx::query(
         "INSERT INTO commercial_document_workflows (document_type, document_id, status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_reason, updated_at)
          VALUES (?, ?, 'pending_owner_approval', ?, datetime('now'), NULL, NULL, NULL, datetime('now'))
@@ -1508,8 +1524,11 @@ pub async fn require_approval_or_owner(
     document_id: i64,
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
 ) -> CoreResult<()> {
+    // Échec fermé : sans session identifiée, aucune opération sensible n'est permise.
     let Some(actor) = auth::current_actor() else {
-        return Ok(());
+        return Err(CoreError::Forbidden(
+            "Une session utilisateur est requise pour cette opération.".into(),
+        ));
     };
     if actor.role == Role::Owner {
         return Ok(());
@@ -1535,8 +1554,11 @@ pub async fn record_owner_direct_approval(
     document_id: i64,
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
 ) -> CoreResult<()> {
+    // Échec fermé : sans session identifiée, aucune opération sensible n'est permise.
     let Some(actor) = auth::current_actor() else {
-        return Ok(());
+        return Err(CoreError::Forbidden(
+            "Une session utilisateur est requise pour cette opération.".into(),
+        ));
     };
     if actor.role != Role::Owner {
         return Ok(());
@@ -1552,7 +1574,7 @@ pub async fn record_owner_direct_approval(
         return Ok(());
     }
     let snapshot = document_snapshot(tx, document_type, document_id).await?;
-    let user_id = actor_db_id(&actor);
+    let user_id = actor_db_id_resolved(tx, &actor).await?;
     sqlx::query(
         "INSERT INTO commercial_document_workflows (document_type, document_id, status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_reason, updated_at)
          VALUES (?, ?, 'approved', ?, datetime('now'), ?, datetime('now'), 'Approbation directe par le propriétaire', datetime('now'))

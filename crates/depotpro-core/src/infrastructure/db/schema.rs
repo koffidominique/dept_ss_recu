@@ -50,18 +50,6 @@ impl DepotDb {
     /// Initialise uniquement les paramètres applicatifs neutres nécessaires au premier démarrage
     /// (aucun fournisseur, produit, stock ni client fictif).
     pub async fn ensure_neutral_defaults(pool: &SqlitePool) -> CoreResult<()> {
-        let settings_count_pre: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM app_settings")
-            .fetch_one(pool)
-            .await?;
-        let methods_count_pre: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM payment_methods")
-            .fetch_one(pool)
-            .await?;
-        let exp_cat_count_pre: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM expense_categories")
-            .fetch_one(pool)
-            .await?;
-        let cat_count_pre: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM categories")
-            .fetch_one(pool)
-            .await?;
         let has_loc_tbl: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'stock_locations'",
         )
@@ -74,15 +62,6 @@ impl DepotDb {
         } else {
             1
         };
-
-        if settings_count_pre > 0
-            && methods_count_pre > 0
-            && exp_cat_count_pre > 0
-            && cat_count_pre > 0
-            && loc_count_pre > 0
-        {
-            return Ok(());
-        }
 
         let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
 
@@ -99,27 +78,22 @@ impl DepotDb {
             .await?;
         }
 
-        let methods_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM payment_methods")
-            .fetch_one(&mut *tx)
+        for (code, label, is_cash) in [
+            ("cash", "Espèces", 1_i64),
+            ("wave", "Wave Mobile Money", 0_i64),
+            ("orange_money", "Orange Money", 0_i64),
+            ("mtn_money", "MTN MoMo", 0_i64),
+            ("transfer", "Virement bancaire", 0_i64),
+            ("cheque", "Chèque", 0_i64),
+        ] {
+            sqlx::query(
+                "INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES (?, ?, ?, 1)",
+            )
+            .bind(code)
+            .bind(label)
+            .bind(is_cash)
+            .execute(&mut *tx)
             .await?;
-        if methods_count == 0 {
-            for (code, label, is_cash) in [
-                ("cash", "Espèces", 1_i64),
-                ("wave", "Wave Mobile Money", 0_i64),
-                ("orange_money", "Orange Money", 0_i64),
-                ("mtn_money", "MTN MoMo", 0_i64),
-                ("transfer", "Virement bancaire", 0_i64),
-                ("cheque", "Chèque", 0_i64),
-            ] {
-                sqlx::query(
-                    "INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES (?, ?, ?, 1)",
-                )
-                .bind(code)
-                .bind(label)
-                .bind(is_cash)
-                .execute(&mut *tx)
-                .await?;
-            }
         }
 
         let exp_cat_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM expense_categories")

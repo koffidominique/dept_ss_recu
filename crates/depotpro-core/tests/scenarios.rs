@@ -19,6 +19,12 @@ async fn rust_core_scenarios_a_through_l() {
     let (db_path, backup_dir) = temp_paths("all");
     let db = DepotDb::connect(&db_path).await.expect("connect temp db");
 
+    // Seed moyens de paiement requis par les scénarios (INSERT OR IGNORE : déjà présents par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1), ('orange_money', 'Orange Money', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
     // Auth setup & PIN verification + change
     let status = auth::get_auth_status(&db).await.unwrap();
     assert!(status.needs_setup);
@@ -190,12 +196,14 @@ async fn rust_core_scenarios_a_through_l() {
     .await
     .unwrap();
 
-    purchases::receive_purchase_order(
-        &db,
-        po.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "rust-rec-1".to_string(),
-            notes: None,
+    auth::with_actor(
+        auth::SessionIdentity::from_role("1", "owner", "Propriétaire", auth::Role::Owner),
+        purchases::receive_purchase_order(
+            &db,
+            po.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "rust-rec-1".to_string(),
+                notes: None,
             lines: vec![purchases::ReceiveLineInput {
                 purchase_order_line_id: po_line_id,
                 received_quantity: "10".to_string(),
@@ -204,6 +212,7 @@ async fn rust_core_scenarios_a_through_l() {
             }],
             ..Default::default()
         },
+        ),
     )
     .await
     .unwrap();
@@ -984,6 +993,10 @@ async fn scenario_t_company_logo_and_wave_refund() {
 async fn scenario_u_cancel_po_and_overdue_kpis() {
     let (db_path, _backup_dir) = temp_paths("scen_u");
     let db = DepotDb::connect(&db_path).await.expect("connect temp db");
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1), ('orange_money', 'Orange Money', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
     let cat = products::create_category(&db, "Boissons U", None)
         .await
@@ -1104,20 +1117,23 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
     )
     .await
     .unwrap();
-    purchases::receive_purchase_order(
-        &db,
-        po_rec.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "rec-u-1".to_string(),
-            notes: None,
-            lines: vec![purchases::ReceiveLineInput {
-                purchase_order_line_id: po_rec.lines[0].id,
-                received_quantity: "2".to_string(),
-                discrepancy_reason: None,
+    auth::with_actor(
+        auth::SessionIdentity::from_role("1", "owner", "Propriétaire", auth::Role::Owner),
+        purchases::receive_purchase_order(
+            &db,
+            po_rec.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "rec-u-1".to_string(),
+                notes: None,
+                lines: vec![purchases::ReceiveLineInput {
+                    purchase_order_line_id: po_rec.lines[0].id,
+                    received_quantity: "2".to_string(),
+                    discrepancy_reason: None,
+                    ..Default::default()
+                }],
                 ..Default::default()
-            }],
-            ..Default::default()
-        },
+            },
+        ),
     )
     .await
     .unwrap();

@@ -5,6 +5,8 @@ use depotpro_core::infrastructure::db::{
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::path::PathBuf;
 
+const EXPECTED_SCHEMA_V22_JSON: &str =
+    include_str!("../../../migrations/sqlite/expected_schema_v22.json");
 const EXPECTED_SCHEMA_V23_JSON: &str =
     include_str!("../../../migrations/sqlite/expected_schema_v23.json");
 

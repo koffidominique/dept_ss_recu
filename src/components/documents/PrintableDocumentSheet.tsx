@@ -109,14 +109,18 @@ export function PrintableDocumentSheet({
               )}
             </div>
           </div>
-          <div className="order-receipt-number">
-            <strong>REÇU DE COMMANDE</strong>
-            <small>
+          <div className="order-receipt-number order-receipt-number--right">
+            <strong className="text-green-700 border-green-300 border rounded px-3 py-1 text-sm font-bold">
+              REÇU DE COMMANDE
+            </strong>
+            <small className="text-sm">
               {doc.version && doc.version > 1
                 ? `VERSION CORRIGÉE V${doc.version}`
-                : 'SOUS-DÉPÔT · DOCUMENT OFFICIEL'}
+                : 'DOCUMENT OFFICIEL'}
             </small>
-            <span>N° Reçu : <b>{doc.reference}</b></span>
+            <span className="font-bold">
+              N° Reçu : <b>{doc.reference}</b>
+            </span>
             {doc.orderReference && <span>Réf. Commande : {doc.orderReference}</span>}
             <span>Date / Heure : {formatDateTime(doc.date)}</span>
             <span>Caissier / Agent : {cashier}</span>
@@ -158,17 +162,24 @@ export function PrintableDocumentSheet({
           </section>
         </div>
 
+        {/* Orange separation line */}
+        <div className="mt-4 border-orange-500 border-b border-2 pb-4">
+
+        </div>
+
         <section className="order-receipt-products">
-          <h2>DÉTAIL DES BOISSONS COMMANDÉES</h2>
-          <table>
+          <h2 className="text-orange-700 border-b border-orange-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">
+            DÉTAIL DES BOISSONS COMMANDÉES
+          </h2>
+          <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th>N°</th>
-                <th>Désignation Boisson</th>
-                <th>Condit. (Unité / Pack / Casier)</th>
-                <th>Qté</th>
-                <th>P.U. (FCFA)</th>
-                <th>Total (FCFA)</th>
+              <tr className="border-b border-orange-300 bg-orange-50 text-orange-800 uppercase text-xs font-bold">
+                <th className="p-2 text-left">N°</th>
+                <th className="p-2 text-left">Désignation Boisson & Format</th>
+                <th className="p-2 text-center">Conditionnement</th>
+                <th className="p-2 text-center">Qté</th>
+                <th className="p-2 text-right">P.U. (FCFA)</th>
+                <th className="p-2 text-right">Total (FCFA)</th>
               </tr>
             </thead>
             <tbody>
@@ -192,7 +203,7 @@ export function PrintableDocumentSheet({
         <div className="order-receipt-bottom-grid">
           <div className="space-y-2">
             <section className="order-receipt-packaging">
-              <h2>SUIVI CONSIGNATIONS &amp; EMBALLAGES</h2>
+              <h2 className="text-green-700 border-b border-green-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">SUIVI CONSIGNATIONS & EMBALLAGES</h2>
               {doc.packagingLines?.length ? (
                 <table>
                   <thead>
@@ -235,7 +246,7 @@ export function PrintableDocumentSheet({
           </div>
 
           <section className="order-receipt-finance">
-            <h2>DÉCOMPTE FINANCIER (FCFA)</h2>
+            <h2 className="text-orange-700 border-b border-orange-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">DÉCOMPTE FINANCIER (FCFA)</h2>
             <div className="order-receipt-summary">
               {doc.summaryRows.map((row, index) => {
                 const isNet = row.tone === 'success' || /net à (payer|percevoir)/i.test(row.label);
@@ -255,7 +266,7 @@ export function PrintableDocumentSheet({
         </div>
 
         <section className="order-receipt-payment">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-orange-700">
             <b>MODE DE RÈGLEMENT / CANAL PRÉVU</b>
             {extRefs && <span>Réf. Mobile Money / Externe : <b>{extRefs}</b></span>}
           </div>
@@ -294,9 +305,38 @@ export function PrintableDocumentSheet({
           </div>
         </section>
 
-        <footer>
+        <footer className="mt-8">
           Merci pour votre confiance ! Veuillez vérifier vos quantités et emballages avant de quitter le dépôt.
         </footer>
+
+        {/* Page 2: Thank you message */}
+        <div className="mt-8 page-break-inside-avoid second-page">
+          <div className="max-w-2xl mx-auto px-5 py-10 text-center">
+            <p className="text-2xl text-green-700 font-bold mb-6">
+              Merci pour votre confiance&nbsp;!
+            </p>
+            <p className="text-slate-600 text-lg mb-8">
+              Veuillez vérifier vos quantités et emballages avant de quitter le dépôt.
+            </p>
+            <div className="border border-slate-300 p-4 rounded mb-6">
+              <h3 className="text-orange-700 text-xs font-bold uppercase tracking-wider mb-3">
+                RÉFÉRENCE RAPIDE
+              </h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="font-bold text-slate-600">N° Reçu</p>
+                  <p className="font-mono-num font-bold">{doc.reference}</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-600">Montant Total</p>
+                  <p className="font-mono-num font-bold text-orange-700">
+                    {doc.summaryRows.find((r) => /TOTAL/.test(r.label))?.value || '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </article>
     );
   }
@@ -445,7 +485,7 @@ export function PrintableDocumentSheet({
         <div className="border border-black">
           <h2 className="bg-black px-3 py-2 text-xs font-bold text-white">Observations et conditions</h2>
           <div className="min-h-24 whitespace-pre-line px-3 py-3 text-xs leading-relaxed text-slate-700">
-            {[doc.commercialConditions, doc.notes].filter(Boolean).join('\n') || (isPurchaseOrder
+            {[doc.commercialConditions, doc.notes, doc.missingPackagingNote].filter(Boolean).join('\n') || (isPurchaseOrder
               ? 'Merci de confirmer la disponibilité et le délai de livraison. Toute réception physique sera contrôlée séparément.'
               : 'Merci pour votre confiance.')}
           </div>

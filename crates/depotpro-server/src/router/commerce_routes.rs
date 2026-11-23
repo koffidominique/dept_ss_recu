@@ -170,6 +170,10 @@ pub(crate) fn packaging_and_system_router() -> Router<AppState> {
             get(consignments::packaging_dashboard),
         )
         .route(
+            "/api/packaging-obligations/client-balances/:client_id",
+            get(consignments::client_packaging_balances),
+        )
+        .route(
             "/api/packaging-obligations/pay",
             post(consignments::packaging_pay_debt),
         )

@@ -8,7 +8,7 @@ use super::encoding_and_layout::{format_fcfa_ascii, wrap_text};
 use super::header_section::draw_header_and_party;
 use super::primitives::{
     assemble_pdf_bytes, decode_logo_jpeg, draw_line, draw_table_header, draw_text, draw_text_right,
-    start_page, MARGIN, PAGE_H, RIGHT,
+    start_page, CONTENT_W, MARGIN, PAGE_H, RIGHT,
 };
 use super::summary_section::draw_summary_section;
 use super::{DocumentPdfInput, DocumentPdfLine};
@@ -258,6 +258,9 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
     }
     if let Some(n) = doc.notes.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         combined_notes.push(format!("Observation : {n}"));
+    }
+    if let Some(missing) = doc.missing_packaging_note.as_deref().filter(|s| !s.is_empty()) {
+        combined_notes.push(format!("Défaut emballages vides : {missing}"));
     }
     let note_lines = if combined_notes.is_empty() {
         Vec::new()

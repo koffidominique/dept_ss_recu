@@ -88,6 +88,10 @@ async fn make_beverage_variant(
 #[tokio::test]
 async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     let db = DepotDb::connect(&temp_db_path("cases")).await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
     let cat = products::create_category(&db, "Bières Mixtes", None)
         .await
         .unwrap();

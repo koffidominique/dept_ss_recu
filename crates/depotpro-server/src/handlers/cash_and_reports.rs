@@ -253,6 +253,7 @@ pub(crate) async fn generate_document_pdf(
         | "BON DE RÉCEPTION"
         | "BON DE RÉCEPTION FOURNISSEUR"
         | "ÉTAT DES DETTES FOURNISSEURS" => Permission::PurchasesRead,
+        "REÇU DE PAIEMENT" => Permission::CashRead,
         "CLOTURE_CAISSE" => Permission::CashRead,
         _ => Permission::SalesRead,
     };
@@ -262,6 +263,34 @@ pub(crate) async fn generate_document_pdf(
     };
     let db = state.db().await;
     match auth::with_actor(actor, pdf::generate_document_pdf(&db, payload)).await {
+        Ok((filename, bytes)) => {
+            let disp = format!("attachment; filename=\"{filename}\"");
+            let mut resp_headers = HeaderMap::new();
+            resp_headers.insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/pdf"),
+            );
+            if let Ok(val) = HeaderValue::from_str(&disp) {
+                resp_headers.insert(header::CONTENT_DISPOSITION, val);
+            }
+            (StatusCode::OK, resp_headers, bytes).into_response()
+        }
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn generate_payment_receipt_pdf(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<pdf::PaymentReceiptInput>,
+) -> impl IntoResponse {
+    let needed = pdf::Permission::CashRead;
+    let actor = match require_perm(&state, &headers, needed).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(actor, pdf::generate_payment_receipt(&db, payload)).await {
         Ok((filename, bytes)) => {
             let disp = format!("attachment; filename=\"{filename}\"");
             let mut resp_headers = HeaderMap::new();

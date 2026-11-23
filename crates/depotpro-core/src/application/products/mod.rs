@@ -7,7 +7,7 @@ use sqlx::FromRow;
 
 mod categories;
 mod create;
-mod create_packagings;
+pub(crate) mod create_packagings;
 mod create_prep_helpers;
 mod create_units_helpers;
 pub(crate) mod create_v4_helpers;

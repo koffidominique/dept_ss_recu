@@ -118,6 +118,11 @@ export const tauriSalesApi = {
       token: getStoredTauriToken(),
       payload: input,
     }),
+  getClientPackagingBalances: (clientId: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["getClientPackagingBalances"]>>>(
+      "get_client_packaging_balances",
+      { token: getStoredTauriToken(), clientId },
+    ),
   cancelSale: (saleId: number, input: Record<string, unknown>) =>
     tauriInvoke<Awaited<ReturnType<ApiClient["cancelSale"]>>>("cancel_sale", {
       token: getStoredTauriToken(),

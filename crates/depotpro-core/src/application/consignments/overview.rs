@@ -106,3 +106,25 @@ pub async fn get_overview(db: &DepotDb) -> CoreResult<ConsignmentsOverviewDto> {
         returns,
     })
 }
+
+/// Soldes d'emballages par type de retour pour un client donn�.
+pub async fn get_client_packaging_balances(
+    db: &DepotDb,
+    client_id: i64,
+) -> CoreResult<Vec<ClientPackagingBalanceDto>> {
+    require_current_actor_permission(Permission::ConsignmentsRead)?;
+    let rows: Vec<ClientPackagingBalanceDto> = sqlx::query_as(
+        "SELECT cpa.rowid AS id, cpa.client_id, c.name AS client_name, c.code AS client_code,
+                cpa.returnable_id, rpt.name AS packaging_name, rpt.code AS packaging_code, rpt.deposit_value,
+                cpa.balance_pieces, cpa.deposit_held_amount
+         FROM customer_packaging_accounts cpa
+         JOIN clients c ON c.id = cpa.client_id
+         JOIN returnable_packaging_types rpt ON rpt.id = cpa.returnable_id
+         WHERE cpa.client_id = ? AND (cpa.balance_pieces > 0 OR cpa.deposit_held_amount > 0)
+         ORDER BY rpt.name",
+    )
+    .bind(client_id)
+    .fetch_all(&db.pool)
+    .await?;
+    Ok(rows)
+}

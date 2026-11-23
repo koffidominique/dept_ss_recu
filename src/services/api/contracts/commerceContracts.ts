@@ -146,6 +146,18 @@ export interface SalesApiClient {
       payment_terms_days?: number;
     },
   ): Promise<unknown>;
+  getClientPackagingBalances(clientId: number): Promise<Array<{
+    id: number;
+    client_id: number;
+    client_name: string;
+    client_code: string;
+    returnable_id: number;
+    packaging_name: string;
+    packaging_code: string;
+    deposit_value: number;
+    balance_pieces: number;
+    deposit_held_amount: number;
+  }>>;
   listSales(params?: {
     search?: string;
     status?: string;

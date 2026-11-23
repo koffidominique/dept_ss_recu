@@ -82,11 +82,23 @@ pub async fn get_sale_detail(db: &DepotDb, sale_id: i64) -> CoreResult<SaleDetai
                 COALESCE(json_extract(component.value, '$.name'), 'Détail non disponible sur cette opération historique') AS packaging_name,
                 COALESCE(json_extract(component.value, '$.code'), 'INCONNU') AS packaging_code,
                 di.pieces, di.returned_pieces, di.unit_value, di.amount,
-                (sl.product_name || ' (' ||
-                    CASE WHEN sl.base_quantity_milli % 1000 = 0
-                         THEN CAST(sl.base_quantity_milli / 1000 AS TEXT)
-                         ELSE rtrim(rtrim(printf('%.3f', sl.base_quantity_milli / 1000.0), '0'), '.')
-                    END || ' ' || sl.base_unit || ')') AS expected_products
+                COALESCE(
+                    (SELECT GROUP_CONCAT(
+                        sl2.product_name || ' (' ||
+                        CASE WHEN sl2.base_quantity_milli % 1000 = 0
+                             THEN CAST(sl2.base_quantity_milli / 1000 AS TEXT)
+                             ELSE rtrim(rtrim(printf('%.3f', sl2.base_quantity_milli / 1000.0), '0'), '.')
+                        END || ' ' || sl2.base_unit || ')',
+                        ' + ')
+                     FROM sale_lines sl2
+                     JOIN deposit_packaging_components dpc2 ON dpc2.packaging_id = sl2.packaging_id
+                     WHERE sl2.sale_id = di.sale_id AND dpc2.returnable_id = di.returnable_id),
+                    (sl.product_name || ' (' ||
+                        CASE WHEN sl.base_quantity_milli % 1000 = 0
+                             THEN CAST(sl.base_quantity_milli / 1000 AS TEXT)
+                             ELSE rtrim(rtrim(printf('%.3f', sl.base_quantity_milli / 1000.0), '0'), '.')
+                        END || ' ' || sl.base_unit || ')')
+                ) AS expected_products
          FROM deposit_issues di
          LEFT JOIN sale_lines sl ON sl.id = di.sale_line_id
          LEFT JOIN json_each(sl.packaging_snapshot_json, '$.depositItems') component

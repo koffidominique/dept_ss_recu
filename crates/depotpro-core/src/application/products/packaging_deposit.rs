@@ -6,7 +6,7 @@ use sqlx::{Sqlite, Transaction};
 
 use crate::error::{CoreError, CoreResult};
 
-use super::{DepositComponentInput, PackagingInput};
+use super::{create_packagings::is_non_consignable_packaging, DepositComponentInput, PackagingInput};
 
 pub(crate) async fn record_packaging_price_changes_tx(
     tx: &mut Transaction<'_, Sqlite>,
@@ -43,10 +43,12 @@ pub(crate) async fn record_packaging_price_changes_tx(
 pub(crate) async fn upsert_packaging_deposit_profile_tx(
     tx: &mut Transaction<'_, Sqlite>,
     pkg_id: i64,
+    packaging_name: &str,
     deposit_mode: Option<&str>,
     components: Option<Vec<DepositComponentInput>>,
 ) -> CoreResult<()> {
-    let mode = if deposit_mode == Some("deposit") {
+    let consignable = !is_non_consignable_packaging(packaging_name);
+    let mode = if deposit_mode == Some("deposit") && consignable {
         "deposit"
     } else {
         "none"
