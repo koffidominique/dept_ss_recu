@@ -344,7 +344,14 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     // Ordre metier impose par le noyau : livre -> facture -> encaisse.
     // pay_order ne passe le statut a 'paid' que si la commande etait 'invoiced'.
     await page.getByRole('button', { name: 'Facturer', exact: true }).click();
-    await expect(page.getByText(/\(INVOICED\)/)).toBeVisible();
+    // Diagnostic : capture du bandeau d'etat reel et d'un eventuel message d'erreur.
+    await page.waitForTimeout(1500);
+    const stateText = await page
+      .locator('text=/Commande #ORD-/')
+      .first()
+      .textContent()
+      .catch(() => null);
+    expect(stateText, 'statut affiche apres facturation').toContain('(INVOICED)');
 
     await page.getByRole('button', { name: /Encaisser solde/i }).click();
     await expect(page.getByText(/\(PAID\)/)).toBeVisible();
