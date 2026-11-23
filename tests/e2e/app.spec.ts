@@ -244,6 +244,18 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     const { token } = (await loginRes.json()) as { token: string };
     const authHeaders = { Authorization: `Bearer ${token}` };
 
+    // L'encaissement est bloque sans session de caisse ouverte (le bouton
+    // « Encaisser solde » reste desactive). Le Scenario 2 en ouvre deja une et
+    // ne la cloture pas : l'appel est donc idempotent, un 400 SESSION_ALREADY_OPEN
+    // signifiant simplement que la precondition est deja remplie.
+    const openRes = await page.request.post('/api/cash/open', {
+      headers: authHeaders,
+      data: { opening_cash: 1000, request_key: 'e2e-scenario6-open' },
+    });
+    if (!openRes.ok()) {
+      expect((await openRes.json()).code).toBe('SESSION_ALREADY_OPEN');
+    }
+
     const catRes = await page.request.get('/api/categories', { headers: authHeaders });
     expect(catRes.ok()).toBeTruthy();
     const cats = (await catRes.json()) as Array<{ id: number }>;
