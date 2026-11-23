@@ -69,6 +69,7 @@ async fn persist_purchase_receipt_snapshot_tx(
     receipt_id: i64,
     po_id: i64,
 ) -> CoreResult<()> {
+    #[allow(clippy::type_complexity)]
     let (
         rec_ref,
         status,
