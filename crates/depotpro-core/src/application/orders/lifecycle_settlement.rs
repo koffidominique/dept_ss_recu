@@ -14,12 +14,25 @@ use super::queries::get_order;
 pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> {
     require_current_actor_permission(Permission::SalesWrite)?;
     let (_guard, mut tx) = db.begin_write().await?;
-    let row: Option<(String, String, i64, i64, i64, i64, i64, i64, Option<String>)> = sqlx::query_as(
-        "SELECT order_number, status, customer_id, subtotal_xof, discount_xof, total_xof,
+    let row: Option<(String, String, i64, i64, i64, i64, i64, i64, Option<String>)> =
+        sqlx::query_as(
+            "SELECT order_number, status, customer_id, subtotal_xof, discount_xof, total_xof,
                 deposit_due_xof, total_to_collect_xof, notes FROM orders WHERE id = ?",
-    ).bind(id).fetch_optional(&mut *tx).await?;
-    let (order_number, status, customer_id, subtotal, discount, merchandise_total, deposit, total, notes) =
-        row.ok_or_else(|| CoreError::NotFound("Commande introuvable.".into()))?;
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let (
+        order_number,
+        status,
+        customer_id,
+        subtotal,
+        discount,
+        merchandise_total,
+        deposit,
+        total,
+        notes,
+    ) = row.ok_or_else(|| CoreError::NotFound("Commande introuvable.".into()))?;
     if matches!(status.as_str(), "invoiced" | "paid") {
         tx.rollback().await?;
         return get_order(db, id).await;
@@ -29,17 +42,30 @@ pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
             "La commande doit être confirmée ou livrée pour être facturée.".into(),
         ));
     }
-    crate::application::commercial_documents::require_approval_or_owner("customer_order", id, &mut tx).await?;
+    crate::application::commercial_documents::require_approval_or_owner(
+        "customer_order",
+        id,
+        &mut tx,
+    )
+    .await?;
     let already: Option<i64> = sqlx::query_scalar("SELECT id FROM sales WHERE order_id = ?")
-        .bind(id).fetch_optional(&mut *tx).await?;
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
     if already.is_some() {
-        sqlx::query("UPDATE orders SET status = 'invoiced', updated_at = datetime('now') WHERE id = ?")
-            .bind(id).execute(&mut *tx).await?;
+        sqlx::query(
+            "UPDATE orders SET status = 'invoiced', updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         return get_order(db, id).await;
     }
     let paid: i64 = sqlx::query_scalar("SELECT paid_xof FROM orders WHERE id = ?")
-        .bind(id).fetch_one(&mut *tx).await?;
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
     if paid > total {
         return Err(CoreError::InvalidPayment("Les paiements excèdent le montant de la commande.".into()));
     }

@@ -172,7 +172,10 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
             .await?;
     let (order_number, status, customer_id) =
         row.ok_or_else(|| CoreError::NotFound("Commande introuvable.".into()))?;
-    if !matches!(status.as_str(), "confirmed" | "preparing" | "invoiced" | "paid") {
+    if !matches!(
+        status.as_str(),
+        "confirmed" | "preparing" | "invoiced" | "paid"
+    ) {
         return Err(CoreError::Validation(
             "La commande doit être confirmée avant livraison.".to_string(),
         ));
