@@ -112,17 +112,23 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
     .fetch_all(&mut **tx)
     .await?;
 
-    let client_info: Option<(String, String, Option<String>, Option<String>, Option<String>, Option<String>)> =
-        if let Some(cid) = pay.client_id {
-            sqlx::query_as(
-                "SELECT code, name, establishment_name, phone, commune, quartier FROM clients WHERE id = ?",
-            )
-            .bind(cid)
-            .fetch_optional(&mut **tx)
-            .await?
-        } else {
-            None
-        };
+    let client_info: Option<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    )> = if let Some(cid) = pay.client_id {
+        sqlx::query_as(
+            "SELECT code, name, establishment_name, phone, commune, quartier FROM clients WHERE id = ?",
+        )
+        .bind(cid)
+        .fetch_optional(&mut **tx)
+        .await?
+    } else {
+        None
+    };
 
     let payer_name = client_info
         .as_ref()
@@ -133,7 +139,9 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
                 .unwrap_or_else(|| name.clone())
         })
         .unwrap_or_else(|| "Client comptoir".to_string());
-    let payer_phone = client_info.as_ref().and_then(|(_, _, _, ph, _, _)| ph.clone());
+    let payer_phone = client_info
+        .as_ref()
+        .and_then(|(_, _, _, ph, _, _)| ph.clone());
     let payer_code = client_info.as_ref().map(|(c, _, _, _, _, _)| c.clone());
     let payer_location = client_info.as_ref().and_then(|(_, _, _, _, com, q)| {
         let joined = [com.as_deref(), q.as_deref()]
@@ -142,7 +150,11 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
             .filter(|v| !v.trim().is_empty())
             .collect::<Vec<_>>()
             .join(" / ");
-        if joined.is_empty() { None } else { Some(joined) }
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
     });
 
     let linked_order_ref: Option<String> = if let Some(oid) = pay.order_id {
@@ -255,8 +267,14 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
         format!("Document lié : {linked_ref}"),
         format!("Encaissé par : {issuer_name}"),
     ];
-    if let Some(ext) = pay.external_reference.as_deref().filter(|s| !s.trim().is_empty()) {
-        note_lines.push(format!("Référence transaction externe / Mobile Money : {ext}"));
+    if let Some(ext) = pay
+        .external_reference
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
+        note_lines.push(format!(
+            "Référence transaction externe / Mobile Money : {ext}"
+        ));
     }
     if let Some(n) = pay.note.as_deref().filter(|s| !s.trim().is_empty()) {
         note_lines.push(format!("Observation : {n}"));
@@ -271,10 +289,18 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
         order_reference: linked_order_ref.clone(),
         linked_document_ref: Some(linked_ref.clone()),
         date: pay.created_at.clone(),
-        status_label: Some(if after_val == 0 { "SOLDÉ".to_string() } else { "ACOMPTE ENCAISSÉ".to_string() }),
+        status_label: Some(if after_val == 0 {
+            "SOLDÉ".to_string()
+        } else {
+            "ACOMPTE ENCAISSÉ".to_string()
+        }),
         party_title: Some("PAYEUR / CLIENT".to_string()),
         party_name: Some(payer_name.clone()),
-        party_details: if party_details.is_empty() { None } else { Some(party_details.join(" · ")) },
+        party_details: if party_details.is_empty() {
+            None
+        } else {
+            Some(party_details.join(" · "))
+        },
         party_phone: payer_phone.clone(),
         secondary_party_title: Some("DOCUMENT RATTACHÉ".to_string()),
         secondary_party_name: Some(linked_ref.clone()),

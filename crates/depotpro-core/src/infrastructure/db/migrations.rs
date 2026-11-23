@@ -3,7 +3,7 @@
 // ============================================================================
 
 use crate::error::CoreResult;
-use sqlx::{Acquire, Sqlite, SqlitePool, Transaction};
+use sqlx::{Connection, Sqlite, SqlitePool, Transaction};
 use std::collections::HashSet;
 
 pub use super::sql_defs::{

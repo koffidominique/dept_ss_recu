@@ -185,7 +185,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 .await?;
 
                 crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
-                    tx, cid, rid, pieces, unit_val,
+                    tx, cid, *rid, *pieces, *unit_val,
                 )
                 .await?;
             }

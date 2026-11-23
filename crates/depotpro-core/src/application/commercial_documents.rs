@@ -489,7 +489,9 @@ pub async fn get_document_detail(
     let mut packaging_lines = Vec::new();
     let mut payments = Vec::new();
     let mut snapshots = Vec::new();
-    let mut notes = None;
+    // Affecte dans chaque branche du match ci-dessous : toute initialisation
+    // ici serait ecrasee avant lecture (inutile, et signalee en -D warnings).
+    let notes;
 
     match document_type {
         "customer_order" => {
