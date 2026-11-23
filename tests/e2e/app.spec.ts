@@ -341,6 +341,12 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Valider la livraison' }).click();
     await expect(page.getByText(/\(DELIVERED\)/)).toBeVisible();
 
+    // Diagnostic : etat du bouton d'encaissement avant le clic.
+    const payable = await page.getByRole('button', { name: /Encaisser solde/i }).count();
+    const payableEnabled = payable
+      ? await page.getByRole('button', { name: /Encaisser solde/i }).isEnabled()
+      : false;
+    expect(payableEnabled, 'bouton Encaisser solde actif (session de caisse)').toBeTruthy();
     await page.getByRole('button', { name: /Encaisser solde/i }).click();
     await expect(page.getByText(/\(PAID\)/)).toBeVisible();
 
