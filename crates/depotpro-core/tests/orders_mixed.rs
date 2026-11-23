@@ -87,10 +87,17 @@ async fn make_beverage_variant(
 
 #[tokio::test]
 async fn orders_mixed_cases_1_to_7_and_lifecycle() {
-    // Les operations metier exigent une session : on rejoue tout le scenario
-    // sous une identite proprietaire, comme le fait le serveur.
-    auth::with_actor(auth::SessionIdentity::owner(), async {
         let db = DepotDb::connect(&temp_db_path("cases")).await.unwrap();
+        // confirm_order enregistre l'approbation directe du proprietaire : sans
+        // session identifiee l'operation echoue volontairement (echec ferme).
+        // Cet acteur ne sert qu'a l'approbation ; le nom fige dans les recus
+        // reste celui de l'emetteur explicite (`actor`, plus bas).
+        let approver = SessionIdentity::from_role(
+            "orders-test-approver",
+            "orders-test",
+            "Approbateur Test",
+            Role::Owner,
+        );
         sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
             .execute(&db.pool)
             .await
@@ -418,7 +425,12 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         assert!(deps_draft.is_empty());
 
         // Confirm : décrémente le stock en unités de base (200 -> 188), sans créer d'achat fournisseur.
-        let confirmed = orders::confirm_order(&db, created.order.id).await.unwrap();
+        let confirmed = auth::with_actor(
+            approver.clone(),
+            orders::confirm_order(&db, created.order.id),
+        )
+        .await
+        .unwrap();
         assert_eq!(confirmed.order.status, "confirmed");
         let supplier_orders: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM purchase_orders")
             .fetch_one(&db.pool)
@@ -433,7 +445,12 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         assert_eq!(bock_stock, 188_000);
 
         // Deliver : crée mouvement LIVRAISON_CLIENT & incrémente customer_deposit_balances
-        let delivered = orders::deliver_order(&db, created.order.id).await.unwrap();
+        let delivered = auth::with_actor(
+            approver.clone(),
+            orders::deliver_order(&db, created.order.id),
+        )
+        .await
+        .unwrap();
         assert_eq!(delivered.order.status, "delivered");
         assert_eq!(delivered.customer_deposits.len(), 1);
         assert_eq!(delivered.customer_deposits[0].quantity_held, 1);
@@ -498,15 +515,23 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         )
         .await
         .unwrap();
-        orders::confirm_order(&db, invoice_order.order.id).await.unwrap();
+        auth::with_actor(
+            approver.clone(),
+            orders::confirm_order(&db, invoice_order.order.id),
+        )
+        .await
+        .unwrap();
         sqlx::query("UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?")
             .bind(invoice_order.order.id)
             .execute(&db.pool)
             .await
             .unwrap();
-        let invoiced = orders::invoice_order(&db, invoice_order.order.id)
-            .await
-            .unwrap();
+        let invoiced = auth::with_actor(
+            approver.clone(),
+            orders::invoice_order(&db, invoice_order.order.id),
+        )
+        .await
+        .unwrap();
         assert_eq!(invoiced.order.status, "paid");
         let (sales_count, supplier_order_count): (i64, i64) = sqlx::query_as(
             "SELECT (SELECT COUNT(*) FROM sales WHERE order_id = ?), (SELECT COUNT(*) FROM purchase_orders)",
@@ -615,6 +640,4 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         assert!(receipt_pdf_text.contains("Maquis Abidjan"));
         assert!(!receipt_pdf_text.contains("PRODUIT FORGE"));
         assert!(!receipt_pdf_text.contains("CLIENT FORGE"));
-    })
-    .await;
 }
