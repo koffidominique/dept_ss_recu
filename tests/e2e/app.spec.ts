@@ -351,10 +351,10 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Facturer', exact: true }).click();
     await expect(page.getByText(/\(PAID\)/)).toBeVisible();
 
-    await page.getByRole('button', { name: /Retourner 1 Casier 24 × 33cl verre/i }).click();
-    await expect(
-      page.getByRole('button', { name: /Retourner 1 Casier 24 × 33cl verre/i })
-    ).toBeHidden();
+    // Libelle reel du bouton de restitution (OrderStepConfirm) : « Restituer (n) ».
+    const restitute = page.getByRole('button', { name: /Restituer \(1\)/i });
+    await restitute.click();
+    await expect(restitute).toBeHidden();
 
     expect(errors).toEqual([]);
   });
