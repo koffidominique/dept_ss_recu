@@ -56,6 +56,12 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
     let db_path = temp_db_path("parity");
     let db = DepotDb::connect(&db_path).await.expect("connect temp db");
 
+    // Seed moyens de paiement requis (INSERT OR IGNORE : déjà présents par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
     let session = cash::open_cash_session(
         &db,
         cash::OpenCashInput {

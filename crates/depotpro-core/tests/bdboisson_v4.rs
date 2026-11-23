@@ -252,40 +252,45 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
     let su_demi = &prod.sales_units[0];
 
     // Vente de 2 bouteilles + 1 demi-casier en tarif gros (3_100 + 1_400 consigne)
-    let sale = sales::create_sale_v4(
-        &db,
-        sales::CreateSaleV4Input {
-            request_key: "v4-sale-multi-1".to_string(),
-            client_id: None,
-            sale_type: "cash".to_string(),
-            price_tier: "wholesale".to_string(),
-            discount_amount: None,
-            notes: None,
-            lines: vec![
-                sales::CreateSaleLineV4Input {
-                    product_id: prod.id,
-                    packaging_id: pkg_bouteille.id,
-                    sales_unit_id: None,
-                    quantity: "2".to_string(),
-                    discount_amount: None,
-                },
-                sales::CreateSaleLineV4Input {
-                    product_id: prod.id,
-                    packaging_id: pkg_casier.id,
-                    sales_unit_id: Some(su_demi.id),
-                    quantity: "1".to_string(),
-                    discount_amount: None,
-                },
-            ],
-            payments: vec![sales::PaymentPartInput {
-                method_code: "cash".to_string(),
-                amount: 5_500, // 2*500 (1000) + 1*3100 (3100) + (900+500) consigne = 5500
-                ..Default::default()
-            }],
-            due_date: None,
+    let payload = sales::CreateSaleV4Input {
+        request_key: "v4-sale-multi-1".to_string(),
+        client_id: None,
+        sale_type: "cash".to_string(),
+        price_tier: "wholesale".to_string(),
+        discount_amount: None,
+        notes: None,
+        lines: vec![
+            sales::CreateSaleLineV4Input {
+                product_id: prod.id,
+                packaging_id: pkg_bouteille.id,
+                sales_unit_id: None,
+                quantity: "2".to_string(),
+                discount_amount: None,
+            },
+            sales::CreateSaleLineV4Input {
+                product_id: prod.id,
+                packaging_id: pkg_casier.id,
+                sales_unit_id: Some(su_demi.id),
+                quantity: "1".to_string(),
+                discount_amount: None,
+            },
+        ],
+        payments: vec![sales::PaymentPartInput {
+            method_code: "cash".to_string(),
+            amount: 5_500, // 2*500 (1000) + 1*3100 (3100) + (900+500) consigne = 5500
             ..Default::default()
-        },
-    )
+        }],
+        due_date: None,
+        ..Default::default()
+    };
+
+    // Seed moyen de paiement "cash" requis par le test (INSERT OR IGNORE : déjà présent par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+    let sale = sales::create_sale_v4(&db, payload)
     .await
     .unwrap();
 

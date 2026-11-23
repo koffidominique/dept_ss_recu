@@ -124,6 +124,12 @@ pub struct PaymentPartInput {
 }
 
 #[derive(Debug, Default, Deserialize)]
+pub struct ReceivedReturnableInput {
+    pub returnable_id: i64,
+    pub pieces: i64,
+}
+
+#[derive(Debug, Default, Deserialize)]
 pub struct CreateSaleInput {
     pub request_key: String,
     pub client_id: Option<i64>,
@@ -151,6 +157,8 @@ pub struct CreateSaleV4Input {
     pub due_date: Option<String>,
     #[serde(default)]
     pub external_reference: Option<String>,
+    #[serde(default)]
+    pub received_returnables: Option<Vec<ReceivedReturnableInput>>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -121,6 +121,27 @@ pub(crate) async fn packaging_dashboard(
     }
 }
 
+pub(crate) async fn client_packaging_balances(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(client_id): Path<i64>,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsRead).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor,
+        consignments::get_client_packaging_balances(&db, client_id),
+    )
+    .await
+    {
+        Ok(dto) => Json(serde_json::to_value(dto).unwrap()).into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
 pub(crate) async fn packaging_pay_debt(
     State(state): State<AppState>,
     headers: HeaderMap,

@@ -102,6 +102,7 @@ export interface PrintableDocumentData {
   summaryRows: PrintableDocumentSummaryRow[];
   payments?: Array<{ label: string; amount: number }>;
   notes?: string | null;
+  missingPackagingNote?: string | null;
 }
 
 export function DocumentPrintModal({

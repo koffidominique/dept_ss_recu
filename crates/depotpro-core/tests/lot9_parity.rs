@@ -36,6 +36,12 @@ async fn lot9_22_scenarios_business_parity() {
     let backup_dir = dir.0.join("Sauvegardes");
     let db = DepotDb::connect(&db_path).await.unwrap();
 
+    // Seed moyens de paiement requis par le test de parité (INSERT OR IGNORE : déjà présents par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1), ('orange_money', 'Orange Money', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
     auth::with_actor(SessionIdentity::owner(), async move {
         // Scénario 1 — Création client & politique de crédit
         let bad_cli = sales::create_client(

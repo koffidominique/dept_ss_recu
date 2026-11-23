@@ -182,7 +182,7 @@ export function ProductStepPackaging({
         )}
       />
 
-      <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3 text-xs">
+          <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3 text-xs">
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" {...form.register('package_reusable')} />
@@ -197,8 +197,12 @@ export function ProductStepPackaging({
                 form.setValue('package_returnable', checked);
                 if (!checked) form.setValue('package_deposit_amount', 0);
               }}
+              disabled={pkgName === 'carton' || pkgName === 'pack'}
             />
             Emballage consigné
+            {pkgName === 'carton' || pkgName === 'pack' ? (
+              <span className="ml-1 text-[10px] text-[#667085] dark:text-slate-400">(jamais consigné)</span>
+            ) : null}
           </label>
         </div>
         {totalVolumeMl > 0 && (

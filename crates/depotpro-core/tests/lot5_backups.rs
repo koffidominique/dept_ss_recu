@@ -303,6 +303,12 @@ async fn lot5_read_only_verify_sha256_compatibility_and_path_security() {
     let db = DepotDb::connect(&db_path).await.unwrap();
     seed_all_14_entities(&db).await;
 
+    // Seed moyens de paiement requis par les tests de sauvegarde (INSERT OR IGNORE : déjà présents par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
     let bkp = backup::create_backup_summary(&db, &backup_dir)
         .await
         .unwrap();
@@ -439,6 +445,12 @@ async fn lot5_atomic_restore_failure_recovery_and_restart_persistence() {
 
     let db = DepotDb::connect(&db_path).await.unwrap();
     seed_all_14_entities(&db).await;
+
+    // Seed moyens de paiement requis par les tests de sauvegarde (INSERT OR IGNORE : déjà présents par défaut)
+    sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1), ('wave', 'Wave', 0, 1)")
+        .execute(&db.pool)
+        .await
+        .unwrap();
 
     let bkp_t0 = backup::create_backup_summary(&db, &backup_dir)
         .await

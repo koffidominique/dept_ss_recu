@@ -9,6 +9,15 @@ import type { Client, PaymentMethodConfig } from '../../../types/erp.ts';
 import type { SaleCalculationResult } from '../utils/saleCalculations.ts';
 import { PosPaymentPanel } from './PosPaymentPanel.tsx';
 
+interface ClientReturnableBalance {
+  returnable_id: number;
+  packaging_name: string;
+  packaging_code: string;
+  deposit_value: number;
+  balance_pieces: number;
+  deposit_held_amount: number;
+}
+
 interface PosCartPanelProps {
   posCart: CartItem[];
   heldCarts: HeldCart[];
@@ -38,6 +47,9 @@ interface PosCartPanelProps {
   onOpenHeldModal: () => void;
   onOpenQuickClient: () => void;
   onSubmitSale: () => void;
+  clientReturnables: ClientReturnableBalance[];
+  receivedReturnables: Array<{ returnable_id: number; pieces: number }>;
+  onReceivedReturnableChange: (returnableId: number, pieces: number) => void;
 }
 
 export function PosCartPanel({
@@ -65,6 +77,9 @@ export function PosCartPanel({
   onOpenHeldModal,
   onOpenQuickClient,
   onSubmitSale,
+  clientReturnables,
+  receivedReturnables,
+  onReceivedReturnableChange,
 }: PosCartPanelProps) {
   const selectedClient = clients?.find((c) => c.id === posClientId);
   const availCredit =
@@ -190,6 +205,44 @@ export function PosCartPanel({
               Dû : {formatFcfa(selectedClient.unpaid_balance)} · Vides :{' '}
               {selectedClient.returnable_pieces_due} pcs
             </span>
+          </div>
+        )}
+        
+        {selectedClient && clientReturnables.length > 0 && (
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[#182230] dark:text-slate-200 text-xs">Retour d’emballages (pièces du client)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {clientReturnables.map((bal) => {
+                const current = receivedReturnables.find((r) => r.returnable_id === bal.returnable_id)?.pieces ?? 0;
+                return (
+                  <div key={bal.returnable_id} className="flex items-center justify-between gap-3 bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 rounded-lg p-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-medium text-[#182230] dark:text-slate-100 truncate">
+                        {bal.packaging_name}
+                      </div>
+                      <div className="text-[10px] text-[#667085] dark:text-slate-400">
+                        {bal.packaging_code} · solde {bal.balance_pieces} pcs
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={current}
+                        onChange={(e) => onReceivedReturnableChange(bal.returnable_id, Math.max(0, parseInt(e.target.value || '0', 10)))}
+                        className="w-20 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-mono-num"
+                      />
+                      <span className="text-[10px] font-mono-num text-[#667085] dark:text-slate-400">pcs</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-[#667085] dark:text-slate-400 italic">
+              Seuls les ensembles casier + bouteilles vides sont consignés. Une bouteille seule ne génère aucune consigne.
+            </p>
           </div>
         )}
 

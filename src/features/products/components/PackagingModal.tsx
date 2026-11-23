@@ -119,9 +119,23 @@ export function PackagingModal({
           <select
             aria-label="Type de conditionnement"
             value={state.name}
-            onChange={(e) =>
-              onChangeState((prev) => ({ ...prev, name: e.target.value as PackagingName }))
-            }
+            onChange={(e) => {
+              const next = e.target.value as PackagingName;
+              const isNonConsignable = next === 'carton' || next === 'pack';
+              onChangeState((prev) => ({
+                ...prev,
+                name: next,
+                ...(isNonConsignable
+                  ? {
+                      deposit_mode: 'none' as const,
+                      bottle_deposit_amount: 0,
+                      package_deposit_amount: 0,
+                      returnable_id: 0,
+                      returnable_pieces: 1,
+                    }
+                  : {}),
+              }));
+            }}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm capitalize"
           >
             {PACKAGING_OPTIONS.map((opt) => (
@@ -161,11 +175,13 @@ export function PackagingModal({
           label="Consigne bouteille"
           value={state.bottle_deposit_amount}
           onChange={(v) => onChangeState((prev) => ({ ...prev, bottle_deposit_amount: v }))}
+          disabled={state.name === 'carton' || state.name === 'pack'}
         />
         <MoneyInput
           label="Consigne caisse / casier"
           value={state.package_deposit_amount}
           onChange={(v) => onChangeState((prev) => ({ ...prev, package_deposit_amount: v }))}
+          disabled={state.name === 'carton' || state.name === 'pack'}
         />
         <div className="col-span-2">
           <label className="block text-xs font-medium">Code-barres conditionnement</label>
@@ -208,13 +224,19 @@ export function PackagingModal({
                 deposit_mode: e.target.value as 'none' | 'deposit',
               }))
             }
+            disabled={state.name === 'carton' || state.name === 'pack'}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           >
             <option value="none">Sans retour emballage (perdu / jetable)</option>
             <option value="deposit">Avec consigne & suivi retour d'emballage</option>
           </select>
+          {state.name === 'carton' || state.name === 'pack' ? (
+            <p className="mt-1 text-[10px] text-[#667085] dark:text-slate-400">
+              Les cartons et packs ne sont jamais soumis à la consignation.
+            </p>
+          ) : null}
         </div>
-        {state.deposit_mode === 'deposit' && (
+        {(state.deposit_mode === 'deposit' && state.name !== 'carton' && state.name !== 'pack') && (
           <>
             <div>
               <label className="block text-xs font-medium">Type d'emballage consigné</label>

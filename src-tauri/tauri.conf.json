@@ -4,7 +4,7 @@
   "version": "3.0.0",
   "identifier": "com.depotpro.erp",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run dev:server",
     "devUrl": "http://localhost:3000",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"

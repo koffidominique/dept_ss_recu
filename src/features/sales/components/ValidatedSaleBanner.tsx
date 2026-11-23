@@ -91,7 +91,15 @@ export function buildSalePrintableDoc(sale: SaleDetail): PrintableDocumentData {
       amount: p.part_amount,
     })),
     notes: sale.due_date ? `Échéance crédit : ${sale.due_date}` : sale.notes,
+    missingPackagingNote: buildMissingPackagingNote(sale.deposits),
   };
+}
+
+function buildMissingPackagingNote(deposits: SaleDetail['deposits']): string | null {
+  const missing = deposits.filter((d) => d.pieces - d.returned_pieces > 0);
+  if (missing.length === 0) return null;
+  const parts = missing.map((d) => `${d.pieces - d.returned_pieces}× ${d.packaging_name} (${d.packaging_code})`);
+  return `Emballages vides non restitués : ${parts.join(' · ')}. Le client est soumis à restitution sous 15 jours de l’emballage retour faisant défaut ; à défaut après ce délai, il paie la valeur de l’emballage retour.`;
 }
 
 interface ValidatedSaleBannerProps {

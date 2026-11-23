@@ -83,6 +83,7 @@ export class HttpApiClient implements ApiClient {
   listReceivables = httpSalesApi.listReceivables;
   payReceivable = httpSalesApi.payReceivable;
   getPaymentReceipt = httpSalesApi.getPaymentReceipt;
+  getClientPackagingBalances = httpSalesApi.getClientPackagingBalances;
 
   /* --- Fournisseurs, Commandes & Dettes --- */
   listSuppliers = httpPurchasesApi.listSuppliers;

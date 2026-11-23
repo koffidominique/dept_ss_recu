@@ -4,7 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::application::auth::{require_current_actor_permission, Permission};
+pub use crate::application::auth::{require_current_actor_permission, Permission};
+use crate::application::pdf::encoding_and_layout::format_fcfa_ascii;
 use crate::application::reports::{get_settings, AppSettingsDto};
 use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
@@ -161,6 +162,8 @@ pub struct DocumentPdfInput {
     pub balance_after_xof: Option<i64>,
     #[serde(default)]
     pub linked_document_ref: Option<String>,
+    #[serde(default)]
+    pub missing_packaging_note: Option<String>,
 }
 
 async fn try_render_snapshot_pdf(
@@ -301,6 +304,67 @@ pub async fn generate_document_pdf(
     let company = get_settings(db).await?;
     let bytes = render_document_pdf(&company, &input);
     Ok((format!("DEPOTPRO_{safe_ref}.pdf"), bytes))
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentReceiptInput {
+    pub reference: String,
+    #[serde(default)]
+    pub order_reference: Option<String>,
+    pub date: String,
+    #[serde(default)]
+    pub cashier_name: Option<String>,
+    #[serde(default)]
+    pub status_label: Option<String>,
+    #[serde(default)]
+    pub party_name: Option<String>,
+    #[serde(default)]
+    pub party_details: Option<String>,
+    #[serde(default)]
+    pub party_phone: Option<String>,
+    #[serde(default)]
+    pub external_references: Option<Vec<String>>,
+    #[serde(default)]
+    pub payments: Option<Vec<DocumentPdfPayment>>,
+    #[serde(default)]
+    pub balance_after_xof: Option<i64>,
+    #[serde(default)]
+    pub planned_payment_method: Option<String>,
+}
+
+pub async fn generate_payment_receipt(
+    db: &DepotDb,
+    input: PaymentReceiptInput,
+) -> CoreResult<(String, Vec<u8>)> {
+    let mut notes = Vec::new();
+    if let Some(method) = input.planned_payment_method.as_deref().filter(|s| !s.trim().is_empty()) {
+        notes.push(format!("Mode de règlement : {method}"));
+    }
+    if let Some(balance) = input.balance_after_xof {
+        notes.push(format!("Solde après encaissement : {}", format_fcfa_ascii(balance)));
+    }
+    if let Some(ext) = input.external_references.as_ref().filter(|v| !v.is_empty()) {
+        notes.push(format!("Réf. transaction(s) externe(s) : {}", ext.join(", ")));
+    }
+
+    let doc = DocumentPdfInput {
+        doc_type: "REÇU DE PAIEMENT".to_string(),
+        reference: input.reference.clone(),
+        order_reference: input.order_reference,
+        date: input.date,
+        status_label: input.status_label,
+        party_title: Some("CLIENT".to_string()),
+        party_name: input.party_name,
+        party_details: input.party_details,
+        party_phone: input.party_phone,
+        cashier_name: input.cashier_name,
+        external_references: input.external_references,
+        payments: input.payments,
+        notes: if notes.is_empty() { None } else { Some(notes.join(" · ")) },
+        ..Default::default()
+    };
+    generate_document_pdf(db, doc).await
 }
 
 #[cfg(test)]

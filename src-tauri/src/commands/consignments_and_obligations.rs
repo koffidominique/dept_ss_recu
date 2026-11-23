@@ -99,6 +99,23 @@ pub async fn get_packaging_dashboard(
 }
 
 #[tauri::command]
+pub async fn get_client_packaging_balances(
+    state: State<'_, DesktopState>,
+    token: String,
+    client_id: i64,
+) -> Result<serde_json::Value, String> {
+    let actor = verify_desktop_perm(&state, &token, Permission::ConsignmentsRead).await?;
+    let db = state.db().await;
+    let rows = auth::with_actor(
+        actor,
+        consignments::get_client_packaging_balances(&db, client_id),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    serde_json::to_value(rows).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn pay_packaging_debt(
     state: State<'_, DesktopState>,
     token: String,

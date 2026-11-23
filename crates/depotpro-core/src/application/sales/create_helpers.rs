@@ -11,6 +11,7 @@ use crate::domain::quantity::Quantity;
 use crate::error::{CoreError, CoreResult};
 
 pub(crate) use super::create_deposit_helpers::normalize_sale_payments_tx;
+use crate::application::products::create_packagings::is_non_consignable_packaging;
 use super::create_deposit_helpers::{finalize_shared_deposits, SharedDepositAccum};
 use super::create_line_resolver::resolve_line_unit_tx;
 use super::CreateSaleLineV4Input;
@@ -157,15 +158,20 @@ pub(crate) async fn prepare_sale_lines_tx(
                 .bind(resolved.pkg_id)
                 .fetch_optional(&mut **tx)
                 .await?;
-        let (mode,) = dep_mode.ok_or_else(|| {
-            CoreError::Validation(format!(
-                "Le profil de consigne de \"{pname} ({})\" n'est pas configuré.",
-                resolved.pkg_name
-            ))
-        })?;
+        let non_consignable = is_non_consignable_packaging(&resolved.pkg_name);
+        let mode = match dep_mode {
+            Some((m,)) => m,
+            None if non_consignable => "none".to_string(),
+            None => {
+                return Err(CoreError::Validation(format!(
+                    "Le profil de consigne de \"{pname} ({})\" n'est pas configuré.",
+                    resolved.pkg_name
+                )))
+            }
+        };
 
         let mut deposit_items = Vec::new();
-        if mode == "deposit" {
+        if mode == "deposit" && !non_consignable {
             if base_qty.milli_units % 1000 != 0 {
                 return Err(CoreError::Validation(format!(
                     "Les ventes consignées doivent correspondre à un nombre entier d'unités de base ({pname})."
@@ -227,7 +233,7 @@ pub(crate) async fn prepare_sale_lines_tx(
                     }
                 }
             }
-        } else if resolved.unit_b_dep + resolved.unit_c_dep > 0 {
+        } else if !non_consignable && resolved.unit_b_dep + resolved.unit_c_dep > 0 {
             let dep_line = qty.compute_line_fcfa(resolved.unit_b_dep + resolved.unit_c_dep)?;
             total_deposit = total_deposit.checked_add(Money(dep_line), "Total consignes")?;
         }

@@ -32,17 +32,23 @@ async fn purchase_order_needs_owner_approval_and_keeps_audit_snapshots() {
     assert!(blocked.is_err(), "unapproved purchase orders must not be received by staff");
 
     let owner = SessionIdentity::from_role("2", "owner", "Owner", Role::Owner);
-    auth::with_actor(owner, commercial_documents::review_document(
+    auth::with_actor(owner.clone(), commercial_documents::review_document(
         &db,
         "purchase_order",
         1,
         ReviewDecisionInput { action: "approved".into(), reason: None },
     )).await.expect("owner approval");
 
-    let (_guard, mut tx) = db.begin_write().await.expect("transaction");
-    commercial_documents::require_approval_or_owner("purchase_order", 1, &mut tx)
-        .await.expect("approved purchase order is eligible for reception");
-    tx.rollback().await.expect("rollback");
+    let approved_ok = {
+        let (_guard, mut tx) = db.begin_write().await.expect("transaction");
+        let result = auth::with_actor(owner.clone(), async {
+            commercial_documents::require_approval_or_owner("purchase_order", 1, &mut tx).await
+        })
+        .await;
+        tx.rollback().await.expect("rollback");
+        result
+    };
+    approved_ok.expect("approved purchase order is eligible for reception");
 
     let status: String = sqlx::query_scalar("SELECT status FROM commercial_document_workflows WHERE document_type = 'purchase_order' AND document_id = 1")
         .fetch_one(&db.pool).await.expect("workflow status");

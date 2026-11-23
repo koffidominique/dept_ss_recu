@@ -173,6 +173,10 @@ export const httpSalesApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  getClientPackagingBalances: (clientId: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['getClientPackagingBalances']>>>(
+      `/api/packaging-obligations/client-balances/${clientId}`,
+    ),
   cancelSale: (saleId: number, input: Record<string, unknown>) =>
     httpRequest<Awaited<ReturnType<ApiClient['cancelSale']>>>(`/api/sales/${saleId}/cancel`, {
       method: 'POST',

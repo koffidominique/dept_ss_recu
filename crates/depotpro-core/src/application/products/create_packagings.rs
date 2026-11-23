@@ -81,7 +81,7 @@ pub(crate) async fn insert_initial_packagings_tx(
             first_pkg_id = Some(pkg_id);
         }
 
-        let mode = if pkg.deposit_mode.as_deref() == Some("deposit") {
+        let mode = if pkg.deposit_mode.as_deref() == Some("deposit") && !is_non_consignable_packaging(&pkg.name) {
             "deposit"
         } else {
             "none"
@@ -125,4 +125,11 @@ pub(crate) async fn insert_initial_packagings_tx(
     }
 
     Ok(first_pkg_id)
+}
+
+/// Les conditionnements "carton", "pack", "bouteille" et "canette" ne sont jamais soumis au
+/// système de consignation lorsqu'ils sont vendus seuls. La consigne s'applique à l'ensemble
+/// "casier + bouteilles vides", pas à la bouteille/unité individuelle.
+pub(crate) fn is_non_consignable_packaging(name: &str) -> bool {
+    matches!(name, "carton" | "pack" | "bouteille" | "canette")
 }

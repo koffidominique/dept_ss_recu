@@ -38,6 +38,7 @@ pub async fn create_sale(db: &DepotDb, input: CreateSaleInput) -> CoreResult<Sal
         payments: input.payments,
         due_date: input.due_date,
         external_reference: input.external_reference,
+        received_returnables: None,
     };
     create_sale_v4(db, v4).await
 }
@@ -245,6 +246,7 @@ pub async fn create_sale_v4(db: &DepotDb, input: CreateSaleV4Input) -> CoreResul
         paid_amount,
         credit_amount,
         external_reference: input.external_reference.as_deref(),
+        received_returnables: input.received_returnables.as_deref(),
     };
     persist_sale_lines_and_deposits_tx(&mut tx, &ctx, &prepared.lines).await?;
     persist_sale_payments_and_receivable_tx(&mut tx, &ctx, &normalized_payments).await?;

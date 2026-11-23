@@ -266,6 +266,7 @@ pub async fn upsert_packaging_v4(
     upsert_packaging_deposit_profile_tx(
         &mut tx,
         pkg_id,
+        &pkg.name,
         pkg.deposit_mode.as_deref(),
         pkg.components,
     )
