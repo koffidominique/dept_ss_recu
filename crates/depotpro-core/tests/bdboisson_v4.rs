@@ -278,7 +278,6 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
         payments: vec![sales::PaymentPartInput {
             method_code: "cash".to_string(),
             amount: 5_500, // 2*500 (1000) + 1*3100 (3100) + (900+500) consigne = 5500
-            ..Default::default()
         }],
         due_date: None,
         ..Default::default()

@@ -137,8 +137,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                         }],
                         payments: vec![sales::PaymentPartInput {
                             method_code: "cash".to_string(),
-                            amount: 24_000,
-                            ..Default::default()
+                            amount: 24_000
                         }],
                         due_date: None,
                         ..Default::default()
@@ -161,8 +160,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                         }],
                         payments: vec![sales::PaymentPartInput {
                             method_code: "cash".to_string(),
-                            amount: 24_000,
-                            ..Default::default()
+                            amount: 24_000
                         }],
                         due_date: None,
                         ..Default::default()
@@ -211,8 +209,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                             received_quantity: "8".to_string(),
                             discrepancy_reason: None,
                             ..Default::default()
-                        }],
-                        ..Default::default()
+                        }]
                     },
                 ),
                 purchases::receive_purchase_order(
@@ -226,8 +223,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                             received_quantity: "8".to_string(),
                             discrepancy_reason: None,
                             ..Default::default()
-                        }],
-                        ..Default::default()
+                        }]
                     },
                 ),
             );
@@ -315,8 +311,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                         }],
                         payments: vec![sales::PaymentPartInput {
                             method_code: "cash".to_string(),
-                            amount: 2_000,
-                            ..Default::default()
+                            amount: 2_000
                         }],
                         due_date: None,
                         ..Default::default()
@@ -330,8 +325,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                         note: Some("Acompte simultané".to_string()),
                         parts: vec![sales::PaymentPartInput {
                             method_code: "cash".to_string(),
-                            amount: 1_500,
-                            ..Default::default()
+                            amount: 1_500
                         }],
                         ..Default::default()
                     },
@@ -361,8 +355,7 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
                         }],
                         payments: vec![sales::PaymentPartInput {
                             method_code: "cash".to_string(),
-                            amount: 800,
-                            ..Default::default()
+                            amount: 800
                         }],
                         due_date: None,
                         ..Default::default()

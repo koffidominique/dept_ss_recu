@@ -211,8 +211,7 @@ async fn rust_core_scenarios_a_through_l() {
                     received_quantity: "10".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         ),
     )
@@ -273,8 +272,7 @@ async fn rust_core_scenarios_a_through_l() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 15_600 + 2_500,
-                ..Default::default()
+                amount: 15_600 + 2_500
             }],
             due_date: None,
             ..Default::default()
@@ -335,8 +333,7 @@ async fn rust_core_scenarios_a_through_l() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 500,
-                ..Default::default()
+                amount: 500
             }],
             due_date: None,
             ..Default::default()
@@ -495,8 +492,7 @@ async fn rust_core_scenarios_a_through_l() {
             note: Some("Acompte".to_string()),
             parts: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 20_000,
-                ..Default::default()
+                amount: 20_000
             }],
             ..Default::default()
         },
@@ -524,18 +520,15 @@ async fn rust_core_scenarios_a_through_l() {
             payments: vec![
                 sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 10_000,
-                    ..Default::default()
+                    amount: 10_000
                 },
                 sales::PaymentPartInput {
                     method_code: "wave".to_string(),
-                    amount: 15_000,
-                    ..Default::default()
+                    amount: 15_000
                 },
                 sales::PaymentPartInput {
                     method_code: "orange_money".to_string(),
-                    amount: 25_000,
-                    ..Default::default()
+                    amount: 25_000
                 },
             ],
             due_date: None,
@@ -977,8 +970,7 @@ async fn scenario_t_company_logo_and_wave_refund() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "wave".to_string(),
-                amount: 1200,
-                ..Default::default()
+                amount: 1200
             }],
             due_date: None,
             ..Default::default()
@@ -1159,8 +1151,7 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
                     received_quantity: "2".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         ),
     )
@@ -1433,8 +1424,7 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 9_200,
-                ..Default::default()
+                amount: 9_200
             }],
             due_date: None,
             ..Default::default()
@@ -1469,8 +1459,7 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
             ],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 17_400,
-                ..Default::default()
+                amount: 17_400
             }],
             due_date: None,
             ..Default::default()

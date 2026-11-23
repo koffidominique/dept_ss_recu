@@ -265,8 +265,7 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
                         discrepancy_reason: None,
                         ..Default::default()
                     },
-                ],
-                ..Default::default()
+                ]
             },
         ),
     )
@@ -312,8 +311,7 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
                         discrepancy_reason: None,
                         ..Default::default()
                     },
-                ],
-                ..Default::default()
+                ]
             },
         ),
     )
@@ -551,8 +549,7 @@ async fn test7_reappro_fournisseur_echange_emballages_par_type_exact() {
                     received_quantity: "1".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         ),
     )

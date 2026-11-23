@@ -127,8 +127,7 @@ async fn lot1_sale_returns_prevent_duplicates_and_preserve_atomicity() {
                 ],
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 7_000,
-                    ..Default::default()
+                    amount: 7_000
                 }],
                 due_date: None,
                 ..Default::default()
@@ -331,8 +330,7 @@ async fn lot1_sale_returns_prevent_duplicates_and_preserve_atomicity() {
                 }],
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 2_000,
-                    ..Default::default()
+                    amount: 2_000
                 }],
                 due_date: None,
                 ..Default::default()
@@ -386,8 +384,7 @@ async fn lot1_sale_returns_prevent_duplicates_and_preserve_atomicity() {
                 }],
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
-                    amount: 2_000,
-                    ..Default::default()
+                    amount: 2_000
                 }],
                 due_date: None,
                 ..Default::default()
@@ -598,8 +595,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                         discrepancy_reason: None,
                         ..Default::default()
                     },
-                ],
-                ..Default::default()
+                ]
             },
         )
         .await
@@ -617,8 +613,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                     received_quantity: "3".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         )
         .await
@@ -637,8 +632,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                     received_quantity: "3".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         )
         .await
@@ -665,8 +659,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                         discrepancy_reason: None,
                         ..Default::default()
                     },
-                ],
-                ..Default::default()
+                ]
             },
         )
         .await
@@ -691,8 +684,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                     received_quantity: "3".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         )
         .await
@@ -711,8 +703,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                         received_quantity: "3".to_string(),
                         discrepancy_reason: None,
                         ..Default::default()
-                    }],
-                    ..Default::default()
+                    }]
                 },
             ),
             purchases::receive_purchase_order(
@@ -726,8 +717,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                         received_quantity: "3".to_string(),
                         discrepancy_reason: None,
                         ..Default::default()
-                    }],
-                    ..Default::default()
+                    }]
                 },
             )
         );
@@ -753,8 +743,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                         discrepancy_reason: None,
                         ..Default::default()
                     },
-                ],
-                ..Default::default()
+                ]
             },
         )
         .await
@@ -822,8 +811,7 @@ async fn lot1_purchase_receipts_prevent_duplicates_concurrency_and_partial_write
                     received_quantity: "1".to_string(),
                     discrepancy_reason: None,
                     ..Default::default()
-                }],
-                ..Default::default()
+                }]
             },
         )
         .await
