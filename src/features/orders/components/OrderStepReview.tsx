@@ -263,7 +263,7 @@ export function OrderStepReview({
             type="text"
             value={plannedDeliveryTime}
             onChange={(e) => onChangePlannedDeliveryTime(e.target.value)}
-            placeholder="Ex : Aujourd'hui 16h30"
+            placeholder="Ex. 23/11/2026 à 16h30"
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
         </div>

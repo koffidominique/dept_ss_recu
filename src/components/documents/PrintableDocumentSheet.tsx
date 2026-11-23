@@ -40,11 +40,9 @@ export function PrintableDocumentSheet({
   doc: PrintableDocumentData;
   company: AppSettings | undefined;
 }) {
-  const isOrderReceipt =
-    doc.docType === 'REÇU DE COMMANDE' ||
-    doc.docType === 'BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION';
+  const isOrderReceipt = doc.docType === 'REÇU DE COMMANDE';
   const isPaymentReceipt = doc.docType === 'REÇU DE PAIEMENT';
-  const isCustomerReceipt = ['REÇU DE VENTE', 'REÇU DE COMMANDE', 'BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION'].includes(doc.docType);
+  const isCustomerReceipt = ['REÇU DE VENTE', 'REÇU DE COMMANDE'].includes(doc.docType);
   const isPurchaseOrder = doc.docType === 'BON DE COMMANDE' || doc.docType === 'BON DE COMMANDE FOURNISSEUR';
   const isPurchaseReceipt = doc.docType === 'BON DE RÉCEPTION' || doc.docType === 'BON DE RÉCEPTION FOURNISSEUR';
   const secondaryName = doc.secondaryPartyName || company?.company_name || 'Sous-dépôt';
@@ -183,19 +181,24 @@ export function PrintableDocumentSheet({
               </tr>
             </thead>
             <tbody>
-              {drinkLines.map((line, index) => (
-                <tr key={`${line.label}-${index}`}>
-                  <td>{index + 1}</td>
-                  <td>
-                    <span className="font-semibold">{line.label}</span>
-                    {line.sublabel && <span className="block text-[7.5px] text-slate-500">{line.sublabel}</span>}
-                  </td>
-                  <td>{line.packagingInfo || '—'}</td>
-                  <td className="font-mono-num font-semibold">{line.quantity}</td>
-                  <td className="font-mono-num">{line.unitPrice == null ? '—' : formatFcfa(line.unitPrice)}</td>
-                  <td className="font-mono-num font-semibold">{line.total == null ? '—' : formatFcfa(line.total)}</td>
-                </tr>
-              ))}
+              {Array.from({ length: Math.max(10, drinkLines.length) }, (_, index) => {
+                const line = drinkLines[index];
+                return (
+                  <tr key={line ? `${line.label}-${index}` : `blank-${index}`} className={!line ? 'order-receipt-empty-row' : undefined}>
+                    <td>{index + 1}</td>
+                    <td>
+                      {line && <>
+                        <span className="font-semibold">{line.label}</span>
+                        {line.sublabel && <span className="block text-[7.5px] text-slate-500">{line.sublabel}</span>}
+                      </>}
+                    </td>
+                    <td>{line?.packagingInfo || ''}</td>
+                    <td className="font-mono-num font-semibold">{line?.quantity || ''}</td>
+                    <td className="font-mono-num">{line?.unitPrice == null ? '' : formatFcfa(line.unitPrice)}</td>
+                    <td className="font-mono-num font-semibold">{line?.total == null ? '' : formatFcfa(line.total)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>
@@ -203,16 +206,16 @@ export function PrintableDocumentSheet({
         <div className="order-receipt-bottom-grid">
           <div className="space-y-2">
             <section className="order-receipt-packaging">
-              <h2 className="text-green-700 border-b border-green-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">SUIVI CONSIGNATIONS & EMBALLAGES</h2>
+              <h2 className="text-green-700 border-b border-green-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">SUIVI DES CASIERS & BOUTEILLES VIDES (CONSIGNES)</h2>
               {doc.packagingLines?.length ? (
                 <>
                   <table>
                     <thead>
                       <tr>
-                        <th>Emballage</th>
-                        <th>Prévu</th>
-                        <th>Remis / Rendu</th>
-                        <th>Consigne</th>
+                        <th>Type d&apos;emballage</th>
+                        <th>Sortis</th>
+                        <th>Rendus</th>
+                        <th>Solde dû</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -222,12 +225,10 @@ export function PrintableDocumentSheet({
                             {line.label}
                             <small>{line.statusLabel}</small>
                           </td>
-                          <td className="text-center font-mono-num">{line.expectedQuantity}</td>
-                          <td className="text-center font-mono-num">
-                            {line.issuedQuantity ?? '—'} / {line.returnedQuantity ?? 0}
-                          </td>
-                          <td className="text-right font-mono-num">
-                            {line.unitDepositXof == null ? 'Non cons.' : formatFcfa(line.amount ?? 0)}
+                          <td className="text-center font-mono-num">{line.issuedQuantity ?? line.expectedQuantity}</td>
+                          <td className="text-center font-mono-num">{line.returnedQuantity ?? 0}</td>
+                          <td className="text-center font-mono-num font-semibold">
+                            {Math.max(0, (line.issuedQuantity ?? line.expectedQuantity) - (line.returnedQuantity ?? 0))}
                           </td>
                         </tr>
                       ))}
