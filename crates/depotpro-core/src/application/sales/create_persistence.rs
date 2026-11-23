@@ -192,9 +192,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         if let Some(received) = ctx.received_returnables {
             for rr in received {
                 if rr.pieces <= 0 {
-                    return Err(CoreError::Validation(
-                        "Nombre de pièces retournées invalide.".to_string(),
-                    ));
+                    continue;
                 }
                 let rt_exists: Option<(String,)> = sqlx::query_as(
                     "SELECT name FROM returnable_packaging_types WHERE id = ?",
@@ -257,7 +255,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                     "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document)
                      VALUES (?, ?, 'entry', ?, ?, ?, ?, ?)",
                 )
-                .bind(format!("ret-retour-{}", ctx.request_key))
+                .bind(format!("ret-retour-{}-{}", ctx.request_key, rr.returnable_id))
                 .bind(rr.returnable_id)
                 .bind(rr.pieces)
                 .bind(before_stock)

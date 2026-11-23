@@ -23,7 +23,7 @@ import {
 import { usePosShortcuts } from '../features/sales/hooks/usePosShortcuts.ts';
 import { PosCatalogPanel } from '../features/sales/components/PosCatalogPanel.tsx';
 import { PosCartPanel } from '../features/sales/components/PosCartPanel.tsx';
-import { ValidatedSaleBanner } from '../features/sales/components/ValidatedSaleBanner.tsx';
+import { ValidatedSaleBanner, buildMissingPackagingNote } from '../features/sales/components/ValidatedSaleBanner.tsx';
 import { HeldSalesModal } from '../features/sales/components/HeldSalesModal.tsx';
 import { QuickClientModal } from '../features/sales/components/QuickClientModal.tsx';
 import type {
@@ -275,7 +275,7 @@ export function SalesPage() {
         />
       </div>
 
-      {validatedSale && <ValidatedSaleBanner sale={validatedSale} onPrint={setPrintDoc} onClose={() => setValidatedSale(null)} />}
+      {validatedSale && <ValidatedSaleBanner sale={validatedSale} onPrint={setPrintDoc} onClose={() => setValidatedSale(null)} missingPackagingNote={buildMissingPackagingNote(validatedSale.deposits)} />}
       <HeldSalesModal
         open={heldModalOpen}
         onOpenChange={setHeldModalOpen}

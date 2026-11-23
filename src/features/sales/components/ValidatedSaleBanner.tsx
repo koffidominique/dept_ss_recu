@@ -95,7 +95,7 @@ export function buildSalePrintableDoc(sale: SaleDetail): PrintableDocumentData {
   };
 }
 
-function buildMissingPackagingNote(deposits: SaleDetail['deposits']): string | null {
+export function buildMissingPackagingNote(deposits: SaleDetail['deposits']): string | null {
   const missing = deposits.filter((d) => d.pieces - d.returned_pieces > 0);
   if (missing.length === 0) return null;
   const parts = missing.map((d) => `${d.pieces - d.returned_pieces}× ${d.packaging_name} (${d.packaging_code})`);
@@ -106,9 +106,11 @@ interface ValidatedSaleBannerProps {
   sale: SaleDetail;
   onPrint: (doc: PrintableDocumentData) => void;
   onClose: () => void;
+  missingPackagingNote?: string | null;
 }
 
-export function ValidatedSaleBanner({ sale, onPrint, onClose }: ValidatedSaleBannerProps) {
+export function ValidatedSaleBanner({ sale, onPrint, onClose, missingPackagingNote }: ValidatedSaleBannerProps) {
+  const note = missingPackagingNote ?? buildMissingPackagingNote(sale.deposits);
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96, y: -8 }}
@@ -127,6 +129,11 @@ export function ValidatedSaleBanner({ sale, onPrint, onClose }: ValidatedSaleBan
               Client : {sale.client_name} · Total : {formatFcfa(sale.total_amount)} · Encaissé :{' '}
               {formatFcfa(sale.paid_amount)}
             </p>
+            {note && (
+              <p className="text-xs text-[#9B1C1C] dark:text-red-400 font-medium mt-0.5">
+                {note}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2.5 no-print">
