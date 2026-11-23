@@ -287,7 +287,10 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Nouveau client rapide' }).click();
     await page.getByPlaceholder('Nom client *').fill('Maquis E2E Plateau');
     await page.getByRole('button', { name: 'Créer', exact: true }).click();
-    await expect(page.getByText(/Solde consigné en cours — Maquis E2E Plateau/i)).toBeVisible();
+    // Le panneau emballages confirme le client actif (libelle reel de
+    // OrderStepClient ; l ancien attendu « Solde consigne en cours » n a jamais
+    // existe dans l application).
+    await expect(page.getByText(/Emballages dus — Maquis E2E Plateau/i)).toBeVisible();
     await page.getByRole('button', { name: 'Suivant' }).click();
 
     // Étape 2 : casier mixte (12 Bock 33cl + 12 Drogba 33cl)
