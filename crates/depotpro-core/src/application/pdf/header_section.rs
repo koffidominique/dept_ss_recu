@@ -196,7 +196,7 @@ pub(crate) fn draw_header_and_party(
         muted,
     );
     right_y -= 11.0;
-    if let Some(ref linked) = doc
+    if let Some(linked) = doc
         .linked_document_ref
         .as_deref()
         .or(doc.order_reference.as_deref())

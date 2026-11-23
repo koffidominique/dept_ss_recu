@@ -29,7 +29,7 @@ fn format_fcfa(value: i64) -> String {
     let digits = value.abs().to_string();
     let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, ch) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             grouped.push(' ');
         }
         grouped.push(ch);
@@ -212,7 +212,10 @@ async fn persist_purchase_receipt_snapshot_tx(
         _ => "RÉCEPTION COMPLÈTE",
     };
 
-    let mut sup_details = vec![format!("Code : {supplier_code}"), format!("Tél. : {supplier_phone}")];
+    let mut sup_details = vec![
+        format!("Code : {supplier_code}"),
+        format!("Tél. : {supplier_phone}"),
+    ];
     if let Some(addr) = supplier_address.as_deref().filter(|s| !s.trim().is_empty()) {
         sup_details.push(format!("Adresse : {}", addr.trim()));
     }
@@ -400,7 +403,8 @@ pub async fn receive_purchase_order(
         let has_incident = missing_milli > 0 || damaged_milli > 0 || refused_milli > 0;
         if qty.milli_units == 0 && !has_incident {
             return Err(CoreError::Validation(
-                "La quantité reçue doit être > 0 (ou déclarez un écart manquant/cassé/refusé).".to_string(),
+                "La quantité reçue doit être > 0 (ou déclarez un écart manquant/cassé/refusé)."
+                    .to_string(),
             ));
         }
         let disc_reason = l
@@ -511,7 +515,9 @@ pub async fn receive_purchase_order(
         let remaining_milli = ordered_milli - received_milli;
         let cum_received = received_milli
             .checked_add(item.qty.milli_units)
-            .ok_or_else(|| CoreError::Validation("Débordement quantité réceptionnée.".to_string()))?;
+            .ok_or_else(|| {
+                CoreError::Validation("Débordement quantité réceptionnée.".to_string())
+            })?;
         if cum_received > ordered_milli {
             return Err(CoreError::Validation(
                 "La quantité reçue dépasse la quantité commandée restante.".to_string(),

@@ -20,7 +20,7 @@ fn amount(value: i64) -> String {
     let digits = value.abs().to_string();
     let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
     for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             grouped.push(' ');
         }
         grouped.push(ch);
@@ -40,7 +40,7 @@ fn time_part(date: &str) -> String {
         .unwrap_or("");
     let time = time.trim_end_matches('Z');
     let time = time
-        .split(|ch| ch == '+' || ch == '-')
+        .split(['+', '-'])
         .next()
         .unwrap_or(time);
     if time.len() >= 5 {
@@ -578,7 +578,7 @@ fn draw_product_row(
         bottom,
         CONTENT_W,
         row_h,
-        if index % 2 == 0 {
+        if index.is_multiple_of(2) {
             LIGHT
         } else {
             (1.0, 1.0, 1.0)
@@ -903,10 +903,7 @@ fn draw_packaging_and_finance(cmds: &mut Vec<String>, top: f64, doc: &DocumentPd
 }
 
 fn normalize_method(value: &str) -> String {
-    value
-        .to_ascii_lowercase()
-        .replace(' ', "_")
-        .replace('-', "_")
+    value.to_ascii_lowercase().replace([' ', '-'], "_")
 }
 
 fn draw_notes_block(cmds: &mut Vec<String>, top: f64, lines: &[String], continuation: bool) -> f64 {
