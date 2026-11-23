@@ -217,6 +217,7 @@ pub async fn list_reference_price_history(
     product_id: i64,
 ) -> CoreResult<Vec<ReferencePriceDto>> {
     require_current_actor_permission(Permission::CatalogRead)?;
+    #[allow(clippy::type_complexity)]
     let rows = sqlx::query_as::<_, (i64, i64, i64, Option<String>, Option<String>, String)>(
         "SELECT id, catalogue_product_id, reference_price, reason, changed_by_name, created_at
          FROM catalogue_reference_price_history

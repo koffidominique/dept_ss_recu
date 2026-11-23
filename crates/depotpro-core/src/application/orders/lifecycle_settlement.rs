@@ -14,6 +14,7 @@ use super::queries::get_order;
 pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> {
     require_current_actor_permission(Permission::SalesWrite)?;
     let (_guard, mut tx) = db.begin_write().await?;
+    #[allow(clippy::type_complexity)]
     let row: Option<(String, String, i64, i64, i64, i64, i64, i64, Option<String>)> =
         sqlx::query_as(
             "SELECT order_number, status, customer_id, subtotal_xof, discount_xof, total_xof,

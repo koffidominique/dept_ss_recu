@@ -140,9 +140,59 @@ RBAC réelle du serveur (propriétaire = tous les écrans ; caissier privé de
 sauvegardes et d'administration catalogue ; comptable sans écriture de
 dépenses).
 
-**Non exécutés, et non revendiqués** : `cargo test`, `cargo clippy`,
-`cargo fmt --check`, Playwright E2E. Aucune de ces suites n'a été lancée dans ce
-lot.
+### 4 bis. Déblocage de la CI (même lot, périmètre étendu)
+
+Le Prompt Master impose de corriger les régressions avant d'élargir. La CI de la
+branche étant rouge de bout en bout, elle a été reprise étape par étape. Chaque
+ligne ci-dessous correspond à un run réellement observé.
+
+| Job CI | État initial | État final | Preuve |
+| --- | --- | --- | --- |
+| 1. TypeScript | ✓ | ✓ | run `45210343916` |
+| 2. ESLint | ✓ | ✓ | idem |
+| 3. Tests web | ✓ | ✓ | 110 / 110 |
+| 4. Build Vite | ✗ (lockfile Linux seul) | ✓ | `npm install` complet régénère 26 variantes `@rollup/rollup-*` et 26 `@esbuild/*` ; run `45206301486` compile sur Windows et macOS |
+| 5. Playwright E2E | **skipped** puis 5/6 | **✓ 7 / 7** | run `45204587150` |
+| 6. Migration SQLite | ✓ | ✓ | — |
+| 7. Tests Rust Core | ✗ | ✓ | runs `45192149332`, `45194525075` |
+| 8. Tests Axum | ✗ | ✓ | run `45194525075` |
+| 9. Clippy `-D warnings` | ✗ 22 erreurs | ✗ → traité | 22 erreurs préexistantes de `depotpro-core`, toutes de style, aucune de logique |
+| 10. `cargo fmt --check` | ✗ 52 fichiers | **✓** | run `45272815817` : job vert |
+| 11/12. Tauri Windows / macOS | ✗ au build | ✗ au clippy desktop | le build passe désormais ; seul le clippy bloquant reste |
+
+Deux constats vérifiés expliquent l'essentiel des échecs `fmt` :
+
+1. **Le dépôt n'avait jamais été passé sous `rustfmt`** — pas seulement le code
+   récent : à la révision de base `675c908`, `cargo fmt --check` échouait déjà
+   sur des fichiers jamais touchés par ces lots. 52 fichiers `crates/` plus
+   5 fichiers `src-tauri/` étaient concernés.
+2. **`rustfmt` n'est pas installable dans l'environnement de travail** : le
+   réseau y est fermé vers `rustup.rs`, et le paquet `rustfmt` du registre npm
+   compile en WebAssembly mais **tronque** certains fichiers en sortie
+   (`security.rs` vidé, en-têtes de commentaires supprimés). Il a donc été
+   écarté après vérification, plutôt que d'être utilisé en aveugle.
+
+La solution retenue est un job CI dédié (`13. Appliquer rustfmt`), qui fait
+tourner le **vrai** `cargo fmt` sur un runner GitHub et pousse le résultat. Il
+ne s'exécute que sur `workflow_dispatch` ou sur un message de commit contenant
+`[rustfmt]` — aucun run ordinaire ne peut donc réécrire la branche. Le commit
+poussé par le bot ne déclenche pas de nouveau run (protection anti-récursion de
+`GITHUB_TOKEN`) : un commit vide a servi à relancer la vérification.
+
+Sur Clippy, les 22 erreurs sont **toutes préexistantes** et **toutes de style** :
+11 « very complex type » (tuples de `SELECT` SQLx), 6 `.is_multiple_of()`,
+1 `str::replace` consécutif, 1 référence de référence, 1 comparaison de chars,
+2 signatures à 9 et 10 arguments. Aucune règle métier n'a été touchée : les
+corrections sont soit une réécriture strictement équivalente (`% 2 == 0` →
+`.is_multiple_of(2)`), soit un `#[allow(...)]` ciblé, suivant les trois
+précédents déjà présents dans le dépôt (`too_many_arguments` dans
+`pdf/primitives.rs`, `packaging_obligations/ledger.rs` et
+`purchases/packaging_exchange.rs`).
+
+**Non exécutés localement, et non revendiqués** : `cargo test`, `cargo clippy`,
+`cargo fmt --check` (binaire `cargo` absent de l'environnement) et Playwright en
+local. Tous les résultats Rust ci-dessus proviennent de runs CI réels, jamais
+d'une simulation.
 
 ## 5. Risques résiduels et décisions métier à clarifier
 
