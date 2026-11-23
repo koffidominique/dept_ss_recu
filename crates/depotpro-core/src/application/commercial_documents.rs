@@ -3,6 +3,36 @@
 use crate::application::auth::{self, Permission, Role};
 use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
+
+/// Ligne de commande fournisseur brute lue en base (tuples SQLx).
+type SupplierOrderLineRow = (
+    String,
+    String,
+    i64,
+    String,
+    i64,
+    i64,
+    i64,
+    String,
+    String,
+);
+/// Ligne de reception fournisseur brute lue en base (tuples SQLx).
+type SupplierReceiptLineRow = (
+    String,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+    String,
+    i64,
+    i64,
+    i64,
+    Option<String>,
+    String,
+    String,
+);
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -738,11 +768,7 @@ pub async fn get_document_detail(
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
-            lines = sqlx::query_as::<
-                _,
-                #[allow(clippy::type_complexity)]
-                (String, String, i64, String, i64, i64, i64, String, String),
-            >(
+            lines = sqlx::query_as::<_, SupplierOrderLineRow>(
                 "SELECT product_name, packaging_name, ordered_quantity_milli, base_unit, coefficient_milli,
                         unit_price, line_total, product_snapshot_json, packaging_snapshot_json
                  FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id",
@@ -859,26 +885,7 @@ pub async fn get_document_detail(
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
-            #[allow(clippy::type_complexity)]
-            lines = sqlx::query_as::<
-                _,
-                (
-                    String,
-                    String,
-                    i64,
-                    i64,
-                    i64,
-                    i64,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    i64,
-                    Option<String>,
-                    String,
-                    String,
-                ),
-            >(
+            lines = sqlx::query_as::<_, SupplierReceiptLineRow>(
                 "SELECT pol.product_name, pol.packaging_name, prl.quantity_milli,
                         prl.missing_quantity_milli, prl.damaged_quantity_milli, prl.refused_quantity_milli,
                         prl.base_quantity_milli, pol.base_unit, pol.coefficient_milli, prl.unit_price,
