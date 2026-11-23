@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use depotpro_core::application::{cash, consignments, products, purchases, sales};
+use depotpro_core::application::{auth, cash, consignments, products, purchases, sales};
 use depotpro_core::infrastructure::backup::{self, RestoreFailureHook};
 use depotpro_core::infrastructure::db::DepotDb;
 use tokio::sync::RwLock;
@@ -27,271 +27,277 @@ impl Drop for TempDirGuard {
 }
 
 async fn seed_all_14_entities(db: &DepotDb) {
-    let sup = purchases::create_supplier(
-        db,
-        purchases::CreateSupplierInput {
-            name: "Fournisseur Rust Lot 5".to_string(),
-            company_name: None,
-            phone: "+2250102030405".to_string(),
-            address: None,
-            email: None,
-            contact_person: None,
-            payment_terms_days: Some(30),
-        },
-    )
-    .await
-    .unwrap();
-
-    let prod = products::create_product(
-        db,
-        products::CreateProductInput {
-            name: "Bière Rust Lot 5".to_string(),
-            brand: Some("SOLIBRA".to_string()),
-            barcode: None,
-            category_id: 1,
-            supplier_id: Some(sup.id),
-            description: None,
-            base_unit: "bouteille".to_string(),
-            initial_stock: Some("100".to_string()),
-            min_stock: Some("10".to_string()),
-            max_stock: None,
-            purchase_price: Some(500),
-            wholesale_price: Some(650),
-            semi_wholesale_price: None,
-            retail_price: Some(700),
-            image_path: None,
-            packagings: None,
-        },
-    )
-    .await
-    .unwrap();
-
-    let pkg_id = prod.packagings[0].id;
-
-    let cli = sales::create_client(
-        db,
-        sales::CreateClientInput {
-            name: "Maquis Rust Lot 5".to_string(),
-            client_type: "professionnel".to_string(),
-            phone: None,
-            address: None,
-            city: None,
-            email: None,
-            contact_person: None,
-            credit_policy: "limited".to_string(),
-            credit_limit: Some(200_000),
-            payment_terms_days: Some(15),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    cash::open_cash_session(
-        db,
-        cash::OpenCashInput {
-            opening_cash: 100_000,
-            request_key: "rust-lot5-cash-open".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-
-    // Achat + Réception + Règlement dette fournisseur
-    let po = purchases::create_purchase_order(
-        db,
-        purchases::CreatePurchaseOrderInput {
-            request_key: "rust-lot5-po".to_string(),
-            supplier_id: sup.id,
-            expected_date: None,
-            notes: None,
-            lines: vec![purchases::PurchaseOrderLineInput {
-                product_id: prod.id,
-                packaging_id: pkg_id,
-                quantity: "10".to_string(),
-                unit_price: 500,
-            }],
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let po_line_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM purchase_order_lines WHERE purchase_order_id = ? LIMIT 1",
-    )
-    .bind(po.id)
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
-
-    purchases::receive_purchase_order(
-        db,
-        po.id,
-        purchases::ReceivePurchaseOrderInput {
-            request_key: "rust-lot5-rec".to_string(),
-            notes: None,
-            lines: vec![purchases::ReceiveLineInput {
-                purchase_order_line_id: po_line_id,
-                received_quantity: "10".to_string(),
-                discrepancy_reason: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let debts = purchases::list_supplier_debts(db).await.unwrap();
-    purchases::pay_supplier_debt(
-        db,
-        debts[0].id,
-        purchases::PaySupplierDebtInput {
-            method_code: "cash".to_string(),
-            amount: 2_500,
-            request_key: "rust-lot5-pay-debt".to_string(),
-            note: None,
-        },
-    )
-    .await
-    .unwrap();
-
-    // Consignations
-    let ret_type = consignments::create_returnable_type(
-        db,
-        consignments::CreateReturnableTypeInput {
-            code: "CAS-RL5".to_string(),
-            name: "Casier Rust Lot 5".to_string(),
-            producer: "SOLIBRA".to_string(),
-            kind: "crate".to_string(),
-            deposit_value: 3_500,
-            initial_stock: Some(15),
-            description: None,
-        },
-    )
-    .await
-    .unwrap();
-    consignments::adjust_returnable_stock(
-        db,
-        consignments::AdjustReturnableStockInput {
-            packaging_id: ret_type.id,
-            movement_type: "entry".to_string(),
-            quantity: 5,
-            reason: "Approvisionnement Rust Lot 5".to_string(),
-            request_key: "rust-lot5-cons".to_string(),
-        },
-    )
-    .await
-    .unwrap();
-
-    // Vente comptant + retour partiel
-    let sale_cash = sales::create_sale(
-        db,
-        sales::CreateSaleInput {
-            request_key: "rust-lot5-sale-cash".to_string(),
-            client_id: None,
-            sale_type: "cash".to_string(),
-            price_tier: "retail".to_string(),
-            discount_amount: None,
-            notes: None,
-            lines: vec![sales::CreateSaleLineInput {
-                product_id: prod.id,
-                packaging_id: pkg_id,
-                quantity: "4".to_string(),
-                discount_amount: None,
-            }],
-            payments: vec![sales::PaymentPartInput {
-                method_code: "cash".to_string(),
-                amount: 2_800,
-                ..Default::default()
-            }],
-            due_date: None,
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    sales::create_sale_return(
-        db,
-        sale_cash.sale.id,
-        sales::CreateSaleReturnInput {
-            request_key: "rust-lot5-ret".to_string(),
-            reason: "Retour partiel Lot 5".to_string(),
-            restock_approved: true,
-            refund_method_code: "cash".to_string(),
-            lines: vec![sales::SaleReturnLineInput {
-                sale_line_id: sale_cash.lines[0].id,
-                base_quantity: "1".to_string(),
-            }],
-        },
-    )
-    .await
-    .unwrap();
-
-    // Vente à crédit + règlement partiel créance
-    let sale_credit = sales::create_sale(
-        db,
-        sales::CreateSaleInput {
-            request_key: "rust-lot5-sale-credit".to_string(),
-            client_id: Some(cli.id),
-            sale_type: "credit".to_string(),
-            price_tier: "retail".to_string(),
-            discount_amount: None,
-            notes: None,
-            lines: vec![sales::CreateSaleLineInput {
-                product_id: prod.id,
-                packaging_id: pkg_id,
-                quantity: "8".to_string(),
-                discount_amount: None,
-            }],
-            payments: vec![],
-            due_date: None,
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let recs = cash::list_receivables(db).await.unwrap();
-    let rec = recs
-        .into_iter()
-        .find(|r| r.sale_id == sale_credit.sale.id)
+    // Les fonctions metier ci-dessous exigent une session (require_current_actor_permission).
+    // Le test les exercait sans acteur : il echouait des la premiere ecriture protegee.
+    // On les rejoue sous une identite proprietaire, comme le fait le serveur.
+    auth::with_actor(auth::SessionIdentity::owner(), async {
+        let sup = purchases::create_supplier(
+            db,
+            purchases::CreateSupplierInput {
+                name: "Fournisseur Rust Lot 5".to_string(),
+                company_name: None,
+                phone: "+2250102030405".to_string(),
+                address: None,
+                email: None,
+                contact_person: None,
+                payment_terms_days: Some(30),
+            },
+        )
+        .await
         .unwrap();
-    cash::pay_receivable(
-        db,
-        rec.id,
-        cash::PayReceivableInput {
-            request_key: "rust-lot5-pay-rec".to_string(),
-            note: None,
-            parts: vec![sales::PaymentPartInput {
-                method_code: "wave".to_string(),
-                amount: 1_500,
-                ..Default::default()
-            }],
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
 
-    // Dépense
-    cash::create_expense(
-        db,
-        cash::CreateExpenseInput {
-            request_key: "rust-lot5-exp".to_string(),
-            category: "Carburant".to_string(),
-            amount: 1_000,
-            method_code: "cash".to_string(),
-            beneficiary: None,
-            notes: Some("Dépense Rust Lot 5".to_string()),
-            receipt_path: None,
-            expense_date: None,
-        },
-    )
-    .await
-    .unwrap();
+        let prod = products::create_product(
+            db,
+            products::CreateProductInput {
+                name: "Bière Rust Lot 5".to_string(),
+                brand: Some("SOLIBRA".to_string()),
+                barcode: None,
+                category_id: 1,
+                supplier_id: Some(sup.id),
+                description: None,
+                base_unit: "bouteille".to_string(),
+                initial_stock: Some("100".to_string()),
+                min_stock: Some("10".to_string()),
+                max_stock: None,
+                purchase_price: Some(500),
+                wholesale_price: Some(650),
+                semi_wholesale_price: None,
+                retail_price: Some(700),
+                image_path: None,
+                packagings: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let pkg_id = prod.packagings[0].id;
+
+        let cli = sales::create_client(
+            db,
+            sales::CreateClientInput {
+                name: "Maquis Rust Lot 5".to_string(),
+                client_type: "professionnel".to_string(),
+                phone: None,
+                address: None,
+                city: None,
+                email: None,
+                contact_person: None,
+                credit_policy: "limited".to_string(),
+                credit_limit: Some(200_000),
+                payment_terms_days: Some(15),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        cash::open_cash_session(
+            db,
+            cash::OpenCashInput {
+                opening_cash: 100_000,
+                request_key: "rust-lot5-cash-open".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Achat + Réception + Règlement dette fournisseur
+        let po = purchases::create_purchase_order(
+            db,
+            purchases::CreatePurchaseOrderInput {
+                request_key: "rust-lot5-po".to_string(),
+                supplier_id: sup.id,
+                expected_date: None,
+                notes: None,
+                lines: vec![purchases::PurchaseOrderLineInput {
+                    product_id: prod.id,
+                    packaging_id: pkg_id,
+                    quantity: "10".to_string(),
+                    unit_price: 500,
+                }],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let po_line_id: i64 = sqlx::query_scalar(
+            "SELECT id FROM purchase_order_lines WHERE purchase_order_id = ? LIMIT 1",
+        )
+        .bind(po.id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+
+        purchases::receive_purchase_order(
+            db,
+            po.id,
+            purchases::ReceivePurchaseOrderInput {
+                request_key: "rust-lot5-rec".to_string(),
+                notes: None,
+                lines: vec![purchases::ReceiveLineInput {
+                    purchase_order_line_id: po_line_id,
+                    received_quantity: "10".to_string(),
+                    discrepancy_reason: None,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let debts = purchases::list_supplier_debts(db).await.unwrap();
+        purchases::pay_supplier_debt(
+            db,
+            debts[0].id,
+            purchases::PaySupplierDebtInput {
+                method_code: "cash".to_string(),
+                amount: 2_500,
+                request_key: "rust-lot5-pay-debt".to_string(),
+                note: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        // Consignations
+        let ret_type = consignments::create_returnable_type(
+            db,
+            consignments::CreateReturnableTypeInput {
+                code: "CAS-RL5".to_string(),
+                name: "Casier Rust Lot 5".to_string(),
+                producer: "SOLIBRA".to_string(),
+                kind: "crate".to_string(),
+                deposit_value: 3_500,
+                initial_stock: Some(15),
+                description: None,
+            },
+        )
+        .await
+        .unwrap();
+        consignments::adjust_returnable_stock(
+            db,
+            consignments::AdjustReturnableStockInput {
+                packaging_id: ret_type.id,
+                movement_type: "entry".to_string(),
+                quantity: 5,
+                reason: "Approvisionnement Rust Lot 5".to_string(),
+                request_key: "rust-lot5-cons".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Vente comptant + retour partiel
+        let sale_cash = sales::create_sale(
+            db,
+            sales::CreateSaleInput {
+                request_key: "rust-lot5-sale-cash".to_string(),
+                client_id: None,
+                sale_type: "cash".to_string(),
+                price_tier: "retail".to_string(),
+                discount_amount: None,
+                notes: None,
+                lines: vec![sales::CreateSaleLineInput {
+                    product_id: prod.id,
+                    packaging_id: pkg_id,
+                    quantity: "4".to_string(),
+                    discount_amount: None,
+                }],
+                payments: vec![sales::PaymentPartInput {
+                    method_code: "cash".to_string(),
+                    amount: 2_800,
+                    ..Default::default()
+                }],
+                due_date: None,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        sales::create_sale_return(
+            db,
+            sale_cash.sale.id,
+            sales::CreateSaleReturnInput {
+                request_key: "rust-lot5-ret".to_string(),
+                reason: "Retour partiel Lot 5".to_string(),
+                restock_approved: true,
+                refund_method_code: "cash".to_string(),
+                lines: vec![sales::SaleReturnLineInput {
+                    sale_line_id: sale_cash.lines[0].id,
+                    base_quantity: "1".to_string(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+
+        // Vente à crédit + règlement partiel créance
+        let sale_credit = sales::create_sale(
+            db,
+            sales::CreateSaleInput {
+                request_key: "rust-lot5-sale-credit".to_string(),
+                client_id: Some(cli.id),
+                sale_type: "credit".to_string(),
+                price_tier: "retail".to_string(),
+                discount_amount: None,
+                notes: None,
+                lines: vec![sales::CreateSaleLineInput {
+                    product_id: prod.id,
+                    packaging_id: pkg_id,
+                    quantity: "8".to_string(),
+                    discount_amount: None,
+                }],
+                payments: vec![],
+                due_date: None,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let recs = cash::list_receivables(db).await.unwrap();
+        let rec = recs
+            .into_iter()
+            .find(|r| r.sale_id == sale_credit.sale.id)
+            .unwrap();
+        cash::pay_receivable(
+            db,
+            rec.id,
+            cash::PayReceivableInput {
+                request_key: "rust-lot5-pay-rec".to_string(),
+                note: None,
+                parts: vec![sales::PaymentPartInput {
+                    method_code: "wave".to_string(),
+                    amount: 1_500,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        // Dépense
+        cash::create_expense(
+            db,
+            cash::CreateExpenseInput {
+                request_key: "rust-lot5-exp".to_string(),
+                category: "Carburant".to_string(),
+                amount: 1_000,
+                method_code: "cash".to_string(),
+                beneficiary: None,
+                notes: Some("Dépense Rust Lot 5".to_string()),
+                receipt_path: None,
+                expense_date: None,
+            },
+        )
+        .await
+        .unwrap();
+    })
+    .await;
 }
 
 #[tokio::test]
