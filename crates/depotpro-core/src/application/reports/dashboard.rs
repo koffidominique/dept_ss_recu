@@ -26,19 +26,37 @@ pub async fn get_dashboard_kpis(db: &DepotDb) -> CoreResult<DashboardKpisDto> {
     .fetch_one(&db.pool)
     .await?;
 
-    let (receivables_total, receivables_count): (i64, i64) = sqlx::query_as(
+    let (rec_merch_total, rec_merch_count): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(remaining_amount), 0), COUNT(*) FROM customer_receivables WHERE status IN ('open', 'partial')",
     )
     .fetch_one(&db.pool)
     .await?;
 
-    let (overdue_receivables_total, overdue_receivables_count): (i64, i64) = sqlx::query_as(
+    let (pkg_debt_total, pkg_debt_count): (i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(bal), 0), COUNT(*)
+         FROM (
+             SELECT client_id, SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END) AS bal
+             FROM customer_packaging_financial_ledger
+             GROUP BY client_id
+             HAVING bal > 0
+         )",
+    )
+    .fetch_one(&db.pool)
+    .await?;
+
+    let receivables_total = rec_merch_total.saturating_add(pkg_debt_total);
+    let receivables_count = rec_merch_count.saturating_add(pkg_debt_count);
+
+    let (overdue_merch_total, overdue_merch_count): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(remaining_amount), 0), COUNT(*)
          FROM customer_receivables
          WHERE status IN ('open', 'partial') AND remaining_amount > 0 AND due_date IS NOT NULL AND date(due_date) < date('now')",
     )
     .fetch_one(&db.pool)
     .await?;
+
+    let overdue_receivables_total = overdue_merch_total.saturating_add(pkg_debt_total);
+    let overdue_receivables_count = overdue_merch_count.saturating_add(pkg_debt_count);
 
     let (supplier_debts_total, supplier_debts_count): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE(SUM(remaining_amount), 0), COUNT(*) FROM supplier_debts WHERE status IN ('open', 'partial')",

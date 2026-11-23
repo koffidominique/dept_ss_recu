@@ -99,10 +99,16 @@ export function buildOrderReceiptDocument(
     issuedQuantity: ["delivered", "invoiced", "paid"].includes(o.status) ? a.quantity : undefined,
     returnedQuantity: a.returned_quantity,
     unitDepositXof: a.is_consigned ? a.deposit_amount_xof : null,
-    statusLabel: a.is_consigned ? "Consigné — suivi distinct" : "Non consigné",
+    statusLabel: a.is_consigned ? "Consigné — retour sous 15 jours" : "Non consigné",
     detail: `Fourni par : ${a.provided_by || "SOUS-DÉPÔT"}`,
     amount: a.is_consigned ? a.quantity * a.deposit_amount_xof : 0,
   }));
+
+  const hasConsignedAllocations = allocations.some((a) => a.is_consigned);
+  const returnedPackagingAmount = allocations.reduce(
+    (sum, a) => sum + (a.is_consigned ? Math.max(0, a.returned_quantity) * a.deposit_amount_xof : 0),
+    0,
+  );
 
   const clientLoc = [client?.commune, client?.quartier, client?.city]
     .filter((s) => Boolean(s?.trim()))
@@ -190,6 +196,15 @@ export function buildOrderReceiptDocument(
         bold: true,
         tone: "success",
       },
+      ...(hasConsignedAllocations || returnedPackagingAmount > 0
+        ? [
+            {
+              label: "Retour emballages (hors total)",
+              value: formatFcfa(returnedPackagingAmount),
+              tone: returnedPackagingAmount > 0 ? ("success" as const) : ("default" as const),
+            },
+          ]
+        : []),
       {
         label: "Montant Versé (Avance / Cash)",
         value: `- ${formatFcfa(o.paid_xof)}`,
@@ -210,7 +225,7 @@ export function buildOrderReceiptDocument(
           : null,
         agentName ? `Émis par : ${agentName}` : null,
         o.notes,
-        "Les consignes correspondent à des emballages récupérables, suivies séparément de la valeur des boissons et régularisées selon les retours physiques.",
+        "Délai de retour des emballages consignés : 15 jours maximum à compter de l’émission. Le montant des retours d’emballages est suivi hors total commande.",
       ]
         .filter(Boolean)
         .join("\n") || null,

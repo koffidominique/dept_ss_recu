@@ -116,6 +116,11 @@ export class HttpApiClient implements ApiClient {
   listPackagingObligations = httpConsignmentsApi.listPackagingObligations;
   getPackagingDashboard = httpConsignmentsApi.getPackagingDashboard;
   payPackagingDebt = httpConsignmentsApi.payPackagingDebt;
+  processDuePackagingObligations = httpConsignmentsApi.processDuePackagingObligations;
+  registerPackagingLateReturn = httpConsignmentsApi.registerPackagingLateReturn;
+  listPackagingLossDeclarations = httpConsignmentsApi.listPackagingLossDeclarations;
+  declarePackagingLoss = httpConsignmentsApi.declarePackagingLoss;
+  validatePackagingLoss = httpConsignmentsApi.validatePackagingLoss;
   getProductCatalogueOverview = httpConsignmentsApi.getProductCatalogueOverview;
   setCatalogueProductActive = httpConsignmentsApi.setCatalogueProductActive;
   setCatalogueReferencePrice = httpConsignmentsApi.setCatalogueReferencePrice;

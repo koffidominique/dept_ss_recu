@@ -507,8 +507,8 @@ fn draw_packaging_and_finance(cmds: &mut Vec<String>, top: f64, doc: &DocumentPd
         cmds,
         left_x + 2.0,
         y - 9.0,
-        "* Tout emballage non restitué à la livraison est facturé au tarif de consigne en vigueur.",
-        5.1,
+        "* Retour emballages sous 15 jours max · Montant retour hors total commande (tarif consigne après 15 j).",
+        5.0,
         false,
         GRAY,
     );

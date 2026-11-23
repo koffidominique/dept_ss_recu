@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { CartItem } from '../../../stores/uiStore.ts';
 import type {
+  ClientPackagingBalance,
   PriceTier,
   ProductPackaging,
   ProductSalesUnit,
@@ -36,7 +37,7 @@ export function getSalesUnitTierPrice(
   return unit.retail_price ?? 0;
 }
 
-export function usePosQueries(search: string) {
+export function usePosQueries(search: string, posClientId: number | null = null) {
   const productsQuery = useQuery({
     queryKey: ['products-pos', search],
     queryFn: () => apiClient.listProducts({ search, page: 1, pageSize: 50 }),
@@ -46,6 +47,12 @@ export function usePosQueries(search: string) {
   const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.listClients(),
+  });
+
+  const clientReturnablesQuery = useQuery<ClientPackagingBalance[]>({
+    queryKey: ['client-packaging-balances', posClientId],
+    queryFn: () => apiClient.getClientPackagingBalances(posClientId as number),
+    enabled: posClientId !== null,
   });
 
   const settingsQuery = useQuery({
@@ -63,9 +70,16 @@ export function usePosQueries(search: string) {
     [settingsQuery.data]
   );
 
+  const clientReturnables = useMemo(
+    () => (posClientId !== null ? (clientReturnablesQuery.data ?? []) : []),
+    [posClientId, clientReturnablesQuery.data]
+  );
+
   return {
     productsRes: productsQuery.data,
     clients: clientsQuery.data,
+    clientReturnables,
+    isLoadingClientReturnables: posClientId !== null && clientReturnablesQuery.isLoading,
     cashStatus: cashQuery.data,
     activeMethods,
   };
@@ -112,6 +126,15 @@ export function usePosMutations({
         throw new Error(totals.errors[0] || 'Panier invalide : corrigez les quantités ou montants.');
       }
       const filteredPayments = paymentRows.filter((p) => p.amount > 0);
+      const validReturnables =
+        posClientId !== null
+          ? receivedReturnables
+              .filter((r) => Number.isFinite(r.pieces) && Math.trunc(r.pieces) > 0)
+              .map((r) => ({
+                returnable_id: r.returnable_id,
+                pieces: Math.trunc(r.pieces),
+              }))
+          : [];
       return apiClient.createSale({
         request_key: requestKey,
         client_id: posClientId,
@@ -128,22 +151,29 @@ export function usePosMutations({
           discount_amount: c.discountAmount,
         })),
         payments: filteredPayments,
-        received_returnables: receivedReturnables
-          .filter((r) => r.pieces > 0)
-          .map((r) => ({
-            returnable_id: r.returnable_id,
-            pieces: r.pieces,
-          })),
+        received_returnables: validReturnables.length > 0 ? validReturnables : undefined,
       });
     },
     onSuccess: (sale) => {
       onSaleSuccess(sale);
       qc.invalidateQueries({ queryKey: ['products-pos'] });
+      qc.invalidateQueries({ queryKey: ['products-orders'] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['cash'] });
       qc.invalidateQueries({ queryKey: ['sales'] });
       qc.invalidateQueries({ queryKey: ['receivables'] });
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['client-packaging-balances'] });
+      qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-obligations'] });
+      qc.invalidateQueries({ queryKey: ['packaging-dashboard'] });
+      qc.invalidateQueries({ queryKey: ['customer-deposits'] });
+      qc.invalidateQueries({ queryKey: ['customer-deposit-history'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
+      qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (err) =>
       onSaleError(err instanceof Error ? err.message : 'Erreur lors de la validation.'),

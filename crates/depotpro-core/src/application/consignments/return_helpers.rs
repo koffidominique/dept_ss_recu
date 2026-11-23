@@ -66,7 +66,7 @@ pub(crate) async fn apply_return_credit_reduction_tx(
 pub(crate) async fn update_client_packaging_balance_tx(
     tx: &mut Transaction<'_, Sqlite>,
     client_id: Option<i64>,
-    issue_id: i64,
+    _issue_id: i64,
     returnable_id: i64,
     pieces_returned: i64,
     unit_value: i64,
@@ -74,34 +74,35 @@ pub(crate) async fn update_client_packaging_balance_tx(
     let Some(cid) = client_id else {
         return Ok(());
     };
-    let issue_data: Option<(i64, i64)> = sqlx::query_as(
-        "SELECT di.pieces, di.returned_pieces FROM deposit_issues di WHERE di.id = ?",
-    )
-    .bind(issue_id)
-    .fetch_optional(&mut **tx)
-    .await?;
-
-    let (total_deposed, already_returned) = issue_data.unwrap_or((0, 0));
-    let new_total_returned = already_returned + pieces_returned;
-    let new_balance = total_deposed - new_total_returned;
     let deposit_reduction = Money::from_non_negative(unit_value, "Tarif consigne")?
         .checked_mul(pieces_returned, "Réduction dépôt")?;
 
     sqlx::query(
         "INSERT INTO customer_packaging_accounts (client_id, returnable_id, balance_pieces, deposit_held_amount)
-         VALUES (?, ?, ?, ?)
+         VALUES (?, ?, 0, 0)
          ON CONFLICT (client_id, returnable_id)
-         DO UPDATE SET 
-           balance_pieces = ?,
-           deposit_held_amount = deposit_held_amount - ?",
+         DO UPDATE SET
+           balance_pieces = MAX(0, balance_pieces - ?),
+           deposit_held_amount = CASE
+               WHEN balance_pieces - ? <= 0 THEN 0
+               ELSE MAX(0, deposit_held_amount - ?)
+           END",
     )
     .bind(cid)
     .bind(returnable_id)
-    .bind(new_balance)
-    .bind(deposit_reduction.value())
-    .bind(new_balance)
+    .bind(pieces_returned)
+    .bind(pieces_returned)
     .bind(deposit_reduction.value())
     .execute(&mut **tx)
+    .await?;
+
+    crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+        tx,
+        cid,
+        returnable_id,
+        -pieces_returned,
+        unit_value,
+    )
     .await?;
     Ok(())
 }

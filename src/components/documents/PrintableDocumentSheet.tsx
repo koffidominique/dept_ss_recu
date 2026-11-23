@@ -205,33 +205,38 @@ export function PrintableDocumentSheet({
             <section className="order-receipt-packaging">
               <h2 className="text-green-700 border-b border-green-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">SUIVI CONSIGNATIONS & EMBALLAGES</h2>
               {doc.packagingLines?.length ? (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Emballage</th>
-                      <th>Prévu</th>
-                      <th>Remis / Rendu</th>
-                      <th>Consigne</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {doc.packagingLines.map((line, index) => (
-                      <tr key={`${line.label}-${index}`}>
-                        <td>
-                          {line.label}
-                          <small>{line.statusLabel}</small>
-                        </td>
-                        <td className="text-center font-mono-num">{line.expectedQuantity}</td>
-                        <td className="text-center font-mono-num">
-                          {line.issuedQuantity ?? '—'} / {line.returnedQuantity ?? 0}
-                        </td>
-                        <td className="text-right font-mono-num">
-                          {line.unitDepositXof == null ? 'Non cons.' : formatFcfa(line.amount ?? 0)}
-                        </td>
+                <>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Emballage</th>
+                        <th>Prévu</th>
+                        <th>Remis / Rendu</th>
+                        <th>Consigne</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {doc.packagingLines.map((line, index) => (
+                        <tr key={`${line.label}-${index}`}>
+                          <td>
+                            {line.label}
+                            <small>{line.statusLabel}</small>
+                          </td>
+                          <td className="text-center font-mono-num">{line.expectedQuantity}</td>
+                          <td className="text-center font-mono-num">
+                            {line.issuedQuantity ?? '—'} / {line.returnedQuantity ?? 0}
+                          </td>
+                          <td className="text-right font-mono-num">
+                            {line.unitDepositXof == null ? 'Non cons.' : formatFcfa(line.amount ?? 0)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-1 rounded border border-amber-200 bg-amber-50/70 p-1.5 text-[7.5px] font-medium text-amber-900">
+                    Délai de retour des emballages consignés : <b>15 jours maximum</b> à compter de l’émission. Le montant des retours d’emballages est comptabilisé <b>hors total commande</b>.
+                  </p>
+                </>
               ) : (
                 <p className="rounded border border-slate-200 p-2 text-[8px] text-slate-500">
                   Aucun emballage consigné sur cette commande.
@@ -330,7 +335,11 @@ export function PrintableDocumentSheet({
                 <div>
                   <p className="font-bold text-slate-600">Montant Total</p>
                   <p className="font-mono-num font-bold text-orange-700">
-                    {doc.summaryRows.find((r) => /TOTAL/.test(r.label))?.value || '—'}
+                    {doc.summaryRows.find(
+                      (r) =>
+                        /NET À PAYER|TOTAL/i.test(r.label) &&
+                        !/hors total|total liquide|total marchandises/i.test(r.label)
+                    )?.value || '—'}
                   </p>
                 </div>
               </div>
@@ -460,24 +469,68 @@ export function PrintableDocumentSheet({
 
       {doc.packagingLines && doc.packagingLines.length > 0 && (
         <section className="border border-slate-400 p-3 text-xs">
-          <h2 className="mb-2 font-bold uppercase">{isPurchaseOrder ? 'Emballages vides à préparer' : isPurchaseReceipt ? 'Emballages vides remis au fournisseur' : isCustomerReceipt ? 'Emballages consignés remis au client' : 'Emballages physiques / consignes'}</h2>
+          <h2 className="mb-2 font-bold uppercase">
+            {isPurchaseOrder
+              ? 'Emballages vides à préparer'
+              : isPurchaseReceipt
+                ? 'Emballages vides remis au fournisseur'
+                : isCustomerReceipt || doc.docType === 'FACTURE'
+                  ? 'Emballages consignés & retours client (délai : 15 jours max)'
+                  : 'Emballages physiques / consignes'}
+          </h2>
           <div className="divide-y divide-slate-200">
-            {doc.packagingLines.map((line, index) => (
-              <div key={`${line.label}-${index}`} className="grid grid-cols-[1fr_auto] gap-2 py-2">
-                <div>
-                  <div className="font-semibold">{line.label} · {line.kind === 'bottle' ? 'bouteilles' : line.kind === 'crate' ? 'casiers' : 'autre'}</div>
-                  {line.detail && <div className="text-[10px] text-slate-600">{line.detail}</div>}
-                  <div className="text-[10px] font-medium text-slate-700">{line.statusLabel}</div>
+            {doc.packagingLines.map((line, index) => {
+              const isClientReturnOnly =
+                line.expectedQuantity === 0 && (line.returnedQuantity ?? 0) > 0;
+              return (
+                <div key={`${line.label}-${index}`} className="grid grid-cols-[1fr_auto] gap-2 py-2">
+                  <div>
+                    <div className="font-semibold">
+                      {line.label} ·{' '}
+                      {line.kind === 'bottle'
+                        ? 'bouteilles'
+                        : line.kind === 'crate'
+                          ? 'casiers'
+                          : 'autre'}
+                    </div>
+                    {line.detail && <div className="text-[10px] text-slate-600">{line.detail}</div>}
+                    <div className="text-[10px] font-medium text-slate-700">{line.statusLabel}</div>
+                  </div>
+                  <div className="text-right font-mono-num">
+                    {isClientReturnOnly ? (
+                      <>
+                        <div className="font-semibold text-emerald-700">
+                          Retour reçu : {line.returnedQuantity} pcs
+                        </div>
+                        {line.amount != null && (
+                          <div className="text-[10px] text-emerald-700">
+                            {formatFcfa(line.amount)} (hors total)
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div>Attendu : {line.expectedQuantity}</div>
+                        {line.issuedQuantity != null && <div>Remis : {line.issuedQuantity}</div>}
+                        {line.returnedQuantity != null && (
+                          <div>
+                            Retourné : {line.returnedQuantity} · Solde :{' '}
+                            {Math.max(0, line.expectedQuantity - line.returnedQuantity)}
+                          </div>
+                        )}
+                        {line.amount != null && <div>{formatFcfa(line.amount)}</div>}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right font-mono-num">
-                  <div>Attendu : {line.expectedQuantity}</div>
-                  {line.issuedQuantity != null && <div>Remis : {line.issuedQuantity}</div>}
-                  {line.returnedQuantity != null && <div>Retourné : {line.returnedQuantity} · Solde : {Math.max(0, line.expectedQuantity - line.returnedQuantity)}</div>}
-                  {line.amount != null && <div>{formatFcfa(line.amount)}</div>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {(isCustomerReceipt || doc.docType === 'FACTURE') && (
+            <p className="mt-2 border-t border-slate-200 pt-1.5 text-[10px] font-medium text-slate-700">
+              Délai de retour des emballages consignés : 15 jours maximum à compter de l’émission. Le montant des retours d’emballages est comptabilisé hors total commande.
+            </p>
+          )}
         </section>
       )}
 
@@ -492,7 +545,10 @@ export function PrintableDocumentSheet({
         </div>
         <div className="space-y-2 self-start px-1 py-1 text-xs">
           {(doc.summaryRows || []).map((row, index) => {
-            const emphasis = row.bold || /total|reste à payer|montant encaissé|net commande/i.test(row.label);
+            const emphasis =
+              row.bold ||
+              (!/hors total/i.test(row.label) &&
+                /total|reste à payer|montant encaissé|net commande/i.test(row.label));
             return (
               <div key={`${row.label}-${index}`} className={`flex justify-between gap-3 ${emphasis ? 'border-t border-black pt-2 text-sm font-bold' : ''} ${row.tone === 'danger' ? 'text-red-700' : row.tone === 'success' ? 'text-emerald-700' : row.tone === 'warning' ? 'text-amber-700' : ''}`}>
                 <span>{row.label}</span><span className="shrink-0 text-right font-mono-num">{row.value}</span>

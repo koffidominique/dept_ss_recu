@@ -33,6 +33,15 @@ export function useProductMutations(callbacks: {
 }) {
   const qc = useQueryClient();
 
+  const invalidateProductCaches = () => {
+    qc.invalidateQueries({ queryKey: ['products'] });
+    qc.invalidateQueries({ queryKey: ['products-pos'] });
+    qc.invalidateQueries({ queryKey: ['products-orders'] });
+    qc.invalidateQueries({ queryKey: ['products-all'] });
+    qc.invalidateQueries({ queryKey: ['deposit-rules'] });
+    qc.invalidateQueries({ queryKey: ['stock'] });
+  };
+
   const saveProductMutation = useMutation({
     mutationFn: async ({
       editingProduct,
@@ -180,7 +189,7 @@ export function useProductMutations(callbacks: {
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      invalidateProductCaches();
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       callbacks.onSavedProduct();
     },
@@ -191,7 +200,7 @@ export function useProductMutations(callbacks: {
   const archiveMutation = useMutation({
     mutationFn: (prod: Product) => apiClient.updateProduct(prod.id, { is_active: !prod.is_active }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      invalidateProductCaches();
       callbacks.onArchivedProduct();
     },
   });
@@ -229,8 +238,8 @@ export function useProductMutations(callbacks: {
             : [],
       }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['products'] });
-      qc.invalidateQueries({ queryKey: ['stock'] });
+      invalidateProductCaches();
+      qc.invalidateQueries({ queryKey: ['consignments'] });
       callbacks.onSavedPackaging(Boolean(variables.pkg.id));
     },
     onError: (err) =>
@@ -255,7 +264,9 @@ export function useProductMutations(callbacks: {
   const importCsvMutation = useMutation({
     mutationFn: (csvText: string) => apiClient.importProductsCsv(csvText),
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      invalidateProductCaches();
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       callbacks.onImportedCsv(res.created);
     },
     onError: (err) =>
@@ -265,9 +276,8 @@ export function useProductMutations(callbacks: {
   const deleteProductMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteProduct(id),
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      invalidateProductCaches();
       qc.invalidateQueries({ queryKey: ['dashboard'] });
-      qc.invalidateQueries({ queryKey: ['stock'] });
       callbacks.onDeletedProduct?.(res);
     },
     onError: (err) => {
@@ -281,11 +291,13 @@ export function useProductMutations(callbacks: {
     mutationFn: ({ keys, activate }: { keys: string[]; activate: boolean }) =>
       apiClient.applyCatalogPresets(keys, activate),
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+      invalidateProductCaches();
       qc.invalidateQueries({ queryKey: ['categories'] });
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.invalidateQueries({ queryKey: ['breweries'] });
+      qc.invalidateQueries({ queryKey: ['brands'] });
       qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['catalog-presets'] });
       callbacks.onAppliedPresets?.(res);

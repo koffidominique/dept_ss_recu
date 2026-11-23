@@ -56,9 +56,24 @@ pub async fn return_client_empties(
     }
 
     let (session_id, _sref, opening_cash) = require_open_session_tx(&mut tx).await?;
-    type DepositIssueRow = (i64, i64, Option<i64>, i64, i64, i64, i64, String);
+    type DepositIssueRow = (
+        i64,
+        i64,
+        Option<i64>,
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+        String,
+        String,
+    );
     let issue: Option<DepositIssueRow> = sqlx::query_as(
-        "SELECT di.id, di.sale_id, di.client_id, di.returnable_id, di.pieces, di.returned_pieces, di.unit_value, s.status
+        "SELECT di.id, di.sale_id, di.client_id, di.returnable_id, di.pieces, di.returned_pieces,
+                (di.lost_pieces + di.destroyed_pieces + di.converted_pieces),
+                di.converted_pieces,
+                di.unit_value, s.status, COALESCE(di.status, 'pending')
          FROM deposit_issues di
          JOIN sales s ON s.id = di.sale_id
          WHERE di.id = ?",
@@ -73,13 +88,27 @@ pub async fn return_client_empties(
         returnable_id,
         pieces,
         returned_pieces,
+        other_out_pieces,
+        converted_pieces,
         unit_value,
         sale_status,
+        di_status,
     ) = issue.ok_or_else(|| CoreError::Validation("Consigne client introuvable.".to_string()))?;
 
     if sale_status == "cancelled" {
         return Err(CoreError::HistoricalImmutable(
             "Impossible d'enregistrer un retour d'emballage sur une vente annulée.".to_string(),
+        ));
+    }
+    if di_status == "converted" {
+        return Err(CoreError::Validation(
+            "Cette obligation a dépassé le délai de restitution et a été convertie en créance financière : enregistrez un retour tardif dans l'onglet Obligations & créances."
+                .to_string(),
+        ));
+    }
+    if matches!(di_status.as_str(), "returned" | "settled" | "cancelled") {
+        return Err(CoreError::Validation(
+            "Cette consigne d'emballage est déjà soldée ou clôturée.".to_string(),
         ));
     }
 
@@ -100,13 +129,12 @@ pub async fn return_client_empties(
         )));
     }
 
-    let total_returned_pieces = returned_pieces
-        .checked_add(input.pieces)
-        .ok_or_else(|| CoreError::Validation("Débordement du nombre de pièces.".to_string()))?;
-    if total_returned_pieces > pieces {
-        return Err(CoreError::Validation(
-            "Nombre de vides retournés supérieur au solde sorti sur cette vente.".to_string(),
-        ));
+    let remaining_physical = (pieces - returned_pieces - other_out_pieces).max(0);
+    if input.pieces > remaining_physical {
+        return Err(CoreError::Validation(format!(
+            "Nombre de vides retournés ({}) supérieur au reliquat physiquement restituable ({remaining_physical}).",
+            input.pieces
+        )));
     }
     let max_val = Money::from_non_negative(unit_value, "Tarif consigne")?
         .checked_mul(input.pieces, "Valeur consignée retournée")?;
@@ -146,21 +174,21 @@ pub async fn return_client_empties(
     };
 
     if input.condition_state == "good" {
-        if bal.is_some() {
-            sqlx::query("UPDATE returnable_stock_balances SET quantity = ? WHERE packaging_id = ?")
-                .bind(after)
-                .bind(returnable_id)
-                .execute(&mut *tx)
-                .await?;
-        } else {
-            sqlx::query(
-                "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)",
-            )
-            .bind(returnable_id)
-            .bind(after)
-            .execute(&mut *tx)
-            .await?;
-        }
+        sqlx::query(
+            "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
+             ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
+        )
+        .bind(returnable_id)
+        .bind(after)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?",
+        )
+        .bind(input.pieces)
+        .bind(returnable_id)
+        .execute(&mut *tx)
+        .await?;
     }
 
     let mov_type = if input.condition_state == "good" {
@@ -169,8 +197,8 @@ pub async fn return_client_empties(
         "breakage"
     };
     let mov_id = sqlx::query(
-        "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, customer_id, unit_deposit_value, total_value)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(format!("ret-vides:{request_key}"))
     .bind(returnable_id)
@@ -180,15 +208,34 @@ pub async fn return_client_empties(
     .bind(after)
     .bind(format!("Retour client ({}) : {reason}", input.condition_state))
     .bind(format!("VENTE-{sale_id}"))
+    .bind(client_id)
+    .bind(unit_value)
+    .bind(max_val.value())
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();
 
-    sqlx::query("UPDATE deposit_issues SET returned_pieces = returned_pieces + ? WHERE id = ?")
-        .bind(input.pieces)
-        .bind(issue_id)
-        .execute(&mut *tx)
-        .await?;
+    let next_status = if returned_pieces + input.pieces + other_out_pieces >= pieces {
+        if converted_pieces > 0 {
+            "converted"
+        } else {
+            "settled"
+        }
+    } else {
+        "partially_returned"
+    };
+    sqlx::query(
+        "UPDATE deposit_issues
+         SET returned_pieces = returned_pieces + ?,
+             status = ?,
+             updated_at = datetime('now')
+         WHERE id = ?",
+    )
+    .bind(input.pieces)
+    .bind(next_status)
+    .bind(issue_id)
+    .execute(&mut *tx)
+    .await?;
 
     update_client_packaging_balance_tx(
         &mut tx,

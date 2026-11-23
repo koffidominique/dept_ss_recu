@@ -136,3 +136,9 @@ pub(crate) struct AddPaymentMethodPayload {
 pub(crate) struct TogglePaymentMethodPayload {
     pub(crate) active: bool,
 }
+
+#[derive(Deserialize)]
+pub(crate) struct PackagingLateReturnPayload {
+    pub(crate) pieces: i64,
+}
+

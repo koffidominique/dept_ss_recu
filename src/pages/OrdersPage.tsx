@@ -259,12 +259,12 @@ export function OrdersPage() {
                 actionMutation.mutate(() => apiClient.cancelCustomerOrder(activeOrder.order.id))
               }
               onEditDraft={() => startEditingDraft(activeOrder)}
-              onReturnCrate={(assetId) =>
+              onReturnCrate={(assetId, quantity, notes) =>
                 actionMutation.mutate(() =>
                   apiClient.returnOrderPackaging(activeOrder.order.id, {
                     packaging_asset_id: assetId,
-                    quantity: 1,
-                    notes: 'Retour casier vide client',
+                    quantity,
+                    notes: notes ?? 'Retour casiers vides client',
                   }),
                 )
               }

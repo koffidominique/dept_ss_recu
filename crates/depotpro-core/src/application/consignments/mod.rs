@@ -67,6 +67,8 @@ pub struct OpenDepositIssueDto {
     pub packaging_code: String,
     pub pieces: i64,
     pub returned_pieces: i64,
+    pub other_out_pieces: i64,
+    pub due_date: Option<String>,
     pub unit_value: i64,
     pub amount: i64,
     pub expected_products: Option<String>,

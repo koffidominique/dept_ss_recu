@@ -110,32 +110,164 @@ pub async fn cancel_sale(
     .execute(&mut *tx)
     .await?;
 
-    let deposits: Vec<(Option<i64>, i64, i64, i64, i64)> = sqlx::query_as(
-        "SELECT client_id, returnable_id, pieces, returned_pieces, amount FROM deposit_issues WHERE sale_id = ?",
+    let deposits: Vec<(i64, Option<i64>, i64, i64, i64, i64, i64, i64, String)> = sqlx::query_as(
+        "SELECT id, client_id, returnable_id, pieces, returned_pieces,
+                lost_pieces + destroyed_pieces + converted_pieces,
+                unit_value, amount, COALESCE(status, 'pending')
+         FROM deposit_issues WHERE sale_id = ?",
     )
     .bind(sale_id)
     .fetch_all(&mut *tx)
     .await?;
-    for (cid_opt, rid, pieces, returned_pieces, amount) in deposits {
-        if returned_pieces > 0 {
-            return Err(CoreError::HistoricalImmutable(
-                "Des vides ont déjà été retournés sur cette vente.".to_string(),
-            ));
-        }
-        if let Some(cid) = cid_opt {
+    for (di_id, cid_opt, rid, pieces, returned_pieces, other_out, unit_value, amount, di_status) in deposits {
+        if di_status == "returned" {
+            if let Some(cid) = cid_opt {
+                let restored_amount = if amount > 0 {
+                    amount
+                } else {
+                    pieces.saturating_mul(unit_value)
+                };
+                sqlx::query(
+                    "INSERT INTO customer_packaging_accounts (client_id, returnable_id, balance_pieces, deposit_held_amount)
+                     VALUES (?, ?, ?, ?)
+                     ON CONFLICT(client_id, returnable_id) DO UPDATE SET
+                       balance_pieces = balance_pieces + excluded.balance_pieces,
+                       deposit_held_amount = deposit_held_amount + excluded.deposit_held_amount",
+                )
+                .bind(cid)
+                .bind(rid)
+                .bind(pieces)
+                .bind(restored_amount)
+                .execute(&mut *tx)
+                .await?;
+
+                crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                    &mut tx, cid, rid, pieces, unit_value,
+                )
+                .await?;
+
+                let mut rem_reopen = pieces;
+                let settled_priors: Vec<(i64, i64, i64, i64, i64)> = sqlx::query_as(
+                    "SELECT di.id, di.pieces, di.returned_pieces,
+                            di.lost_pieces + di.destroyed_pieces + di.converted_pieces,
+                            COALESCE((SELECT SUM(dr.pieces) FROM deposit_returns dr WHERE dr.issue_id = di.id), 0)
+                     FROM deposit_issues di
+                     WHERE di.client_id = ? AND di.returnable_id = ? AND di.sale_id != ?
+                       AND di.status IN ('settled', 'partially_returned')
+                       AND di.returned_pieces > 0
+                     ORDER BY di.id DESC",
+                )
+                .bind(cid)
+                .bind(rid)
+                .bind(sale_id)
+                .fetch_all(&mut *tx)
+                .await?;
+
+                for (p_id, p_pieces, p_ret, p_other, explicit_ret) in settled_priors {
+                    if rem_reopen <= 0 {
+                        break;
+                    }
+                    let reversible = (p_ret - explicit_ret).max(0);
+                    if reversible <= 0 {
+                        continue;
+                    }
+                    let undo = rem_reopen.min(reversible);
+                    let next_ret = p_ret - undo;
+                    let next_st = if next_ret + p_other >= p_pieces {
+                        "settled"
+                    } else if next_ret > 0 || p_other > 0 {
+                        "partially_returned"
+                    } else {
+                        "pending"
+                    };
+                    sqlx::query(
+                        "UPDATE deposit_issues
+                         SET returned_pieces = ?, status = ?, updated_at = datetime('now')
+                         WHERE id = ?",
+                    )
+                    .bind(next_ret)
+                    .bind(next_st)
+                    .bind(p_id)
+                    .execute(&mut *tx)
+                    .await?;
+                    rem_reopen -= undo;
+                }
+            }
+            let cur_empty_stock: i64 = sqlx::query_scalar(
+                "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",
+            )
+            .bind(rid)
+            .fetch_one(&mut *tx)
+            .await?;
+            if cur_empty_stock < pieces {
+                return Err(CoreError::Validation(
+                    "Stock d'emballages vides insuffisant au sous-dépôt pour annuler le retour associé à cette vente."
+                        .to_string(),
+                ));
+            }
+            let next_empty_stock = cur_empty_stock - pieces;
+            sqlx::query("UPDATE returnable_stock_balances SET quantity = ? WHERE packaging_id = ?")
+                .bind(next_empty_stock)
+                .bind(rid)
+                .execute(&mut *tx)
+                .await?;
             sqlx::query(
-                "UPDATE customer_packaging_accounts
-                 SET balance_pieces = MAX(0, balance_pieces - ?),
-                     deposit_held_amount = MAX(0, deposit_held_amount - ?)
-                 WHERE client_id = ? AND returnable_id = ?",
+                "UPDATE packaging_assets SET stock_empty = MAX(0, stock_empty - ?) WHERE returnable_id = ?",
             )
             .bind(pieces)
-            .bind(amount)
-            .bind(cid)
             .bind(rid)
             .execute(&mut *tx)
             .await?;
+            sqlx::query(
+                "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, customer_id, unit_deposit_value, total_value)
+                 VALUES (?, ?, 'correction_out', ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(format!("cancel-ret:{request_key}:{di_id}"))
+            .bind(rid)
+            .bind(pieces)
+            .bind(cur_empty_stock)
+            .bind(next_empty_stock)
+            .bind(format!("Annulation retour emballage {sale_ref} : {reason}"))
+            .bind(&sale_ref)
+            .bind(cid_opt)
+            .bind(unit_value)
+            .bind(amount)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            if returned_pieces > 0 || other_out > 0 {
+                return Err(CoreError::HistoricalImmutable(
+                    "Impossible d'annuler cette vente : ses emballages consignés ont déjà fait l'objet d'un retour, d'une perte ou d'une conversion en dette.".to_string(),
+                ));
+            }
+            if let Some(cid) = cid_opt {
+                sqlx::query(
+                    "UPDATE customer_packaging_accounts
+                     SET balance_pieces = MAX(0, balance_pieces - ?),
+                         deposit_held_amount = CASE
+                             WHEN balance_pieces - ? <= 0 THEN 0
+                             ELSE MAX(0, deposit_held_amount - ?)
+                         END
+                     WHERE client_id = ? AND returnable_id = ?",
+                )
+                .bind(pieces)
+                .bind(pieces)
+                .bind(amount)
+                .bind(cid)
+                .bind(rid)
+                .execute(&mut *tx)
+                .await?;
+
+                crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                    &mut tx, cid, rid, -pieces, unit_value,
+                )
+                .await?;
+            }
         }
+        sqlx::query("UPDATE deposit_issues SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?")
+            .bind(di_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     let refunded: i64 = sqlx::query_scalar(

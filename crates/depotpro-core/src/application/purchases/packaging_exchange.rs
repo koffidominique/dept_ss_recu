@@ -54,6 +54,13 @@ pub(crate) async fn issue_reserved_packaging_tx(
             "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
              ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
         ).bind(returnable_id).bind(after).execute(&mut **tx).await?;
+        sqlx::query(
+            "UPDATE packaging_assets SET stock_empty = MAX(0, stock_empty - ?) WHERE returnable_id = ?",
+        )
+        .bind(delta)
+        .bind(returnable_id)
+        .execute(&mut **tx)
+        .await?;
         let mov_key = format!("sup-exch:{request_key}:{returnable_id}:{po_line_id}:{receipt_id}");
         sqlx::query(
             "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document)

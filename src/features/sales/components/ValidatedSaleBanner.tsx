@@ -29,6 +29,12 @@ function saleLineSnapshotDescription(line: SaleDetail['lines'][number]): string 
 }
 
 export function buildSalePrintableDoc(sale: SaleDetail): PrintableDocumentData {
+  const receivedReturnables = sale.received_returnables ?? [];
+  const returnedPackagingAmount =
+    sale.total_returned_packaging_amount ??
+    receivedReturnables.reduce((sum, r) => sum + r.amount, 0);
+  const hasAnyPackaging = sale.deposits.length > 0 || receivedReturnables.length > 0;
+
   return {
     docType: sale.sale_type === 'credit' ? 'FACTURE' : 'REÇU DE VENTE',
     reference: sale.reference,
@@ -53,32 +59,56 @@ export function buildSalePrintableDoc(sale: SaleDetail): PrintableDocumentData {
         total: l.line_total,
       })),
       ...sale.deposits.map((d) => ({
-        label: `Retour emballage : ${d.packaging_name}`,
+        label: `Consigne emballage : ${d.packaging_name}`,
         sublabel: d.expected_products
-          ? `Code ${d.packaging_code} · Bouteilles attendues : ${d.expected_products}`
-          : `Code ${d.packaging_code}`,
+          ? `Code ${d.packaging_code} · Délai retour : 15 jours max · Produits attendus : ${d.expected_products}`
+          : `Code ${d.packaging_code} · Délai retour : 15 jours max`,
         quantity: `${d.pieces} pcs`,
         unitPrice: d.unit_value,
         total: d.amount,
       })),
     ],
-    packagingLines: sale.deposits.map((deposit) => ({
-      label: `${deposit.packaging_name} (${deposit.packaging_code})`,
-      kind: deposit.kind,
-      expectedQuantity: deposit.pieces,
-      issuedQuantity: deposit.pieces,
-      returnedQuantity: deposit.returned_pieces,
-      statusLabel: deposit.pieces - deposit.returned_pieces > 0
-        ? `${deposit.pieces - deposit.returned_pieces} à restituer`
-        : 'Restitution complète',
-      detail: deposit.expected_products || undefined,
-      amount: deposit.amount,
-    })),
+    packagingLines: [
+      ...sale.deposits.map((deposit) => ({
+        label: `${deposit.packaging_name} (${deposit.packaging_code})`,
+        kind: deposit.kind,
+        expectedQuantity: deposit.pieces,
+        issuedQuantity: deposit.pieces,
+        returnedQuantity: deposit.returned_pieces,
+        unitDepositXof: deposit.unit_value,
+        statusLabel:
+          deposit.pieces - deposit.returned_pieces > 0
+            ? `${deposit.pieces - deposit.returned_pieces} à restituer sous 15 jours`
+            : 'Restitution complète',
+        detail: deposit.expected_products || undefined,
+        amount: deposit.amount,
+      })),
+      ...receivedReturnables.map((ret) => ({
+        label: `${ret.packaging_name} (${ret.packaging_code})`,
+        kind: ret.kind,
+        expectedQuantity: 0,
+        issuedQuantity: 0,
+        returnedQuantity: ret.pieces,
+        unitDepositXof: ret.unit_value,
+        statusLabel: 'Retour client reçu (hors total commande)',
+        detail: `Entrée stock sous-dépôt · Valorisation unitaire ${formatFcfa(ret.unit_value)}`,
+        amount: ret.amount,
+      })),
+    ],
     summaryRows: [
       { label: 'Total marchandises', value: formatFcfa(sale.total_merchandise) },
       { label: 'Remise', value: formatFcfa(sale.discount_amount) },
-      { label: 'Retour emballages', value: formatFcfa(sale.total_deposit) },
+      { label: 'Consignes emballages', value: formatFcfa(sale.total_deposit) },
       { label: 'Total TTC', value: formatFcfa(sale.total_amount), bold: true },
+      ...(returnedPackagingAmount > 0 || hasAnyPackaging
+        ? [
+            {
+              label: 'Retour emballages (hors total commande)',
+              value: formatFcfa(returnedPackagingAmount),
+              tone: returnedPackagingAmount > 0 ? ('success' as const) : ('default' as const),
+            },
+          ]
+        : []),
       { label: 'Encaissé', value: formatFcfa(sale.paid_amount), tone: 'success' },
       {
         label: 'Reste à payer',
@@ -90,6 +120,9 @@ export function buildSalePrintableDoc(sale: SaleDetail): PrintableDocumentData {
       label: `${p.method_label} (${p.reference})`,
       amount: p.part_amount,
     })),
+    commercialConditions: hasAnyPackaging
+      ? 'Délai de retour des emballages consignés : 15 jours maximum à compter de la date de ce reçu. Le montant des retours d’emballages est comptabilisé hors total commande.'
+      : undefined,
     notes: sale.due_date ? `Échéance crédit : ${sale.due_date}` : sale.notes,
     missingPackagingNote: buildMissingPackagingNote(sale.deposits),
   };
@@ -99,7 +132,7 @@ export function buildMissingPackagingNote(deposits: SaleDetail['deposits']): str
   const missing = deposits.filter((d) => d.pieces - d.returned_pieces > 0);
   if (missing.length === 0) return null;
   const parts = missing.map((d) => `${d.pieces - d.returned_pieces}× ${d.packaging_name} (${d.packaging_code})`);
-  return `Emballages vides non restitués : ${parts.join(' · ')}. Le client est soumis à restitution sous 15 jours de l’emballage retour faisant défaut ; à défaut après ce délai, il paie la valeur de l’emballage retour.`;
+  return `Emballages vides non restitués : ${parts.join(' · ')}. Délai de retour obligatoire : 15 jours maximum ; passé ce délai de 15 jours, la valeur des emballages non rendus est exigible.`;
 }
 
 interface ValidatedSaleBannerProps {
@@ -111,6 +144,11 @@ interface ValidatedSaleBannerProps {
 
 export function ValidatedSaleBanner({ sale, onPrint, onClose, missingPackagingNote }: ValidatedSaleBannerProps) {
   const note = missingPackagingNote ?? buildMissingPackagingNote(sale.deposits);
+  const returnedAmount =
+    sale.total_returned_packaging_amount ??
+    (sale.received_returnables ?? []).reduce((sum, r) => sum + r.amount, 0);
+  const returnedPieces = (sale.received_returnables ?? []).reduce((sum, r) => sum + r.pieces, 0);
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96, y: -8 }}
@@ -126,9 +164,15 @@ export function ValidatedSaleBanner({ sale, onPrint, onClose, missingPackagingNo
               Vente validée · {sale.reference}
             </h3>
             <p className="text-xs text-[#667085] dark:text-slate-400">
-              Client : {sale.client_name} · Total : {formatFcfa(sale.total_amount)} · Encaissé :{' '}
+              Client : {sale.client_name} · Total commande : {formatFcfa(sale.total_amount)} · Encaissé :{' '}
               {formatFcfa(sale.paid_amount)}
             </p>
+            {returnedPieces > 0 && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-0.5">
+                Retour emballages reçu ({returnedPieces} pcs · hors total commande) :{' '}
+                {formatFcfa(returnedAmount)}
+              </p>
+            )}
             {note && (
               <p className="text-xs text-[#9B1C1C] dark:text-red-400 font-medium mt-0.5">
                 {note}

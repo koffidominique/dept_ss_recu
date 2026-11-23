@@ -94,13 +94,21 @@ export function SaleDetailModal({
                   <span className="font-mono-num">{formatFcfa(sale.total_merchandise)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Retour emballages</span>
+                  <span>Consignes emballages</span>
                   <span className="font-mono-num">{formatFcfa(sale.total_deposit)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm pt-1 border-t border-slate-200 dark:border-slate-800">
                   <span>Total TTC</span>
                   <span className="font-mono-num">{formatFcfa(sale.total_amount)}</span>
                 </div>
+                {(sale.total_returned_packaging_amount ?? 0) > 0 && (
+                  <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-medium">
+                    <span>Retour emballages (hors total commande)</span>
+                    <span className="font-mono-num">
+                      {formatFcfa(sale.total_returned_packaging_amount ?? 0)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[#16A36A]">
                   <span>Encaissé</span>
                   <span className="font-mono-num">{formatFcfa(sale.paid_amount)}</span>
@@ -116,7 +124,7 @@ export function SaleDetailModal({
               {sale.deposits.length > 0 && (
                 <div className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 p-3 text-xs space-y-1.5">
                   <div className="font-semibold text-[#1D4ED8] dark:text-blue-400">
-                    Emballages consignés &amp; bouteilles vides à restituer
+                    Emballages consignés &amp; bouteilles vides à restituer (délai : 15 jours max)
                   </div>
                   {sale.deposits.map((d) => (
                     <div key={d.id} className="flex items-start justify-between gap-3">
@@ -133,6 +141,29 @@ export function SaleDetailModal({
                       </div>
                       <span className="font-mono-num font-semibold shrink-0">
                         {formatFcfa(d.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(sale.received_returnables?.length ?? 0) > 0 && (
+                <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 text-xs space-y-1.5">
+                  <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    Emballages retournés par le client (hors total commande)
+                  </div>
+                  {sale.received_returnables!.map((ret) => (
+                    <div key={ret.id} className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium">
+                          {ret.packaging_name} ({ret.packaging_code}) · {ret.pieces} pcs reçues
+                        </div>
+                        <div className="text-[11px] text-[#667085] dark:text-slate-400">
+                          Tarif consigne : {formatFcfa(ret.unit_value)}/pc · Entrée stock sous-dépôt
+                        </div>
+                      </div>
+                      <span className="font-mono-num font-semibold text-emerald-700 dark:text-emerald-400 shrink-0">
+                        {formatFcfa(ret.amount)}
                       </span>
                     </div>
                   ))}

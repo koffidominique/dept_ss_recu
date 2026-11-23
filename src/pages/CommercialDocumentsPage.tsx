@@ -113,9 +113,31 @@ export function CommercialDocumentsPage() {
       const products = await apiClient.listProducts({ page: 1, pageSize: 200 });
       const stocks = Object.fromEntries(products.items.map((product) => [product.id, product.stock_milli]));
       if (reviewTarget?.documentType === 'customer_order') {
-        const [detail, receivables] = await Promise.all([apiClient.getCustomerOrder(reviewTarget.documentId), apiClient.listReceivables()]);
-        const customerBalance = receivables.filter((entry) => entry.client_id === detail.order.customer_id && ['open', 'partial'].includes(entry.status)).reduce((sum, entry) => sum + entry.remaining_amount, 0);
-        return { kind: 'customer_order' as const, detail, stocks, customerBalance };
+        const detail = await apiClient.getCustomerOrder(reviewTarget.documentId);
+        const [receivables, pkgDash] = await Promise.all([
+          apiClient.listReceivables(),
+          detail.order.customer_id
+            ? apiClient.getPackagingDashboard(detail.order.customer_id).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        const tradeBalance = receivables
+          .filter(
+            (entry) =>
+              entry.client_id === detail.order.customer_id &&
+              ['open', 'partial'].includes(entry.status)
+          )
+          .reduce((sum, entry) => sum + entry.remaining_amount, 0);
+        const packagingDebt = pkgDash?.packaging_financial_debt ?? 0;
+        const customerBalance = tradeBalance + packagingDebt;
+        const pendingPieces = pkgDash?.pending_pieces ?? 0;
+        return {
+          kind: 'customer_order' as const,
+          detail,
+          stocks,
+          customerBalance,
+          packagingDebt,
+          pendingPieces,
+        };
       }
       if (reviewTarget?.documentType === 'purchase_order') {
         const [purchaseOrders, supplierDebts] = await Promise.all([apiClient.listPurchases(), apiClient.listSupplierDebts()]);
@@ -128,7 +150,13 @@ export function CommercialDocumentsPage() {
     },
   });
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['commercial-documents'] });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['commercial-documents'] });
+    void queryClient.invalidateQueries({ queryKey: ['commercial-document-events'] });
+    void queryClient.invalidateQueries({ queryKey: ['customer-orders'] });
+    void queryClient.invalidateQueries({ queryKey: ['purchases'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
   const submitMutation = useMutation({
     mutationFn: (doc: CommercialDocument) => apiClient.submitCommercialDocument(
       doc.documentType as 'customer_order' | 'purchase_order', doc.documentId,
@@ -155,8 +183,15 @@ export function CommercialDocumentsPage() {
       const next = await apiClient.listCommercialDocuments({ ...documentQuery, page: current, pageSize: first.pageSize });
       allRows.push(...next.rows);
     }
-    const rows = allRows.map((doc) => [doc.documentType, doc.documentNumber, doc.counterparty, doc.status,
-      doc.approvalStatus ?? '', doc.amountXof, doc.createdAt]);
+    const rows = allRows.map((doc) => [
+      typeLabel(doc.documentType),
+      doc.documentNumber,
+      doc.counterparty,
+      statusLabel(doc.status),
+      doc.approvalStatus ? statusLabel(doc.approvalStatus) : '',
+      doc.amountXof,
+      doc.createdAt,
+    ]);
     const csv = [['Type', 'Référence', 'Tiers', 'Statut', 'Approbation', 'Montant XOF', 'Date'], ...rows]
       .map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
@@ -185,6 +220,16 @@ export function CommercialDocumentsPage() {
     payment_receipt: 'REÇU DE PAIEMENT', credit_note: 'AVOIR CLIENT', cancellation: 'ANNULATION',
   };
   const detail = documentDetailQuery.data as CommercialDocumentDetail | undefined;
+  const returnedPkgAmountFromDetail = detail
+    ? detail.packagingLines
+        .filter(
+          (line) =>
+            line.expectedQuantity === 0 &&
+            (line.returnedQuantity ?? 0) > 0 &&
+            (line.amount ?? 0) > 0
+        )
+        .reduce((sum, line) => sum + (line.amount ?? 0), 0)
+    : 0;
   const printableDocument: PrintableDocumentData | null = detail ? {
     docType: printableType[detail.documentType], reference: detail.documentNumber,
     date: detail.createdAt, statusLabel: statusLabel(detail.status),
@@ -205,7 +250,22 @@ export function CommercialDocumentsPage() {
       detail: line.detail ?? undefined,
       amount: line.amount ?? undefined,
     })),
-    summaryRows: [{ label: 'Total', value: formatFcfa(detail.amountXof), bold: true }],
+    summaryRows: [
+      { label: 'Total', value: formatFcfa(detail.amountXof), bold: true },
+      ...(detail.documentType === 'sales_receipt' && returnedPkgAmountFromDetail > 0
+        ? [
+            {
+              label: 'Retour emballages (hors total commande)',
+              value: formatFcfa(returnedPkgAmountFromDetail),
+              tone: 'success' as const,
+            },
+          ]
+        : []),
+    ],
+    commercialConditions:
+      detail.documentType === 'sales_receipt' && detail.packagingLines.length > 0
+        ? 'Délai de retour des emballages consignés : 15 jours maximum. Le montant des retours d’emballages est comptabilisé hors total commande.'
+        : undefined,
     payments: detail.payments.map((payment) => ({ label: payment.label, amount: payment.amountXof })),
     notes: detail.notes,
   } : null;
@@ -275,7 +335,7 @@ export function CommercialDocumentsPage() {
 
     {reviewTarget && <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setReviewTarget(null); }}><section role="dialog" aria-modal="true" aria-labelledby="review-document-title" className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl dark:bg-[#111A2E]"><div className="flex items-start justify-between gap-3"><div><h2 id="review-document-title" className="font-display text-base font-semibold">Examen Owner · {reviewTarget.documentNumber}</h2><p className="mt-1 text-xs text-slate-500">{typeLabel(reviewTarget.documentType)} · {reviewTarget.counterparty}</p></div><button type="button" onClick={() => setReviewTarget(null)} className="rounded-lg px-2 py-1 text-xs text-slate-500">Fermer</button></div>
       {reviewDetailsQuery.isLoading ? <div className="py-5"><LoadingState rows={4} /></div> : reviewDetailsQuery.error ? <p className="py-5 text-sm text-rose-600">{reviewDetailsQuery.error instanceof Error ? reviewDetailsQuery.error.message : 'Impossible de charger les détails.'}</p> : reviewData?.kind === 'customer_order' ? <>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Total à percevoir</span><strong className="mt-1 block">{formatFcfa(reviewData.detail.order.total_to_collect_xof)}</strong></div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Acompte enregistré</span><strong className="mt-1 block">{formatFcfa(reviewData.detail.order.paid_xof)}</strong></div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Créances client actuelles</span><strong className="mt-1 block">{formatFcfa(reviewData.customerBalance)}</strong></div></div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-4"><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Total à percevoir</span><strong className="mt-1 block">{formatFcfa(reviewData.detail.order.total_to_collect_xof)}</strong></div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Acompte enregistré</span><strong className="mt-1 block">{formatFcfa(reviewData.detail.order.paid_xof)}</strong></div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Créances financières actuelles</span><strong className="mt-1 block">{formatFcfa(reviewData.customerBalance)}</strong>{reviewData.packagingDebt > 0 && <span className="text-[10px] text-amber-700 dark:text-amber-300">dont {formatFcfa(reviewData.packagingDebt)} d’emballages échus</span>}</div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Emballages dus (15 j)</span><strong className="mt-1 block">{reviewData.pendingPieces} pcs</strong></div></div>
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800"><table className="w-full min-w-[600px] text-left text-xs"><thead className="bg-slate-50 dark:bg-slate-900"><tr><th className="px-3 py-2">Produit</th><th className="px-3 py-2">Quantité</th><th className="px-3 py-2">Prix unitaire</th><th className="px-3 py-2">Remise</th><th className="px-3 py-2">Stock actuel</th><th className="px-3 py-2 text-right">Total ligne</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{reviewData.detail.lines.map((line) => <tr key={line.id}><td className="px-3 py-2">{line.product_name} · {line.variant_name}<div className="text-[10px] text-slate-500">Conditionnement : 1 {orderUnitLabel(line.requested_unit)} = {formatQty(Math.round(line.base_quantity * 1000 / line.requested_quantity))} {line.base_unit}</div></td><td className="px-3 py-2">{formatQty(line.requested_quantity)} {line.requested_unit}<div className="text-[10px] text-slate-500">= {formatQty(line.base_quantity)} unité(s) de base</div></td><td className="px-3 py-2">{formatFcfa(line.unit_price_xof)}</td><td className="px-3 py-2">{formatFcfa(line.discount_xof)}</td><td className="px-3 py-2">{formatQty(reviewData.stocks[line.product_id] ?? 0)} {reviewData.stocks[line.product_id] === undefined ? '(indisponible)' : ''}</td><td className="px-3 py-2 text-right font-semibold">{formatFcfa(line.line_total_xof)}</td></tr>)}</tbody></table></div>
       </> : reviewData?.kind === 'purchase_order' ? <>
         <div className="mt-4 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Montant du bon</span><strong className="mt-1 block">{formatFcfa(reviewData.purchase.total_amount)}</strong></div><div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-900"><span className="text-[11px] text-slate-500">Dette fournisseur actuelle</span><strong className="mt-1 block">{formatFcfa(reviewData.supplierBalance)}</strong></div></div>

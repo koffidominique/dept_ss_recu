@@ -628,42 +628,82 @@ pub async fn get_document_detail(
                 },
             )
             .collect();
-            let deposits: Vec<(String, String, i64, i64, String, i64)> = sqlx::query_as(
-                "SELECT COALESCE(json_extract(component.value, '$.kind'), 'other'),
-                        COALESCE(json_extract(component.value, '$.name'), 'Détail non disponible sur cette opération historique'),
-                        di.pieces, di.returned_pieces, COALESCE(sl.product_name, ''), di.amount
-                 FROM deposit_issues di LEFT JOIN sale_lines sl ON sl.id = di.sale_line_id
+            let deposits: Vec<(String, String, i64, i64, String, i64, String)> = sqlx::query_as(
+                "SELECT COALESCE(json_extract(component.value, '$.kind'), rpt.kind, 'other'),
+                        COALESCE(json_extract(component.value, '$.name'), rpt.name, 'Détail non disponible sur cette opération historique'),
+                        di.pieces, di.returned_pieces, COALESCE(sl.product_name, ''),
+                        CASE
+                            WHEN di.status = 'returned' AND di.amount <= 0
+                                THEN di.pieces * COALESCE(NULLIF(di.unit_value, 0), rpt.deposit_value, 0)
+                            ELSE di.amount
+                        END,
+                        COALESCE(di.status, 'pending')
+                 FROM deposit_issues di
+                 LEFT JOIN sale_lines sl ON sl.id = di.sale_line_id
                  LEFT JOIN json_each(sl.packaging_snapshot_json, '$.depositItems') component
                       ON CAST(json_extract(component.value, '$.returnableId') AS INTEGER) = di.returnable_id
+                 LEFT JOIN returnable_packaging_types rpt ON rpt.id = di.returnable_id
                  WHERE di.sale_id = ? ORDER BY di.id",
             )
             .bind(document_id)
             .fetch_all(&db.pool)
             .await?;
+            let mut returned_packaging_amount: i64 = 0;
+            let has_packaging = !deposits.is_empty();
             packaging_lines = deposits
                 .into_iter()
-                .map(|(kind, name, expected, returned, detail, amount)| {
-                    let remaining = (expected - returned).max(0);
-                    CommercialDocumentPackagingLine {
-                        label: name,
-                        kind,
-                        expected_quantity: expected,
-                        issued_quantity: Some(expected),
-                        returned_quantity: Some(returned),
-                        status_label: if remaining > 0 {
-                            format!("{remaining} à restituer")
-                        } else {
-                            "Restitution complète".to_string()
-                        },
-                        detail: if detail.is_empty() {
-                            None
-                        } else {
-                            Some(detail)
-                        },
-                        amount: Some(amount),
+                .map(|(kind, name, expected, returned, detail, amount, di_status)| {
+                    if di_status == "returned" {
+                        returned_packaging_amount += amount;
+                        CommercialDocumentPackagingLine {
+                            label: format!("{name} (retour client reçu)"),
+                            kind,
+                            expected_quantity: 0,
+                            issued_quantity: Some(0),
+                            returned_quantity: Some(expected),
+                            status_label: "Retour reçu · hors total commande".to_string(),
+                            detail: Some("Réintégré au stock d'emballages vides du sous-dépôt".to_string()),
+                            amount: Some(amount),
+                        }
+                    } else {
+                        let remaining = (expected - returned).max(0);
+                        CommercialDocumentPackagingLine {
+                            label: name,
+                            kind,
+                            expected_quantity: expected,
+                            issued_quantity: Some(expected),
+                            returned_quantity: Some(returned),
+                            status_label: if remaining > 0 {
+                                format!("{remaining} à restituer sous 15 jours")
+                            } else {
+                                "Restitution complète".to_string()
+                            },
+                            detail: if detail.is_empty() {
+                                None
+                            } else {
+                                Some(detail)
+                            },
+                            amount: Some(amount),
+                        }
                     }
                 })
                 .collect();
+            if has_packaging {
+                let mut note_parts = Vec::new();
+                if let Some(existing) = notes.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                    note_parts.push(existing.to_string());
+                }
+                if returned_packaging_amount > 0 {
+                    note_parts.push(format!(
+                        "Montant retour emballages reçus (hors total commande) : {returned_packaging_amount} FCFA."
+                    ));
+                }
+                note_parts.push(
+                    "Délai de retour d'emballages : 15 jours maximum. Le montant du retour d'emballages est suivi hors total commande ; à défaut de restitution dans les 15 jours, la valeur des emballages faisant défaut est exigible."
+                        .to_string(),
+                );
+                notes = Some(note_parts.join("\n"));
+            }
             payments = sqlx::query_as::<_, (String, i64)>(
                 "SELECT pm.label || ' · ' || p.reference || COALESCE(' · Txn ' || p.external_reference, ''), pp.amount
                  FROM payments p JOIN payment_parts pp ON pp.payment_id = p.id

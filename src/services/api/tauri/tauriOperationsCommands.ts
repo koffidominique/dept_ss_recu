@@ -75,6 +75,33 @@ export const tauriConsignmentsApi = {
       "pay_packaging_debt",
       { token: getStoredTauriToken(), payload: input },
     ),
+  processDuePackagingObligations: () =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["processDuePackagingObligations"]>>>(
+      "process_due_packaging_obligations",
+      { token: getStoredTauriToken() },
+    ),
+  registerPackagingLateReturn: (depositIssueId: number, pieces: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["registerPackagingLateReturn"]>>>(
+      "register_packaging_late_return",
+      { token: getStoredTauriToken(), depositIssueId, pieces },
+    ),
+  listPackagingLossDeclarations: (clientId?: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["listPackagingLossDeclarations"]>>>(
+      "list_packaging_loss_declarations",
+      { token: getStoredTauriToken(), clientId: clientId ?? null },
+    ),
+  declarePackagingLoss: (
+    input: Parameters<ApiClient["declarePackagingLoss"]>[0],
+  ) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["declarePackagingLoss"]>>>(
+      "declare_packaging_loss",
+      { token: getStoredTauriToken(), payload: input },
+    ),
+  validatePackagingLoss: (declarationId: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["validatePackagingLoss"]>>>(
+      "validate_packaging_loss",
+      { token: getStoredTauriToken(), declarationId },
+    ),
   getProductCatalogueOverview: () =>
     tauriInvoke<Awaited<ReturnType<ApiClient["getProductCatalogueOverview"]>>>(
       "get_product_catalogue_overview_pc",

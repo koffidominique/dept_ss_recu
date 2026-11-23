@@ -17,6 +17,18 @@ interface OrderStepClientProps {
   depositHistory?: PackagingMovementRecord[];
 }
 
+const PACKAGING_MOVEMENT_LABELS: Record<string, string> = {
+  SORTIE_COMMANDE: 'Sortie commande',
+  RETOUR_CLIENT: 'Retour client',
+  ANNULATION_COMMANDE: 'Annulation commande',
+};
+
+const CREDIT_POLICY_LABELS: Record<string, string> = {
+  forbidden: 'Crédit interdit',
+  limited: 'Plafond limité',
+  unlimited: 'Crédit illimité',
+};
+
 export function OrderStepClient({
   clients,
   customerId,
@@ -153,31 +165,73 @@ export function OrderStepClient({
       </div>
 
       {activeClient && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-xs space-y-1">
-          <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-300">
-            <PackageCheck className="h-4 w-4" />
-            Solde consigné en cours — {activeClient.name}
-          </div>
-          {heldDeposits.length === 0 ? (
-            <p className="text-[#667085] dark:text-slate-400">
-              Ce client ne détient aucun emballage consigné actuellement (0 FCFA).
-            </p>
-          ) : (
-            <p className="text-amber-900 dark:text-amber-200">
-              Ce client détient actuellement :{' '}
-              {heldDeposits.map((d) => `${d.quantity_held} ${d.packaging_name}`).join(', ')}{' '}
-              (valeur : <strong>{formatFcfa(heldValue)}</strong>).
-            </p>
-          )}
-          {depositHistory.length > 0 && (
-            <div className="pt-1.5 border-t border-amber-200/70 dark:border-amber-900/40 text-[11px] text-[#667085] dark:text-slate-400">
-              Derniers mouvements :{' '}
-              {depositHistory
-                .slice(0, 3)
-                .map((m) => `${m.movement_type} (${m.quantity} × ${m.packaging_name})`)
-                .join(' · ')}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 p-3 text-xs space-y-1">
+            <div className="flex items-center justify-between gap-2 font-semibold text-amber-900 dark:text-amber-300">
+              <span className="flex items-center gap-2">
+                <PackageCheck className="h-4 w-4" />
+                Emballages dus — {activeClient.name}
+              </span>
+              <span className="text-[11px] font-normal text-amber-800/80 dark:text-amber-400">
+                Échéance 15 j max
+              </span>
             </div>
-          )}
+            {heldDeposits.length === 0 ? (
+              <p className="text-[#667085] dark:text-slate-400">
+                Aucun emballage consigné dû actuellement (0 FCFA).
+              </p>
+            ) : (
+              <p className="text-amber-900 dark:text-amber-200">
+                En attente de retour :{' '}
+                {heldDeposits.map((d) => `${d.quantity_held} ${d.packaging_name}`).join(', ')}{' '}
+                (valeur réf. : <strong>{formatFcfa(heldValue)}</strong>).
+              </p>
+            )}
+            {depositHistory.length > 0 && (
+              <div className="pt-1.5 border-t border-amber-200/70 dark:border-amber-900/40 text-[11px] text-[#667085] dark:text-slate-400">
+                Derniers mouvements :{' '}
+                {depositHistory
+                  .slice(0, 3)
+                  .map(
+                    (m) =>
+                      `${PACKAGING_MOVEMENT_LABELS[m.movement_type] ?? m.movement_type} (${m.quantity} × ${m.packaging_name})`
+                  )
+                  .join(' · ')}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 p-3 text-xs space-y-1">
+            <div className="flex items-center justify-between gap-2 font-semibold text-[#182230] dark:text-slate-200">
+              <span>Encours financier &amp; politique crédit</span>
+              <span className="rounded bg-slate-200/70 dark:bg-slate-800 px-2 py-0.5 text-[10px]">
+                {CREDIT_POLICY_LABELS[activeClient.credit_policy ?? 'forbidden'] ??
+                  activeClient.credit_policy}
+              </span>
+            </div>
+            <p className="text-[#667085] dark:text-slate-300">
+              Encours exigible actuel (marchandises + emballages échus) :{' '}
+              <strong
+                className={
+                  activeClient.unpaid_balance > 0
+                    ? 'text-[#DC4545] font-mono-num'
+                    : 'text-emerald-700 dark:text-emerald-400 font-mono-num'
+                }
+              >
+                {formatFcfa(activeClient.unpaid_balance)}
+              </strong>
+            </p>
+            {activeClient.credit_policy === 'limited' && activeClient.credit_limit != null && (
+              <p className="text-[11px] text-[#667085] dark:text-slate-400">
+                Plafond autorisé :{' '}
+                <strong className="font-mono-num">{formatFcfa(activeClient.credit_limit)}</strong> ·
+                Disponible :{' '}
+                <strong className="font-mono-num">
+                  {formatFcfa(Math.max(0, activeClient.credit_limit - activeClient.unpaid_balance))}
+                </strong>
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -27,6 +27,19 @@ export interface Client {
   returnable_pieces_due: number;
 }
 
+export interface ClientPackagingBalance {
+  id: number;
+  client_id: number;
+  client_name: string;
+  client_code: string;
+  returnable_id: number;
+  packaging_name: string;
+  packaging_code: string;
+  deposit_value: number;
+  balance_pieces: number;
+  deposit_held_amount: number;
+}
+
 export interface Supplier {
   id: number;
   code: string;

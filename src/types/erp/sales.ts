@@ -73,6 +73,17 @@ export interface SaleDetail extends SaleSummary {
     amount: number;
     expected_products?: string | null;
   }>;
+  received_returnables?: Array<{
+    id: number;
+    returnable_id: number;
+    kind: 'bottle' | 'crate' | 'other';
+    packaging_name: string;
+    packaging_code: string;
+    pieces: number;
+    unit_value: number;
+    amount: number;
+  }>;
+  total_returned_packaging_amount?: number;
   cancellation: {
     id: number;
     reason: string;

@@ -20,7 +20,6 @@ pub async fn validate_sale_compatibility(
     let config = get_pos_validation_config(db, &input.terminal_id).await?;
     let rules = get_compatibility_rules(db).await?;
 
-    let issues = Vec::new();
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
 
@@ -31,6 +30,9 @@ pub async fn validate_sale_compatibility(
 
         match rule.rule_type.as_str() {
             "same_crate" => {
+                if rule.required_quantity <= 0 {
+                    continue;
+                }
                 let crate_groups = group_by_crate_type(&input.line_items);
                 for (_crate_type, items) in crate_groups {
                     let total_bottles: i64 = items.iter().map(|item| item.quantity).sum();
@@ -60,11 +62,20 @@ pub async fn validate_sale_compatibility(
                         let affected_lines: Vec<i64> =
                             items.iter().map(|item| item.line_index).collect();
                         let message = if !bottles_valid && !supports_valid {
-                            format!("Le nombre de bouteilles ({}) et de supports ({}) ne correspondent pas à la capacité du casier ({})", total_bottles, total_supports, rule.required_quantity)
+                            format!(
+                                "Le nombre de bouteilles ({}) et de supports ({}) ne correspondent pas à la capacité du casier ({})",
+                                total_bottles, total_supports, rule.required_quantity
+                            )
                         } else if !bottles_valid {
-                            format!("Le nombre de bouteilles ({}) ne correspond pas à la capacité du casier ({})", total_bottles, rule.required_quantity)
+                            format!(
+                                "Le nombre de bouteilles ({}) ne correspond pas à la capacité du casier ({})",
+                                total_bottles, rule.required_quantity
+                            )
                         } else {
-                            format!("Le nombre de supports ({}) ne correspond pas à la capacité du casier ({})", total_supports, rule.required_quantity)
+                            format!(
+                                "Le nombre de supports ({}) ne correspond pas à la capacité du casier ({})",
+                                total_supports, rule.required_quantity
+                            )
                         };
                         let issue = ValidationIssue {
                             rule_type: rule.rule_type.clone(),
@@ -81,58 +92,65 @@ pub async fn validate_sale_compatibility(
                 }
             }
             "same_brand" => {
-                let brand_groups = group_by_brand(&input.line_items, db).await?;
-                for (brand, items) in brand_groups {
+                let crate_groups = group_by_crate_type(&input.line_items);
+                for (crate_type_id, items) in crate_groups {
                     if items.len() > 1 && has_multiple_brands(&items, db).await? {
                         let severity = match config.compatibility_validation_level.as_str() {
                             "strict" => "error",
                             "warning" => "warning",
                             _ => "info",
                         };
-                        let affected_lines: Vec<i64> =
-                            items.iter().map(|item| item.line_index).collect();
-                        let issue = ValidationIssue {
-                            rule_type: rule.rule_type.clone(),
-                            severity: severity.to_string(),
-                            message: rule.error_message.clone().unwrap_or_else(|| {
-                                format!("Mélange de marques dans le même casier: {}", brand)
-                            }),
-                            affected_lines,
-                        };
-                        if severity == "error" {
-                            errors.push(issue);
-                        } else {
-                            warnings.push(issue);
+                        if severity == "error" || severity == "warning" {
+                            let affected_lines: Vec<i64> =
+                                items.iter().map(|item| item.line_index).collect();
+                            let issue = ValidationIssue {
+                                rule_type: rule.rule_type.clone(),
+                                severity: severity.to_string(),
+                                message: rule.error_message.clone().unwrap_or_else(|| {
+                                    format!(
+                                        "Mélange de marques non autorisé dans le casier #{}",
+                                        crate_type_id
+                                    )
+                                }),
+                                affected_lines,
+                            };
+                            if severity == "error" {
+                                errors.push(issue);
+                            } else {
+                                warnings.push(issue);
+                            }
                         }
                     }
                 }
             }
             "same_family" => {
-                let family_groups = group_by_family(&input.line_items, db).await?;
-                for (family, items) in family_groups {
-                    if items.len() > 1 && has_multiple_families(&items, db).await? {
+                let crate_groups = group_by_crate_type(&input.line_items);
+                for (crate_type_id, items) in crate_groups {
+                    if items.len() > 1 && has_multiple_categories(&items, db).await? {
                         let severity = match config.compatibility_validation_level.as_str() {
                             "strict" => "error",
                             "warning" => "warning",
                             _ => "info",
                         };
-                        let affected_lines: Vec<i64> =
-                            items.iter().map(|item| item.line_index).collect();
-                        let issue = ValidationIssue {
-                            rule_type: rule.rule_type.clone(),
-                            severity: severity.to_string(),
-                            message: rule.error_message.clone().unwrap_or_else(|| {
-                                format!(
-                                    "Mélange de familles de produits dans le même casier: {}",
-                                    family
-                                )
-                            }),
-                            affected_lines,
-                        };
-                        if severity == "error" {
-                            errors.push(issue);
-                        } else {
-                            warnings.push(issue);
+                        if severity == "error" || severity == "warning" {
+                            let affected_lines: Vec<i64> =
+                                items.iter().map(|item| item.line_index).collect();
+                            let issue = ValidationIssue {
+                                rule_type: rule.rule_type.clone(),
+                                severity: severity.to_string(),
+                                message: rule.error_message.clone().unwrap_or_else(|| {
+                                    format!(
+                                        "Mélange de familles/catégories de produits dans le casier #{}",
+                                        crate_type_id
+                                    )
+                                }),
+                                affected_lines,
+                            };
+                            if severity == "error" {
+                                errors.push(issue);
+                            } else {
+                                warnings.push(issue);
+                            }
                         }
                     }
                 }
@@ -146,11 +164,7 @@ pub async fn validate_sale_compatibility(
     Ok(ValidationResultDto {
         is_valid: errors.is_empty(),
         can_proceed,
-        issues: issues
-            .into_iter()
-            .chain(warnings.clone())
-            .chain(errors.clone())
-            .collect(),
+        issues: warnings.iter().cloned().chain(errors.iter().cloned()).collect(),
         warnings,
         errors,
     })
@@ -166,52 +180,13 @@ fn group_by_crate_type(line_items: &[SaleLineItem]) -> HashMap<i64, Vec<SaleLine
     groups
 }
 
-async fn group_by_brand(
-    line_items: &[SaleLineItem],
-    db: &DepotDb,
-) -> CoreResult<HashMap<String, Vec<SaleLineItem>>> {
-    let mut groups: HashMap<String, Vec<SaleLineItem>> = HashMap::new();
-    for item in line_items {
-        let brand = sqlx::query_scalar::<_, String>(
-            "SELECT b.name FROM brands b
-             JOIN products p ON p.brand_id = b.id
-             WHERE p.id = ?",
-        )
-        .bind(item.product_id)
-        .fetch_optional(&db.pool)
-        .await?
-        .unwrap_or_else(|| "unknown".to_string());
-        groups.entry(brand).or_default().push(item.clone());
-    }
-    Ok(groups)
-}
-
-async fn group_by_family(
-    line_items: &[SaleLineItem],
-    db: &DepotDb,
-) -> CoreResult<HashMap<String, Vec<SaleLineItem>>> {
-    let mut groups: HashMap<String, Vec<SaleLineItem>> = HashMap::new();
-    for item in line_items {
-        let family = sqlx::query_scalar::<_, String>(
-            "SELECT pf.name FROM product_families pf
-             JOIN products p ON p.family_id = pf.id
-             WHERE p.id = ?",
-        )
-        .bind(item.product_id)
-        .fetch_optional(&db.pool)
-        .await?
-        .unwrap_or_else(|| "unknown".to_string());
-        groups.entry(family).or_default().push(item.clone());
-    }
-    Ok(groups)
-}
-
 async fn has_multiple_brands(items: &[SaleLineItem], db: &DepotDb) -> CoreResult<bool> {
     let mut brands = HashSet::new();
     for item in items {
         let brand = sqlx::query_scalar::<_, String>(
-            "SELECT b.code FROM brands b
-             JOIN products p ON p.brand_id = b.id
+            "SELECT COALESCE(b.code, NULLIF(trim(p.brand), ''), 'unknown')
+             FROM products p
+             LEFT JOIN brands b ON b.id = p.brand_id
              WHERE p.id = ?",
         )
         .bind(item.product_id)
@@ -223,19 +198,20 @@ async fn has_multiple_brands(items: &[SaleLineItem], db: &DepotDb) -> CoreResult
     Ok(brands.len() > 1)
 }
 
-async fn has_multiple_families(items: &[SaleLineItem], db: &DepotDb) -> CoreResult<bool> {
-    let mut families = HashSet::new();
+async fn has_multiple_categories(items: &[SaleLineItem], db: &DepotDb) -> CoreResult<bool> {
+    let mut categories = HashSet::new();
     for item in items {
-        let family = sqlx::query_scalar::<_, String>(
-            "SELECT pf.code FROM product_families pf
-             JOIN products p ON p.family_id = pf.id
+        let category = sqlx::query_scalar::<_, String>(
+            "SELECT COALESCE(c.name, 'unknown')
+             FROM products p
+             LEFT JOIN categories c ON c.id = p.category_id
              WHERE p.id = ?",
         )
         .bind(item.product_id)
         .fetch_optional(&db.pool)
         .await?
         .unwrap_or_else(|| "unknown".to_string());
-        families.insert(family);
+        categories.insert(category);
     }
-    Ok(families.len() > 1)
+    Ok(categories.len() > 1)
 }

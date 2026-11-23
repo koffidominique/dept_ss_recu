@@ -177,6 +177,22 @@ pub(crate) fn packaging_and_system_router() -> Router<AppState> {
             "/api/packaging-obligations/pay",
             post(consignments::packaging_pay_debt),
         )
+        .route(
+            "/api/packaging-obligations/process-due",
+            post(consignments::packaging_process_due),
+        )
+        .route(
+            "/api/packaging-obligations/:id/late-return",
+            post(consignments::packaging_late_return),
+        )
+        .route(
+            "/api/packaging-obligations/losses",
+            get(consignments::packaging_losses_list).post(consignments::packaging_declare_loss),
+        )
+        .route(
+            "/api/packaging-obligations/losses/:id/validate",
+            post(consignments::packaging_validate_loss),
+        )
         // Composants emballages, retours partiels & validation POS
         .route(
             "/api/packaging-components",

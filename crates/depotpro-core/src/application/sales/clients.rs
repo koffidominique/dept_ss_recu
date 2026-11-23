@@ -20,7 +20,8 @@ pub async fn list_clients(db: &DepotDb, search: Option<&str>) -> CoreResult<Vec<
                         c.phone, c.address, c.city, c.commune, c.quartier, c.landmark,
                         c.email, c.contact_person, c.is_active,
                         ccs.policy AS credit_policy, ccs.credit_limit, ccs.payment_terms_days,
-                        COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables r WHERE r.client_id = c.id AND r.status IN ('open', 'partial')), 0) AS unpaid_balance,
+                        COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables r WHERE r.client_id = c.id AND r.status IN ('open', 'partial')), 0)
+                        + MAX(0, COALESCE((SELECT SUM(CASE WHEN l.direction = 'debit' THEN l.amount ELSE -l.amount END) FROM customer_packaging_financial_ledger l WHERE l.client_id = c.id), 0)) AS unpaid_balance,
                         COALESCE((SELECT SUM(balance_pieces) FROM customer_packaging_accounts cpa WHERE cpa.client_id = c.id), 0) AS returnable_pieces_due
                  FROM clients c
                  LEFT JOIN client_credit_settings ccs ON ccs.client_id = c.id
@@ -40,7 +41,8 @@ pub async fn list_clients(db: &DepotDb, search: Option<&str>) -> CoreResult<Vec<
                         c.phone, c.address, c.city, c.commune, c.quartier, c.landmark,
                         c.email, c.contact_person, c.is_active,
                         ccs.policy AS credit_policy, ccs.credit_limit, ccs.payment_terms_days,
-                        COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables r WHERE r.client_id = c.id AND r.status IN ('open', 'partial')), 0) AS unpaid_balance,
+                        COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables r WHERE r.client_id = c.id AND r.status IN ('open', 'partial')), 0)
+                        + MAX(0, COALESCE((SELECT SUM(CASE WHEN l.direction = 'debit' THEN l.amount ELSE -l.amount END) FROM customer_packaging_financial_ledger l WHERE l.client_id = c.id), 0)) AS unpaid_balance,
                         COALESCE((SELECT SUM(balance_pieces) FROM customer_packaging_accounts cpa WHERE cpa.client_id = c.id), 0) AS returnable_pieces_due
                  FROM clients c
                  LEFT JOIN client_credit_settings ccs ON ccs.client_id = c.id

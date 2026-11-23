@@ -1,6 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowLeftRight, PackageCheck } from 'lucide-react';
-import { formatFcfa, formatNumber } from '../../../utils/format.ts';
+import { formatDate, formatFcfa, formatNumber } from '../../../utils/format.ts';
 import type { ClientBalance, OpenIssue, ReturnableType } from '../types.ts';
 
 /* ============================================================================
@@ -67,13 +67,29 @@ export function buildTypeColumns(
 export function buildIssueColumns(
   onStartReturn: (issue: OpenIssue) => void
 ): ColumnDef<OpenIssue>[] {
+  const today = new Date().toISOString().slice(0, 10);
   return [
     {
       accessorKey: 'sale_reference',
-      header: 'Vente',
-      cell: ({ row }) => (
-        <span className="font-mono-num text-xs font-semibold">{row.original.sale_reference}</span>
-      ),
+      header: 'Vente & échéance',
+      cell: ({ row }) => {
+        const due = row.original.due_date;
+        const overdue = Boolean(due && due < today);
+        return (
+          <div>
+            <span className="font-mono-num text-xs font-semibold">{row.original.sale_reference}</span>
+            {due && (
+              <div
+                className={`font-mono-num text-[11px] ${
+                  overdue ? 'text-[#DC4545] font-semibold' : 'text-[#667085]'
+                }`}
+              >
+                Échéance : {formatDate(due)} {overdue ? '(> 15j)' : ''}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'client_name',
@@ -100,7 +116,10 @@ export function buildIssueColumns(
       id: 'remaining',
       header: 'Vides chez client',
       cell: ({ row }) => {
-        const rem = row.original.pieces - row.original.returned_pieces;
+        const rem = Math.max(
+          0,
+          row.original.pieces - row.original.returned_pieces - (row.original.other_out_pieces ?? 0)
+        );
         return (
           <span className="font-mono-num font-semibold text-[#D9901A]">
             {rem} / {row.original.pieces} pcs
@@ -112,8 +131,11 @@ export function buildIssueColumns(
       id: 'val',
       header: "Valeur d'emballage restante",
       cell: ({ row }) => {
-        const rem =
-          (row.original.pieces - row.original.returned_pieces) * row.original.unit_value;
+        const remPieces = Math.max(
+          0,
+          row.original.pieces - row.original.returned_pieces - (row.original.other_out_pieces ?? 0)
+        );
+        const rem = remPieces * row.original.unit_value;
         return <span className="font-mono-num">{formatFcfa(rem)}</span>;
       },
     },

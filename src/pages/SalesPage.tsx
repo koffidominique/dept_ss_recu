@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { apiClient } from '../services/api/createApiClient.ts';
@@ -8,7 +8,11 @@ import {
   type PrintableDocumentData,
 } from '../components/documents/DocumentPrintModal.tsx';
 import { newRequestKey } from '../utils/format.ts';
-import { calculateSaleCart } from '../features/sales/utils/saleCalculations.ts';
+import {
+  calculateSaleCart,
+  computeAvailableReturnableRows,
+  computeReturnedPackagingSummary,
+} from '../features/sales/utils/saleCalculations.ts';
 import {
   buildCartItemFromPackaging,
   buildCartItemFromSalesUnit,
@@ -34,15 +38,6 @@ import type {
   SaleDetail,
 } from '../types/erp.ts';
 
-interface ClientReturnableBalance {
-  returnable_id: number;
-  packaging_name: string;
-  packaging_code: string;
-  deposit_value: number;
-  balance_pieces: number;
-  deposit_held_amount: number;
-}
-
 export function SalesPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState('');
@@ -58,7 +53,6 @@ export function SalesPage() {
   const [heldModalOpen, setHeldModalOpen] = useState(false);
   const [quickClientOpen, setQuickClientOpen] = useState(false);
   const [quickClientError, setQuickClientError] = useState<string | null>(null);
-  const [clientReturnables, setClientReturnables] = useState<ClientReturnableBalance[]>([]);
   const [receivedReturnables, setReceivedReturnables] = useState<Array<{ returnable_id: number; pieces: number }>>([]);
 
   const {
@@ -79,27 +73,33 @@ export function SalesPage() {
     setPosSaleType,
   } = useUiStore();
 
-  const { productsRes, clients, cashStatus, activeMethods } = usePosQueries(search);
+  const {
+    productsRes,
+    clients,
+    clientReturnables,
+    isLoadingClientReturnables,
+    cashStatus,
+    activeMethods,
+  } = usePosQueries(search, posClientId);
+
   const totals = useMemo(
     () => calculateSaleCart(posCart, globalDiscount, paymentRows),
     [posCart, globalDiscount, paymentRows]
   );
 
-  useEffect(() => {
-    if (!posClientId) return;
-    apiClient
-      .getClientPackagingBalances(posClientId)
-      .then((balances) => {
-        setClientReturnables(balances);
-        setReceivedReturnables(
-          balances.map((b) => ({ returnable_id: b.returnable_id, pieces: 0 }))
-        );
-      })
-      .catch(() => {
-        setClientReturnables([]);
-        setReceivedReturnables([]);
-      });
-  }, [posClientId]);
+  const normalizedReceivedReturnables = useMemo(() => {
+    if (posClientId === null) return [];
+    const rows = computeAvailableReturnableRows(clientReturnables, posCart);
+    return computeReturnedPackagingSummary(rows, receivedReturnables).normalized;
+  }, [posClientId, clientReturnables, posCart, receivedReturnables]);
+
+  const handleClientChange = useCallback(
+    (nextClientId: number | null) => {
+      setPosClientId(nextClientId);
+      setReceivedReturnables([]);
+    },
+    [setPosClientId]
+  );
 
   const { createSaleMutation, quickClientMutation } = usePosMutations({
     requestKey,
@@ -111,10 +111,11 @@ export function SalesPage() {
     posCart,
     paymentRows,
     totals,
-    receivedReturnables,
+    receivedReturnables: normalizedReceivedReturnables,
     onSaleSuccess: (sale) => {
       setValidatedSale(sale);
       clearCart();
+      setReceivedReturnables([]);
       setGlobalDiscount(0);
       setDueDate('');
       setPaymentRows([{ method_code: 'cash', amount: 0 }]);
@@ -124,6 +125,7 @@ export function SalesPage() {
     onSaleError: setErrorMsg,
     onQuickClientSuccess: (clientId) => {
       setPosClientId(clientId);
+      setReceivedReturnables([]);
       setQuickClientError(null);
       setQuickClientOpen(false);
     },
@@ -183,6 +185,7 @@ export function SalesPage() {
     if (posCart.length === 0) return;
     const selectedClient = clients?.find((c) => c.id === posClientId);
     holdCurrentCart(selectedClient ? selectedClient.name : `Ticket ${heldCarts.length + 1}`, globalDiscount);
+    setReceivedReturnables([]);
     setGlobalDiscount(0);
     setDueDate('');
     setPaymentRows([{ method_code: 'cash', amount: 0 }]);
@@ -238,7 +241,7 @@ export function SalesPage() {
           heldCarts={heldCarts}
           clients={clients}
           posClientId={posClientId}
-          onClientChange={setPosClientId}
+          onClientChange={handleClientChange}
           posSaleType={posSaleType}
           onSaleTypeChange={setPosSaleType}
           dueDate={dueDate}
@@ -253,7 +256,10 @@ export function SalesPage() {
           isSubmitting={createSaleMutation.isPending}
           onUpdateCartItem={updateCartItem}
           onRemoveFromCart={removeFromCart}
-          onClearCart={clearCart}
+          onClearCart={() => {
+            clearCart();
+            setReceivedReturnables([]);
+          }}
           onHoldCart={handleHoldCart}
           onOpenHeldModal={() => setHeldModalOpen(true)}
           onOpenQuickClient={() => {
@@ -262,16 +268,19 @@ export function SalesPage() {
           }}
           onSubmitSale={() => createSaleMutation.mutate()}
           clientReturnables={clientReturnables}
+          isLoadingClientReturnables={isLoadingClientReturnables}
           receivedReturnables={receivedReturnables}
           onReceivedReturnableChange={(returnableId, pieces) => {
+            const safePieces = Number.isFinite(pieces) ? Math.max(0, Math.trunc(pieces)) : 0;
             setReceivedReturnables((prev) => {
               const next = [...prev];
               const idx = next.findIndex((r) => r.returnable_id === returnableId);
-              if (idx >= 0) next[idx].pieces = pieces;
-              else next.push({ returnable_id: returnableId, pieces });
+              if (idx >= 0) next[idx] = { returnable_id: returnableId, pieces: safePieces };
+              else next.push({ returnable_id: returnableId, pieces: safePieces });
               return next;
             });
           }}
+          onResetReceivedReturnables={() => setReceivedReturnables([])}
         />
       </div>
 
@@ -282,6 +291,7 @@ export function SalesPage() {
         heldCarts={heldCarts}
         onResume={(ticketId) => {
           const resumed = resumeHeldCart(ticketId);
+          setReceivedReturnables([]);
           if (resumed) setGlobalDiscount(resumed.discountAmount);
           setHeldModalOpen(false);
         }}

@@ -90,6 +90,74 @@ pub async fn create_returnable_type(
         .await?;
     }
 
+    let existing_asset_id: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM packaging_assets
+         WHERE (code = ? OR lower(name) = lower(?)) AND returnable_id IS NULL
+         ORDER BY id ASC LIMIT 1",
+    )
+    .bind(&code)
+    .bind(&name)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    if let Some(asset_id) = existing_asset_id {
+        sqlx::query(
+            "UPDATE packaging_assets
+             SET returnable_id = ?, deposit_value = ?, stock_empty = stock_empty + ?, is_active = 1
+             WHERE id = ?",
+        )
+        .bind(id)
+        .bind(deposit_value.value())
+        .bind(initial_stock)
+        .bind(asset_id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        let name_or_code_taken: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM packaging_assets WHERE code = ? OR lower(name) = lower(?)",
+        )
+        .bind(&code)
+        .bind(&name)
+        .fetch_one(&mut *tx)
+        .await?;
+        if name_or_code_taken == 0 {
+            let pt_code = if input.kind == "crate" {
+                "PT-CRATE"
+            } else {
+                "PT-UNIT-BTL"
+            };
+            let pt_id: Option<i64> =
+                sqlx::query_scalar("SELECT id FROM packaging_types WHERE code = ?")
+                    .bind(pt_code)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            let capacity: i64 = if input.kind == "bottle" {
+                1
+            } else if name.contains("12") || code.contains("12") {
+                12
+            } else if name.contains("20") || code.contains("20") {
+                20
+            } else {
+                24
+            };
+            sqlx::query(
+                "INSERT INTO packaging_assets (
+                    code, name, packaging_type_id, returnable_id, capacity,
+                    deposit_value, currency, returnable, compatibility_class, stock_empty, stock_full, is_active
+                 ) VALUES (?, ?, ?, ?, ?, ?, 'XOF', 1, 'other', ?, 0, 1)",
+            )
+            .bind(&code)
+            .bind(&name)
+            .bind(pt_id)
+            .bind(id)
+            .bind(capacity)
+            .bind(deposit_value.value())
+            .bind(initial_stock)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
     audit_log_tx(
         &mut tx,
         "CREATE_RETURNABLE_TYPE",
@@ -211,6 +279,24 @@ pub async fn adjust_returnable_stock(
             .bind(after)
             .execute(&mut *tx)
             .await?;
+    }
+
+    if is_out {
+        sqlx::query(
+            "UPDATE packaging_assets SET stock_empty = MAX(0, stock_empty - ?) WHERE returnable_id = ?",
+        )
+        .bind(input.quantity)
+        .bind(input.packaging_id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?",
+        )
+        .bind(input.quantity)
+        .bind(input.packaging_id)
+        .execute(&mut *tx)
+        .await?;
     }
 
     let mov_id = sqlx::query(

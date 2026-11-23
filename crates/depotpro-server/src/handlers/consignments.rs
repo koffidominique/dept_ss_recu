@@ -9,8 +9,8 @@ use axum::response::{IntoResponse, Json};
 use depotpro_core::application::auth::{self, Permission};
 use depotpro_core::application::{consignments, packaging_obligations};
 
-use crate::dto::PackagingObligationsQuery;
-use crate::state::{map_err, require_perm, AppState};
+use crate::dto::{PackagingLateReturnPayload, PackagingObligationsQuery};
+use crate::state::{map_err, require_auth, require_perm, AppState};
 
 pub(crate) async fn consignments_overview(
     State(state): State<AppState>,
@@ -126,10 +126,17 @@ pub(crate) async fn client_packaging_balances(
     headers: HeaderMap,
     Path(client_id): Path<i64>,
 ) -> impl IntoResponse {
-    let actor = match require_perm(&state, &headers, Permission::ConsignmentsRead).await {
+    let actor = match require_auth(&state, &headers).await {
         Ok(a) => a,
         Err(e) => return e.into_response(),
     };
+    if !actor.has_permission(Permission::ConsignmentsRead)
+        && !actor.has_permission(Permission::SalesRead)
+    {
+        if let Err(e) = auth::require_permission(&actor, Permission::ConsignmentsRead) {
+            return map_err(e).into_response();
+        }
+    }
     let db = state.db().await;
     match auth::with_actor(
         actor,
@@ -159,6 +166,132 @@ pub(crate) async fn packaging_pay_debt(
     .await
     {
         Ok(dto) => Json(serde_json::to_value(dto).unwrap()).into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn packaging_process_due(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsWrite).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor.clone(),
+        packaging_obligations::process_due_obligations(&db, Some(&actor.username)),
+    )
+    .await
+    {
+        Ok(summary) => Json(serde_json::to_value(summary).unwrap()).into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn packaging_late_return(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(deposit_issue_id): Path<i64>,
+    Json(payload): Json<PackagingLateReturnPayload>,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsWrite).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor.clone(),
+        packaging_obligations::register_late_return(
+            &db,
+            deposit_issue_id,
+            payload.pieces,
+            Some(&actor.username),
+        ),
+    )
+    .await
+    {
+        Ok(credited_amount) => Json(serde_json::json!({
+            "deposit_issue_id": deposit_issue_id,
+            "credited_amount": credited_amount
+        }))
+        .into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn packaging_losses_list(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<PackagingObligationsQuery>,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsRead).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor,
+        packaging_obligations::list_loss_declarations(&db, q.client_id),
+    )
+    .await
+    {
+        Ok(rows) => Json(serde_json::to_value(rows).unwrap()).into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn packaging_declare_loss(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<packaging_obligations::DeclareLossInput>,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsWrite).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor.clone(),
+        packaging_obligations::declare_loss(&db, payload, Some(&actor.username)),
+    )
+    .await
+    {
+        Ok(declaration_id) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({ "declaration_id": declaration_id })),
+        )
+            .into_response(),
+        Err(e) => map_err(e).into_response(),
+    }
+}
+
+pub(crate) async fn packaging_validate_loss(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(declaration_id): Path<i64>,
+) -> impl IntoResponse {
+    let actor = match require_perm(&state, &headers, Permission::ConsignmentsWrite).await {
+        Ok(a) => a,
+        Err(e) => return e.into_response(),
+    };
+    let db = state.db().await;
+    match auth::with_actor(
+        actor.clone(),
+        packaging_obligations::validate_loss_declaration(
+            &db,
+            declaration_id,
+            Some(&actor.username),
+        ),
+    )
+    .await
+    {
+        Ok(converted_amount) => Json(serde_json::json!({
+            "declaration_id": declaration_id,
+            "converted_amount": converted_amount
+        }))
+        .into_response(),
         Err(e) => map_err(e).into_response(),
     }
 }

@@ -24,7 +24,9 @@ pub use debt_and_dashboard::{
 pub use late_returns::register_late_return;
 pub use ledger::get_client_packaging_financial_balance;
 pub(crate) use ledger::{insert_ledger_entry, mark_converted};
-pub use losses::{declare_loss, validate_loss_declaration};
+pub use losses::{
+    declare_loss, list_loss_declarations, validate_loss_declaration, PackagingLossDeclarationDto,
+};
 
 #[derive(Debug, Serialize)]
 pub struct PackagingObligationDto {

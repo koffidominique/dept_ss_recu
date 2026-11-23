@@ -243,6 +243,21 @@ pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> 
             y -= row_height;
             draw_line(cmds, MARGIN, y, RIGHT, y, (0.886, 0.91, 0.941), 0.5);
         }
+        if !is_po && !is_rec {
+            if y - 14.0 < 64.0 {
+                start_page(&mut pages, &mut y);
+            }
+            draw_text(
+                pages.last_mut().unwrap(),
+                MARGIN + 5.0,
+                y - 10.0,
+                "* Délai de retour des emballages : 15 jours maximum · Montant retour d'emballages suivi hors total commande.",
+                7.0,
+                false,
+                (0.4, 0.439, 0.522),
+            );
+            y -= 14.0;
+        }
     }
     y -= 14.0;
 
