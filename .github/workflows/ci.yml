@@ -177,7 +177,9 @@ jobs:
           CARGO_TERM_COLOR=never cargo clippy -p depotpro-core -p depotpro-server --all-targets -- -D warnings 2>&1 | tee /tmp/clippy.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            MSG=$(grep -E '^error(\[|:)|   -->' /tmp/clippy.log | head -n 60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
+            # On remonte chaque erreur AVEC sa localisation (3 lignes de contexte) :
+            # sans le chemin et le numero de ligne, l'annotation est inutilisable.
+            MSG=$(awk '/^error/ {for (i=0;i<4;i++) {print; if (getline <= 0) break}}' /tmp/clippy.log | head -n 80 | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
             echo "::error title=clippy::$MSG"
             exit "$rc"
           fi
