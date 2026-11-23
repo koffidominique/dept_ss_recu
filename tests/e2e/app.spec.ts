@@ -319,10 +319,14 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Mettre à jour le brouillon' }).click();
     await expect(page.getByText(/Commande #ORD-.*\(DRAFT\)/)).toBeVisible();
 
+    // Confirmer et livrer ouvrent une ConfirmationDialog : sans la valider,
+    // aucune mutation n'est envoyee et le statut ne change jamais.
     await page.getByRole('button', { name: 'Confirmer (déduire stock)' }).click();
+    await page.getByRole('button', { name: 'Confirmer et déduire le stock' }).click();
     await expect(page.getByText(/\(CONFIRMED\)/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Livrer (imputer consignes client)' }).click();
+    await page.getByRole('button', { name: 'Valider la livraison' }).click();
     await expect(page.getByText(/\(DELIVERED\)/)).toBeVisible();
 
     await page.getByRole('button', { name: /Encaisser solde/i }).click();
