@@ -92,10 +92,13 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         // session identifiee l'operation echoue volontairement (echec ferme).
         // Cet acteur ne sert qu'a l'approbation ; le nom fige dans les recus
         // reste celui de l'emetteur explicite (`actor`, plus bas).
+        // C'est deliver_order qui emet le recu v1, avec l'acteur courant : cet
+        // acteur doit donc porter l'identite attendue par l'assertion plus bas
+        // (issued_by_name = "Test proprietaire"), sinon le nom fige serait faux.
         let approver = SessionIdentity::from_role(
-            "orders-test-approver",
-            "orders-test",
-            "Approbateur Test",
+            "receipt-test-user",
+            "receipt-test",
+            "Test propriétaire",
             Role::Owner,
         );
         sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
@@ -550,7 +553,7 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         assert!(sale_reference.starts_with("VTE-"));
 
         // Le reçu est émis depuis la commande livrée, figé en base et idempotent à la réimpression.
-        let actor = SessionIdentity::from_role("receipt-test-user", "receipt-test", "Test propriétaire", Role::Owner);
+        let actor = approver.clone();
         let payments_before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM payments WHERE order_id = ?")
             .bind(created.order.id)
             .fetch_one(&db.pool)
