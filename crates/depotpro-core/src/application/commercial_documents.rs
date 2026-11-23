@@ -967,6 +967,7 @@ pub async fn get_document_detail(
                     },
                 )
                 .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
                 "SELECT version, document_number, issued_at, issued_by_name, issued_by_role, snapshot_json
                  FROM purchase_receipt_snapshots WHERE receipt_id = ? ORDER BY version DESC",
@@ -1012,6 +1013,7 @@ pub async fn get_document_detail(
             .into_iter()
             .map(|(label, amount_xof)| CommercialDocumentDetailPayment { label, amount_xof })
             .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
                 "SELECT version, receipt_number, issued_at, issued_by_name, issued_by_role, snapshot_json
                  FROM payment_receipt_snapshots WHERE payment_id = ? ORDER BY version DESC",
