@@ -251,8 +251,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }],
                         payments: vec![sales::PaymentPartInput {
                             method_code: "cash".into(),
-                            amount: 1300,
-                            ..Default::default()
+                            amount: 1300
                         }],
                         due_date: None,
                         ..Default::default()
