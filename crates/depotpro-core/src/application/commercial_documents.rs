@@ -660,44 +660,46 @@ pub async fn get_document_detail(
             let has_packaging = !deposits.is_empty();
             packaging_lines = deposits
                 .into_iter()
-                .map(|(kind, name, expected, returned, detail, amount, di_status)| {
-                    if di_status == "returned" {
-                        returned_packaging_amount += amount;
-                        CommercialDocumentPackagingLine {
-                            label: format!("{name} (retour client reçu)"),
-                            kind,
-                            expected_quantity: 0,
-                            issued_quantity: Some(0),
-                            returned_quantity: Some(expected),
-                            status_label: "Retour reçu · hors total commande".to_string(),
-                            detail: Some(
-                                "Réintégré au stock d'emballages vides du sous-dépôt"
-                                    .to_string(),
-                            ),
-                            amount: Some(amount),
+                .map(
+                    |(kind, name, expected, returned, detail, amount, di_status)| {
+                        if di_status == "returned" {
+                            returned_packaging_amount += amount;
+                            CommercialDocumentPackagingLine {
+                                label: format!("{name} (retour client reçu)"),
+                                kind,
+                                expected_quantity: 0,
+                                issued_quantity: Some(0),
+                                returned_quantity: Some(expected),
+                                status_label: "Retour reçu · hors total commande".to_string(),
+                                detail: Some(
+                                    "Réintégré au stock d'emballages vides du sous-dépôt"
+                                        .to_string(),
+                                ),
+                                amount: Some(amount),
+                            }
+                        } else {
+                            let remaining = (expected - returned).max(0);
+                            CommercialDocumentPackagingLine {
+                                label: name,
+                                kind,
+                                expected_quantity: expected,
+                                issued_quantity: Some(expected),
+                                returned_quantity: Some(returned),
+                                status_label: if remaining > 0 {
+                                    format!("{remaining} à restituer sous 15 jours")
+                                } else {
+                                    "Restitution complète".to_string()
+                                },
+                                detail: if detail.is_empty() {
+                                    None
+                                } else {
+                                    Some(detail)
+                                },
+                                amount: Some(amount),
+                            }
                         }
-                    } else {
-                        let remaining = (expected - returned).max(0);
-                        CommercialDocumentPackagingLine {
-                            label: name,
-                            kind,
-                            expected_quantity: expected,
-                            issued_quantity: Some(expected),
-                            returned_quantity: Some(returned),
-                            status_label: if remaining > 0 {
-                                format!("{remaining} à restituer sous 15 jours")
-                            } else {
-                                "Restitution complète".to_string()
-                            },
-                            detail: if detail.is_empty() {
-                                None
-                            } else {
-                                Some(detail)
-                            },
-                            amount: Some(amount),
-                        }
-                    }
-                })
+                    },
+                )
                 .collect();
             if has_packaging {
                 let mut note_parts = Vec::new();
