@@ -24,24 +24,25 @@ pub async fn register_late_return(
     }
     let mut g = db.begin_write().await?;
     let tx = &mut g.1;
-    let (client_id, rid, status, pieces_due, returned, converted): (
+    let (client_id, rid, status, pieces_due, returned, converted, unit_value): (
         Option<i64>,
         i64,
         String,
         i64,
         i64,
         i64,
+        i64,
     ) = sqlx::query_as(
-        "SELECT client_id, returnable_id, status, pieces, returned_pieces, converted_pieces
+        "SELECT client_id, returnable_id, status, pieces, returned_pieces, converted_pieces, unit_value
          FROM deposit_issues WHERE id = ?",
     )
     .bind(deposit_issue_id)
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(|| CoreError::Validation("Obligation introuvable.".to_string()))?;
-    if status == "settled" || status == "cancelled" {
+    if matches!(status.as_str(), "settled" | "cancelled" | "returned") {
         return Err(CoreError::Validation(
-            "Cette obligation est déjà soldée.".to_string(),
+            "Cette obligation est déjà soldée ou clôturée.".to_string(),
         ));
     }
     let pending_physical = pieces_due - returned - converted;
@@ -51,8 +52,13 @@ pub async fn register_late_return(
         )));
     }
     let capped = pieces.min(pending_physical.max(0) + converted);
+    if capped <= 0 {
+        return Err(CoreError::Validation(
+            "Aucune pièce restante à restituer sur cette obligation.".to_string(),
+        ));
+    }
     let late_regulated = (capped - pending_physical.max(0)).max(0).min(converted);
-    let _physical_back = capped - late_regulated;
+    let returned_after = returned + capped;
 
     sqlx::query(
         "UPDATE deposit_issues
@@ -68,59 +74,91 @@ pub async fn register_late_return(
     .await?;
     sqlx::query(
         "UPDATE deposit_issues
-         SET status = CASE WHEN returned_pieces >= pieces THEN 'settled' ELSE status END
+         SET status = CASE
+             WHEN returned_pieces + lost_pieces + destroyed_pieces + converted_pieces >= pieces
+                  AND converted_pieces = 0 THEN 'settled'
+             WHEN returned_pieces > 0 AND converted_pieces = 0 THEN 'partially_returned'
+             ELSE status
+         END
          WHERE id = ?",
     )
     .bind(deposit_issue_id)
     .execute(&mut **tx)
     .await?;
 
-    sqlx::query(
-        "INSERT INTO returnable_stock_movements
-            (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason)
-         SELECT ?, ?, 'entry', COALESCE(rsb.quantity, 0) + ?, COALESCE(rsb.quantity, 0),
-                COALESCE(rsb.quantity, 0) + ?, 'Retour tardif client'
-         FROM returnable_packaging_types rpt
-         LEFT JOIN returnable_stock_balances rsb ON rsb.packaging_id = rpt.id
-         WHERE rpt.id = ?",
+    let before_stock: i64 = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",
     )
-    .bind(format!("late-ret:{deposit_issue_id}:{capped}"))
     .bind(rid)
-    .bind(capped)
-    .bind(capped)
-    .bind(rid)
-    .execute(&mut **tx)
+    .fetch_one(&mut **tx)
     .await?;
+    let after_stock = before_stock.saturating_add(capped);
+    let movement_value = capped.saturating_mul(unit_value);
+
     sqlx::query(
         "INSERT INTO returnable_stock_balances (packaging_id, quantity)
          VALUES (?, ?)
-         ON CONFLICT(packaging_id) DO UPDATE SET quantity = quantity + excluded.quantity",
+         ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
     )
     .bind(rid)
-    .bind(0)
+    .bind(after_stock)
     .execute(&mut **tx)
     .await?;
+    sqlx::query("UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?")
+        .bind(capped)
+        .bind(rid)
+        .execute(&mut **tx)
+        .await?;
     sqlx::query(
-        "UPDATE returnable_stock_balances SET quantity = quantity + ? WHERE packaging_id = ?",
+        "INSERT INTO returnable_stock_movements
+            (request_key, packaging_id, movement_type, quantity, stock_before, stock_after,
+             reason, customer_id, unit_deposit_value, total_value)
+         VALUES (?, ?, 'entry', ?, ?, ?, 'Retour tardif client', ?, ?, ?)",
     )
-    .bind(capped)
+    .bind(format!("late-ret:{deposit_issue_id}:{returned_after}"))
     .bind(rid)
+    .bind(capped)
+    .bind(before_stock)
+    .bind(after_stock)
+    .bind(client_id)
+    .bind(unit_value)
+    .bind(movement_value)
     .execute(&mut **tx)
     .await?;
 
     let mut credited = 0i64;
     if let Some(cid) = client_id {
+        let physical_deduct = (capped - late_regulated).max(0);
+        if physical_deduct > 0 {
+            let phys_val = physical_deduct.saturating_mul(unit_value);
+            sqlx::query(
+                "UPDATE customer_packaging_accounts
+                 SET balance_pieces = MAX(0, balance_pieces - ?),
+                     deposit_held_amount = CASE
+                         WHEN balance_pieces - ? <= 0 THEN 0
+                         ELSE MAX(0, deposit_held_amount - ?)
+                     END
+                 WHERE client_id = ? AND returnable_id = ?",
+            )
+            .bind(physical_deduct)
+            .bind(physical_deduct)
+            .bind(phys_val)
+            .bind(cid)
+            .bind(rid)
+            .execute(&mut **tx)
+            .await?;
+            crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                tx, cid, rid, -physical_deduct, unit_value,
+            )
+            .await?;
+        }
+
         if late_regulated > 0 {
-            let unit_value: i64 =
-                sqlx::query_scalar("SELECT unit_value FROM deposit_issues WHERE id = ?")
-                    .bind(deposit_issue_id)
-                    .fetch_one(&mut **tx)
-                    .await?;
             credited = late_regulated * unit_value;
             if credited > 0 {
                 insert_ledger_entry(
                     tx,
-                    &format!("late-ret:{deposit_issue_id}:{credited}"),
+                    &format!("late-ret:{deposit_issue_id}:{returned_after}:{credited}"),
                     cid,
                     None,
                     "late_return_credit",

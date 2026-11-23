@@ -32,7 +32,8 @@ export function OrderStepPackaging({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-[#667085] dark:text-slate-400">
           Casiers physiques regroupés automatiquement par classe de compatibilité (un casier mixte
-          génère <strong>1 seule consigne</strong>).
+          génère <strong>1 seule consigne</strong>). Délai de restitution client :{' '}
+          <strong>15 jours max</strong> après livraison (suivi hors chiffre d&apos;affaires).
         </p>
         {isCustomOverride && (
           <button

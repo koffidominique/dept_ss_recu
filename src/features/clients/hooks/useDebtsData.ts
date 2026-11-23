@@ -40,10 +40,12 @@ export function usePayReceivableMutation(options: {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['receivables'] });
+      qc.invalidateQueries({ queryKey: ['sale'] });
       qc.invalidateQueries({ queryKey: ['clients'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['cash'] });
       qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       options.onSuccess();
     },
     onError: (err) => options.onError(err instanceof Error ? err.message : 'Erreur encaissement.'),

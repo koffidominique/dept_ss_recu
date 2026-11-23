@@ -17,6 +17,7 @@ const MOVEMENT_TYPE_LABELS: Record<ReturnableMovementRow['movement_type'], strin
   loss: 'Perte (-)',
   correction_in: 'Correction (+)',
   correction_out: 'Correction (-)',
+  supplier_exchange: 'Échange fournisseur (-)',
 };
 
 export function buildMovementColumns(): ColumnDef<ReturnableMovementRow>[] {

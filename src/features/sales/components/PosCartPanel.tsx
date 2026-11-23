@@ -1,22 +1,18 @@
+import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { PauseCircle, PlayCircle, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
+import { PackageCheck, PauseCircle, PlayCircle, RotateCcw, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
 import { FormTipsButton } from '../../../components/common/FormTipsButton.tsx';
 import { DP_EASE } from '../../../components/motion/MotionPrimitives.tsx';
 import { QuantityInput } from '../../../components/common/QuantityInput.tsx';
 import { formatFcfa } from '../../../utils/format.ts';
 import type { CartItem, HeldCart } from '../../../stores/uiStore.ts';
-import type { Client, PaymentMethodConfig } from '../../../types/erp.ts';
-import type { SaleCalculationResult } from '../utils/saleCalculations.ts';
+import type { Client, ClientPackagingBalance, PaymentMethodConfig } from '../../../types/erp.ts';
+import {
+  computeAvailableReturnableRows,
+  computeReturnedPackagingSummary,
+  type SaleCalculationResult,
+} from '../utils/saleCalculations.ts';
 import { PosPaymentPanel } from './PosPaymentPanel.tsx';
-
-interface ClientReturnableBalance {
-  returnable_id: number;
-  packaging_name: string;
-  packaging_code: string;
-  deposit_value: number;
-  balance_pieces: number;
-  deposit_held_amount: number;
-}
 
 interface PosCartPanelProps {
   posCart: CartItem[];
@@ -47,9 +43,11 @@ interface PosCartPanelProps {
   onOpenHeldModal: () => void;
   onOpenQuickClient: () => void;
   onSubmitSale: () => void;
-  clientReturnables: ClientReturnableBalance[];
+  clientReturnables: ClientPackagingBalance[];
+  isLoadingClientReturnables?: boolean;
   receivedReturnables: Array<{ returnable_id: number; pieces: number }>;
   onReceivedReturnableChange: (returnableId: number, pieces: number) => void;
+  onResetReceivedReturnables?: () => void;
 }
 
 export function PosCartPanel({
@@ -78,8 +76,10 @@ export function PosCartPanel({
   onOpenQuickClient,
   onSubmitSale,
   clientReturnables,
+  isLoadingClientReturnables = false,
   receivedReturnables,
   onReceivedReturnableChange,
+  onResetReceivedReturnables,
 }: PosCartPanelProps) {
   const selectedClient = clients?.find((c) => c.id === posClientId);
   const availCredit =
@@ -88,6 +88,16 @@ export function PosCartPanel({
     selectedClient.credit_limit !== null
       ? Math.max(0, selectedClient.credit_limit - selectedClient.unpaid_balance)
       : null;
+
+  const availableReturnableRows = useMemo(
+    () => (selectedClient ? computeAvailableReturnableRows(clientReturnables, posCart) : []),
+    [selectedClient, clientReturnables, posCart]
+  );
+
+  const returnedSummary = useMemo(
+    () => computeReturnedPackagingSummary(availableReturnableRows, receivedReturnables),
+    [availableReturnableRows, receivedReturnables]
+  );
 
   return (
     <div className="space-y-4 lg:col-span-5">
@@ -208,40 +218,153 @@ export function PosCartPanel({
           </div>
         )}
         
-        {selectedClient && clientReturnables.length > 0 && (
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-3 py-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-[#182230] dark:text-slate-200 text-xs">Retour d’emballages (pièces du client)</span>
+        {selectedClient && (
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-3 py-2.5 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <PackageCheck className="h-3.5 w-3.5 text-[#16A36A]" />
+                <span className="font-semibold text-[#182230] dark:text-slate-200 text-xs">
+                  Retour d’emballages client
+                </span>
+              </div>
+              {returnedSummary.totalPieces > 0 && onResetReceivedReturnables && (
+                <button
+                  type="button"
+                  onClick={onResetReceivedReturnables}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#667085] hover:text-[#DC4545]"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Réinitialiser
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {clientReturnables.map((bal) => {
-                const current = receivedReturnables.find((r) => r.returnable_id === bal.returnable_id)?.pieces ?? 0;
-                return (
-                  <div key={bal.returnable_id} className="flex items-center justify-between gap-3 bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 rounded-lg p-2">
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-medium text-[#182230] dark:text-slate-100 truncate">
-                        {bal.packaging_name}
+
+            {isLoadingClientReturnables ? (
+              <p className="text-[11px] text-[#667085] dark:text-slate-400">
+                Chargement des soldes d’emballages du client…
+              </p>
+            ) : availableReturnableRows.length === 0 ? (
+              <p className="text-[11px] text-[#667085] dark:text-slate-400">
+                Aucun emballage consigné dû par ce client ni émis dans le panier.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-2">
+                  {availableReturnableRows.map((row) => {
+                    const rawCurrent =
+                      receivedReturnables.find((r) => r.returnable_id === row.returnable_id)
+                        ?.pieces ?? 0;
+                    const current = Math.min(
+                      row.max_returnable_pieces,
+                      Math.max(0, Number.isFinite(rawCurrent) ? Math.trunc(rawCurrent) : 0)
+                    );
+                    const remainingAfterReturn = Math.max(0, row.max_returnable_pieces - current);
+                    const lineReturnValue = current * row.deposit_value;
+
+                    return (
+                      <div
+                        key={row.returnable_id}
+                        className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 rounded-lg p-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-semibold text-[#182230] dark:text-slate-100 truncate">
+                            {row.packaging_name}{' '}
+                            <span className="font-normal text-[#667085] dark:text-slate-400">
+                              ({row.packaging_code})
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-[#667085] dark:text-slate-400 font-mono-num">
+                            Solde dû : {row.prior_due_pieces} pcs
+                            {row.cart_outgoing_pieces > 0
+                              ? ` · +${row.cart_outgoing_pieces} vente (max ${row.max_returnable_pieces})`
+                              : ''}{' '}
+                            · {formatFcfa(row.deposit_value)}/pc
+                          </div>
+                          {current > 0 && (
+                            <div className="mt-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400 font-mono-num">
+                              Valorisation retour : {formatFcfa(lineReturnValue)} · Reste dû :{' '}
+                              {remainingAfterReturn} pcs
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={current <= 0}
+                            onClick={() =>
+                              onReceivedReturnableChange(
+                                row.returnable_id,
+                                Math.max(0, current - 1)
+                              )
+                            }
+                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            aria-label={`Diminuer ${row.packaging_name}`}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={row.max_returnable_pieces}
+                            step={1}
+                            value={current}
+                            aria-label={`Retour ${row.packaging_name}`}
+                            onChange={(e) => {
+                              const parsed = parseInt(e.target.value, 10);
+                              const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+                              onReceivedReturnableChange(
+                                row.returnable_id,
+                                Math.min(row.max_returnable_pieces, safe)
+                              );
+                            }}
+                            className="w-16 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-center text-xs font-mono-num"
+                          />
+                          <button
+                            type="button"
+                            disabled={current >= row.max_returnable_pieces}
+                            onClick={() =>
+                              onReceivedReturnableChange(
+                                row.returnable_id,
+                                Math.min(row.max_returnable_pieces, current + 1)
+                              )
+                            }
+                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            aria-label={`Augmenter ${row.packaging_name}`}
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            disabled={current === row.max_returnable_pieces}
+                            onClick={() =>
+                              onReceivedReturnableChange(
+                                row.returnable_id,
+                                row.max_returnable_pieces
+                              )
+                            }
+                            className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 disabled:opacity-40"
+                          >
+                            Max
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-[#667085] dark:text-slate-400">
-                        {bal.packaging_code} · solde {bal.balance_pieces} pcs
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        value={current}
-                        onChange={(e) => onReceivedReturnableChange(bal.returnable_id, Math.max(0, parseInt(e.target.value || '0', 10)))}
-                        className="w-20 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-mono-num"
-                      />
-                      <span className="text-[10px] font-mono-num text-[#667085] dark:text-slate-400">pcs</span>
-                    </div>
+                    );
+                  })}
+                </div>
+                {returnedSummary.totalPieces > 0 && (
+                  <div className="flex items-center justify-between rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 px-2.5 py-1.5 text-[11px]">
+                    <span className="font-medium text-emerald-800 dark:text-emerald-300">
+                      Montant retour ({returnedSummary.totalPieces} pcs · hors total commande)
+                    </span>
+                    <span className="font-mono-num font-bold text-emerald-700 dark:text-emerald-400">
+                      {formatFcfa(returnedSummary.totalAmountFcfa)}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </>
+            )}
             <p className="text-[10px] text-[#667085] dark:text-slate-400 italic">
-              Seuls les ensembles casier + bouteilles vides sont consignés. Une bouteille seule ne génère aucune consigne.
+              Délai de retour des emballages consignés : 15 jours maximum. Le montant des retours est comptabilisé hors total commande et les pièces rentrent au stock du sous-dépôt.
             </p>
           </div>
         )}
@@ -329,6 +452,8 @@ export function PosCartPanel({
           globalDiscount={globalDiscount}
           onGlobalDiscountChange={onGlobalDiscountChange}
           totals={totals}
+          returnedPackagingAmount={returnedSummary.totalAmountFcfa}
+          returnedPackagingPieces={returnedSummary.totalPieces}
           paymentRows={paymentRows}
           onPaymentRowsChange={onPaymentRowsChange}
           activeMethods={activeMethods}

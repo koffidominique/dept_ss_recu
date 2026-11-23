@@ -57,8 +57,8 @@ pub async fn confirm_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
         if policy == "limited" {
             let max_credit = limit.unwrap_or(0);
             let used: i64 = sqlx::query_scalar(
-                "SELECT COALESCE(SUM(remaining_amount), 0) FROM customer_receivables
-                 WHERE client_id = ? AND status IN ('open', 'partial')",
+                "SELECT COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables WHERE client_id = ?1 AND status IN ('open', 'partial')), 0)
+                      + MAX(0, COALESCE((SELECT SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END) FROM customer_packaging_financial_ledger WHERE client_id = ?1), 0))",
             )
             .bind(customer_id)
             .fetch_one(&mut *tx)
@@ -172,21 +172,42 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
             .await?;
     let (order_number, status, customer_id) =
         row.ok_or_else(|| CoreError::NotFound("Commande introuvable.".into()))?;
-    if !matches!(status.as_str(), "confirmed" | "preparing") {
+    if !matches!(status.as_str(), "confirmed" | "preparing" | "invoiced" | "paid") {
         return Err(CoreError::Validation(
             "La commande doit être confirmée avant livraison.".to_string(),
         ));
     }
 
-    let allocs: Vec<(i64, i64, i64, i64, i64)> = sqlx::query_as(
-        "SELECT id, packaging_asset_id, quantity, is_consigned, deposit_amount_xof
-         FROM order_packaging_allocations WHERE order_id = ?",
+    let already_delivered: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM packaging_movements WHERE order_id = ? AND movement_type = 'LIVRAISON_CLIENT'",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if already_delivered > 0 || status == "delivered" {
+        return Err(CoreError::Validation(
+            "Cette commande a déjà fait l'objet d'une livraison d'emballages.".to_string(),
+        ));
+    }
+
+    let existing_sale_id: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM sales WHERE order_id = ?")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+
+    let allocs: Vec<(i64, i64, i64, i64, i64, Option<i64>)> = sqlx::query_as(
+        "SELECT opa.id, opa.packaging_asset_id, opa.quantity, opa.is_consigned,
+                opa.deposit_amount_xof, pa.returnable_id
+         FROM order_packaging_allocations opa
+         JOIN packaging_assets pa ON pa.id = opa.packaging_asset_id
+         WHERE opa.order_id = ?",
     )
     .bind(id)
     .fetch_all(&mut *tx)
     .await?;
 
-    for (alloc_id, asset_id, qty, is_consigned, unit_dep) in allocs {
+    for (alloc_id, asset_id, qty, is_consigned, unit_dep, returnable_id_opt) in allocs {
         let total_dep = if is_consigned == 1 { unit_dep * qty } else { 0 };
         sqlx::query(
             "INSERT INTO packaging_movements (
@@ -230,13 +251,71 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
             .bind(total_dep)
             .execute(&mut *tx)
             .await?;
+
+            if let Some(rid) = returnable_id_opt {
+                sqlx::query(
+                    "INSERT INTO customer_packaging_accounts (client_id, returnable_id, balance_pieces, deposit_held_amount)
+                     VALUES (?, ?, ?, ?)
+                     ON CONFLICT(client_id, returnable_id) DO UPDATE SET
+                        balance_pieces = balance_pieces + excluded.balance_pieces,
+                        deposit_held_amount = deposit_held_amount + excluded.deposit_held_amount",
+                )
+                .bind(customer_id)
+                .bind(rid)
+                .bind(qty)
+                .bind(total_dep)
+                .execute(&mut *tx)
+                .await?;
+
+                if let Some(sid) = existing_sale_id {
+                    if qty > 0 {
+                        let (policy_id, return_delay_days): (Option<i64>, i64) = sqlx::query_as(
+                            "SELECT id, return_delay_days FROM packaging_policies
+                             WHERE is_active = 1
+                               AND ((client_id = ?1 AND returnable_id = ?2)
+                                 OR (client_id = ?1 AND returnable_id IS NULL)
+                                 OR (client_id IS NULL AND returnable_id = ?2)
+                                 OR (client_id IS NULL AND returnable_id IS NULL))
+                             ORDER BY (client_id = ?1) DESC, (returnable_id = ?2) DESC
+                             LIMIT 1",
+                        )
+                        .bind(customer_id)
+                        .bind(rid)
+                        .fetch_optional(&mut *tx)
+                        .await?
+                        .unwrap_or((None, 15));
+                        let due_date = (chrono::Utc::now()
+                            + chrono::Duration::days(return_delay_days))
+                        .format("%Y-%m-%d")
+                        .to_string();
+                        sqlx::query(
+                            "INSERT INTO deposit_issues (
+                                sale_id, sale_line_id, client_id, returnable_id,
+                                pieces, returned_pieces, unit_value, amount, due_date, policy_id, status
+                             ) VALUES (?, NULL, ?, ?, ?, 0, ?, ?, ?, ?, 'pending')",
+                        )
+                        .bind(sid)
+                        .bind(customer_id)
+                        .bind(rid)
+                        .bind(qty)
+                        .bind(unit_dep)
+                        .bind(total_dep)
+                        .bind(&due_date)
+                        .bind(policy_id)
+                        .execute(&mut *tx)
+                        .await?;
+                    }
+                }
+            }
         }
     }
 
     sqlx::query(
-        "UPDATE orders SET status = 'delivered',
-         delivery_date = COALESCE(delivery_date, datetime('now')),
-         updated_at = datetime('now') WHERE id = ?",
+        "UPDATE orders
+         SET status = CASE WHEN status IN ('invoiced', 'paid') THEN status ELSE 'delivered' END,
+             delivery_date = COALESCE(delivery_date, datetime('now')),
+             updated_at = datetime('now')
+         WHERE id = ?",
     )
     .bind(id)
     .execute(&mut *tx)

@@ -149,7 +149,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
             .bind(rid)
             .fetch_optional(&mut **tx)
             .await?
-            .unwrap_or((None, 30));
+            .unwrap_or((None, 15));
             let due_date = (chrono::Utc::now() + chrono::Duration::days(return_delay_days))
                 .format("%Y-%m-%d")
                 .to_string();
@@ -183,49 +183,83 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 .bind(amt)
                 .execute(&mut **tx)
                 .await?;
+
+                crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                    tx, cid, rid, pieces, unit_val,
+                )
+                .await?;
             }
         }
     }
 
     // Confirmation de réception des emballages retours : réduction du compte emballage client
-    if let Some(cid) = ctx.client_id {
-        if let Some(received) = ctx.received_returnables {
-            for rr in received {
-                if rr.pieces <= 0 {
-                    continue;
-                }
-                let rt_exists: Option<(String,)> = sqlx::query_as(
-                    "SELECT name FROM returnable_packaging_types WHERE id = ?",
+    // et réintégration physique dans le stock d'emballages vides du sous-dépôt (hors total commande).
+    if let Some(received) = ctx.received_returnables {
+        let mut aggregated: Vec<(i64, i64)> = Vec::new();
+        for rr in received {
+            if rr.pieces < 0 {
+                return Err(CoreError::Validation(
+                    "Le nombre d'emballages retournés ne peut pas être négatif.".to_string(),
+                ));
+            }
+            if rr.pieces == 0 {
+                continue;
+            }
+            if let Some(existing) = aggregated
+                .iter_mut()
+                .find(|(rid, _)| *rid == rr.returnable_id)
+            {
+                existing.1 = existing.1.checked_add(rr.pieces).ok_or_else(|| {
+                    CoreError::Validation(
+                        "Débordement du nombre d'emballages retournés.".to_string(),
+                    )
+                })?;
+            } else {
+                aggregated.push((rr.returnable_id, rr.pieces));
+            }
+        }
+
+        if !aggregated.is_empty() {
+            let cid = ctx.client_id.ok_or_else(|| {
+                CoreError::Validation(
+                    "Un client identifié est requis pour enregistrer un retour d'emballages."
+                        .to_string(),
                 )
-                .bind(rr.returnable_id)
+            })?;
+
+            for (returnable_id, pieces) in aggregated {
+                let rt_row: Option<(String, i64)> = sqlx::query_as(
+                    "SELECT name, deposit_value FROM returnable_packaging_types WHERE id = ?",
+                )
+                .bind(returnable_id)
                 .fetch_optional(&mut **tx)
                 .await?;
-                let rt_name = rt_exists.map(|(n,)| n).unwrap_or_else(|| rr.returnable_id.to_string());
+                let (rt_name, rt_deposit_value) = rt_row.ok_or_else(|| {
+                    CoreError::Validation(format!(
+                        "Type d'emballage consigné introuvable (id={returnable_id})."
+                    ))
+                })?;
 
-                // Créer un enregistrement de retour dans deposit_issues
-                let due_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-                sqlx::query(
-                    "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id, pieces, unit_value, amount, due_date, policy_id, status)
-                     VALUES (?, NULL, ?, ?, ?, 0, 0, ?, NULL, 'returned')",
-                )
-                .bind(ctx.sale_id)
-                .bind(cid)
-                .bind(rr.returnable_id)
-                .bind(rr.pieces)
-                .bind(&due_date)
-                .execute(&mut **tx)
-                .await?;
+                let ret_amount = Money::from_non_negative(rt_deposit_value, "Tarif consigne")?
+                    .checked_mul(pieces, "Montant retour emballages")?
+                    .value();
 
-                // Réduire le solde du compte emballage client
+                // Réduire atomiquement le solde du compte emballage client (pièces + caution détenue)
                 let updated = sqlx::query(
                     "UPDATE customer_packaging_accounts
-                     SET balance_pieces = balance_pieces - ?
+                     SET balance_pieces = balance_pieces - ?,
+                         deposit_held_amount = CASE
+                             WHEN balance_pieces - ? <= 0 THEN 0
+                             ELSE MAX(0, deposit_held_amount - ?)
+                         END
                      WHERE client_id = ? AND returnable_id = ? AND balance_pieces >= ?",
                 )
-                .bind(rr.pieces)
+                .bind(pieces)
+                .bind(pieces)
+                .bind(ret_amount)
                 .bind(cid)
-                .bind(rr.returnable_id)
-                .bind(rr.pieces)
+                .bind(returnable_id)
+                .bind(pieces)
                 .execute(&mut **tx)
                 .await?;
                 if updated.rows_affected() == 0 {
@@ -234,34 +268,116 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                     )));
                 }
 
-                // Mise à jour du stock d'emballages vides du sous-dépôt
-                let before_stock: i64 = sqlx::query_scalar(
-                    "SELECT COALESCE(quantity, 0) FROM returnable_stock_balances WHERE packaging_id = ?",
+                crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                    tx,
+                    cid,
+                    returnable_id,
+                    -pieces,
+                    rt_deposit_value,
                 )
-                .bind(rr.returnable_id)
+                .await?;
+
+                // Apurer en FIFO les obligations d'emballages ouvertes des ventes antérieures du client
+                let mut remaining_to_settle = pieces;
+                let open_prior: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+                    "SELECT id, pieces, returned_pieces, lost_pieces + destroyed_pieces + converted_pieces
+                     FROM deposit_issues
+                     WHERE client_id = ? AND returnable_id = ? AND sale_id != ?
+                       AND status IN ('pending', 'partially_returned')
+                     ORDER BY COALESCE(due_date, '9999-12-31') ASC, id ASC",
+                )
+                .bind(cid)
+                .bind(returnable_id)
+                .bind(ctx.sale_id)
+                .fetch_all(&mut **tx)
+                .await?;
+
+                for (prior_id, prior_pieces, prior_returned, prior_other_out) in open_prior {
+                    if remaining_to_settle <= 0 {
+                        break;
+                    }
+                    let prior_pending = (prior_pieces - prior_returned - prior_other_out).max(0);
+                    if prior_pending <= 0 {
+                        continue;
+                    }
+                    let applied = remaining_to_settle.min(prior_pending);
+                    let next_returned = prior_returned + applied;
+                    let next_status = if next_returned + prior_other_out >= prior_pieces {
+                        "settled"
+                    } else {
+                        "partially_returned"
+                    };
+                    sqlx::query(
+                        "UPDATE deposit_issues
+                         SET returned_pieces = ?, status = ?, updated_at = datetime('now')
+                         WHERE id = ?",
+                    )
+                    .bind(next_returned)
+                    .bind(next_status)
+                    .bind(prior_id)
+                    .execute(&mut **tx)
+                    .await?;
+                    remaining_to_settle -= applied;
+                }
+
+                // Enregistrer la réception d'emballages sur la vente en statut 'returned' (hors total commande)
+                let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                sqlx::query(
+                    "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id, pieces, returned_pieces, unit_value, amount, due_date, policy_id, status)
+                     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, 'returned')",
+                )
+                .bind(ctx.sale_id)
+                .bind(cid)
+                .bind(returnable_id)
+                .bind(pieces)
+                .bind(pieces)
+                .bind(rt_deposit_value)
+                .bind(ret_amount)
+                .bind(&today)
+                .execute(&mut **tx)
+                .await?;
+
+                // Mise à jour du stock d'emballages vides du sous-dépôt (y compris si aucune ligne initiale n'existait)
+                let before_stock: i64 = sqlx::query_scalar(
+                    "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",
+                )
+                .bind(returnable_id)
                 .fetch_one(&mut **tx)
                 .await?;
-                let after_stock = before_stock + rr.pieces;
-                let updated_stock = sqlx::query(
+                let after_stock = before_stock.checked_add(pieces).ok_or_else(|| {
+                    CoreError::Validation(
+                        "Débordement du stock d'emballages vides du sous-dépôt.".to_string(),
+                    )
+                })?;
+                sqlx::query(
                     "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
                      ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
                 )
-                .bind(rr.returnable_id)
+                .bind(returnable_id)
                 .bind(after_stock)
                 .execute(&mut **tx)
                 .await?;
-                let _ = updated_stock.last_insert_rowid();
                 sqlx::query(
-                    "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document)
-                     VALUES (?, ?, 'entry', ?, ?, ?, ?, ?)",
+                    "UPDATE packaging_assets SET stock_empty = stock_empty + ? WHERE returnable_id = ?",
                 )
-                .bind(format!("ret-retour-{}-{}", ctx.request_key, rr.returnable_id))
-                .bind(rr.returnable_id)
-                .bind(rr.pieces)
+                .bind(pieces)
+                .bind(returnable_id)
+                .execute(&mut **tx)
+                .await?;
+                sqlx::query(
+                    "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, customer_id, unit_deposit_value, total_value)
+                     VALUES (?, ?, 'entry', ?, ?, ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(format!("ret-retour-{}-{returnable_id}", ctx.request_key))
+                .bind(returnable_id)
+                .bind(pieces)
                 .bind(before_stock)
                 .bind(after_stock)
                 .bind(format!("Retour emballage client {cid} - vente {}", ctx.sale_ref))
                 .bind(ctx.sale_ref)
+                .bind(cid)
+                .bind(rt_deposit_value)
+                .bind(ret_amount)
                 .execute(&mut **tx)
                 .await?;
             }

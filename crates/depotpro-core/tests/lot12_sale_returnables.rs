@@ -5,8 +5,9 @@
 use depotpro_core::application::auth::{self, Role, SessionIdentity};
 use depotpro_core::application::cash;
 use depotpro_core::application::sales::{
-    create_sale_v4, CreateSaleLineV4Input, CreateSaleV4Input, PaymentPartInput,
-    ReceivedReturnableInput,
+    cancel_sale, create_sale_return, create_sale_v4, CancelSaleInput, CreateSaleLineV4Input,
+    CreateSaleReturnInput, CreateSaleV4Input, PaymentPartInput, ReceivedReturnableInput,
+    SaleReturnLineInput,
 };
 use depotpro_core::infrastructure::db::DepotDb;
 
@@ -327,4 +328,198 @@ async fn test_multiple_returnables() {
             .bind(rid2).fetch_one(&db.pool).await.unwrap();
         assert_eq!(stock2, 52, "Stock bouteille: 50 + 2 = 52");
     }).await;
+}
+
+#[tokio::test]
+async fn test_receive_returnables_without_prior_stock_row_and_outside_order_total() {
+    auth::with_actor(actor(), async {
+        let db = fresh_db("nostockrow").await;
+        let (client_id, rid, product_id, packaging_id) = seed_full(&db).await;
+
+        // Supprimer la ligne de stock sous-dépôt initiale pour vérifier l'INSERT ON CONFLICT
+        sqlx::query("DELETE FROM returnable_stock_balances WHERE packaging_id = ?")
+            .bind(rid)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        let input = make_sale_input(
+            client_id,
+            product_id,
+            packaging_id,
+            vec![ReceivedReturnableInput {
+                returnable_id: rid,
+                pieces: 3,
+            }],
+        )
+        .await;
+
+        let detail = create_sale_v4(&db, input).await.unwrap();
+        assert_eq!(detail.sale.total_amount, 15_600, "Total commande inchangé (hors retour emballage)");
+        assert_eq!(detail.total_returned_packaging_amount, 10_800, "Montant retour hors total: 3 * 3600");
+        assert_eq!(detail.received_returnables.len(), 1);
+        assert_eq!(detail.received_returnables[0].pieces, 3);
+        assert_eq!(detail.received_returnables[0].amount, 10_800);
+
+        let stock: i64 = sqlx::query_scalar(
+            "SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?",
+        )
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(stock, 3, "Stock sous-dépôt initialisé à 3 par upsert");
+
+        let held: i64 = sqlx::query_scalar(
+            "SELECT deposit_held_amount FROM customer_packaging_accounts WHERE client_id = ? AND returnable_id = ?",
+        )
+        .bind(client_id)
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(held, 28_800, "Caution détenue: (10 + 1 - 3) * 3600 = 28800");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_cancel_sale_reverts_received_returnables_and_depot_stock() {
+    auth::with_actor(actor(), async {
+        let db = fresh_db("cancel_ret").await;
+        let (client_id, rid, product_id, packaging_id) = seed_full(&db).await;
+
+        let input = make_sale_input(
+            client_id,
+            product_id,
+            packaging_id,
+            vec![ReceivedReturnableInput {
+                returnable_id: rid,
+                pieces: 4,
+            }],
+        )
+        .await;
+
+        let created = create_sale_v4(&db, input).await.unwrap();
+        assert_eq!(created.total_returned_packaging_amount, 14_400);
+
+        let cancelled = cancel_sale(
+            &db,
+            created.sale.id,
+            CancelSaleInput {
+                request_key: format!("rk-cancel-{}", uuid::Uuid::new_v4()),
+                reason: "Erreur de saisie POS".to_string(),
+                refund_method_code: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(cancelled.sale.status, "cancelled");
+        assert!(cancelled.received_returnables.is_empty());
+
+        let (bal, held): (i64, i64) = sqlx::query_as(
+            "SELECT balance_pieces, deposit_held_amount FROM customer_packaging_accounts WHERE client_id = ? AND returnable_id = ?",
+        )
+        .bind(client_id)
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(bal, 10, "Solde client restauré à 10 après annulation");
+        assert_eq!(held, 36_000, "Caution détenue restaurée à 36000 après annulation");
+
+        let stock: i64 = sqlx::query_scalar(
+            "SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?",
+        )
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(stock, 100, "Stock sous-dépôt restauré à 100 après annulation");
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_partial_sale_return_settles_deposit_issues_and_client_balances() {
+    auth::with_actor(actor(), async {
+        let db = fresh_db("sale_return_dep").await;
+        let (client_id, rid, product_id, packaging_id) = seed_full(&db).await;
+
+        let input = CreateSaleV4Input {
+            request_key: format!("rk-sale-2crates-{}", uuid::Uuid::new_v4()),
+            client_id: Some(client_id),
+            sale_type: "cash".to_string(),
+            price_tier: "retail".to_string(),
+            discount_amount: Some(0),
+            due_date: None,
+            lines: vec![CreateSaleLineV4Input {
+                product_id,
+                packaging_id,
+                sales_unit_id: None,
+                quantity: "2".to_string(),
+                discount_amount: Some(0),
+            }],
+            payments: vec![PaymentPartInput {
+                method_code: "cash".to_string(),
+                amount: 31_200,
+            }],
+            received_returnables: None,
+            notes: None,
+            external_reference: None,
+        };
+
+        let created = create_sale_v4(&db, input).await.unwrap();
+        let sale_line_id = created.lines[0].id;
+
+        let bal_after_sale: i64 = sqlx::query_scalar(
+            "SELECT balance_pieces FROM customer_packaging_accounts WHERE client_id = ? AND returnable_id = ?",
+        )
+        .bind(client_id)
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(bal_after_sale, 12, "10 initiaux + 2 casiers vendus = 12");
+
+        // Retour marchandise approuvé en restock d'1 casier complet (24 bouteilles)
+        let after_ret1 = create_sale_return(
+            &db,
+            created.sale.id,
+            CreateSaleReturnInput {
+                request_key: format!("rk-sret-1-{}", uuid::Uuid::new_v4()),
+                reason: "1 casier plein non ouvert retourné".to_string(),
+                restock_approved: true,
+                refund_method_code: "cash".to_string(),
+                lines: vec![SaleReturnLineInput {
+                    sale_line_id,
+                    base_quantity: "24".to_string(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(after_ret1.sale.status, "partially_returned");
+
+        let (di_ret1, di_status1): (i64, String) = sqlx::query_as(
+            "SELECT returned_pieces, status FROM deposit_issues WHERE sale_line_id = ?",
+        )
+        .bind(sale_line_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(di_ret1, 1);
+        assert_eq!(di_status1, "partially_returned");
+
+        let bal_after_ret1: i64 = sqlx::query_scalar(
+            "SELECT balance_pieces FROM customer_packaging_accounts WHERE client_id = ? AND returnable_id = ?",
+        )
+        .bind(client_id)
+        .bind(rid)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(bal_after_ret1, 11, "12 - 1 casier restitué plein = 11");
+    })
+    .await;
 }

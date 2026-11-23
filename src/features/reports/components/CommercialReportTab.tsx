@@ -14,13 +14,13 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
     <>
       <MotionStaggerGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="CA Marchandises (hors retour emballages)"
+          label="CA Marchandises (hors consignes)"
           value={formatFcfa(data.commercial.merchandise_revenue)}
           hint={`${formatNumber(data.commercial.count)} vente(s) validée(s)`}
           icon={<BarChart3 className="h-4 w-4" />}
         />
         <MetricCard
-          label="Retour emballages facturés"
+          label="Consignes emballages facturées"
           value={formatFcfa(data.commercial.deposit_billed)}
           hint="Emballages consignés hors chiffre d'affaires"
         />
@@ -150,7 +150,7 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
                   <th className="py-2">Journée</th>
                   <th className="py-2 text-right">Ventes</th>
                   <th className="py-2 text-right">CA Marchandises</th>
-                  <th className="py-2 text-right">Retour emballages</th>
+                  <th className="py-2 text-right">Consignes emballages</th>
                   <th className="py-2 text-right">Encaissé</th>
                 </tr>
               </thead>

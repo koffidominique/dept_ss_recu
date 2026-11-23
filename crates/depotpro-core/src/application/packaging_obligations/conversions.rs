@@ -8,7 +8,17 @@ use crate::infrastructure::db::{DepotDb, MIN_SUPPORTED_SCHEMA_VERSION};
 use super::{insert_ledger_entry, mark_converted, ConvertSummary, PackagingObligationDto};
 
 type PolicyRow = (i64, Option<i64>, Option<i64>, i64, i64, i64);
-type DueRow = (i64, Option<i64>, i64, i64, i64, i64, i64);
+type DueRow = (
+    i64,
+    Option<i64>,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+    Option<i64>,
+    Option<i64>,
+);
 
 /// Liste les obligations d'un client (ou toutes) avec leur statut d'exigibilité.
 pub async fn list_obligations(
@@ -39,7 +49,7 @@ pub async fn list_obligations(
          FROM deposit_issues di
          LEFT JOIN sales s ON s.id = di.sale_id
          WHERE (?1 IS NULL OR di.client_id = ?1)
-           AND di.status NOT IN ('settled', 'cancelled')
+           AND di.status NOT IN ('settled', 'cancelled', 'returned')
          ORDER BY di.due_date ASC NULLS LAST, di.id ASC",
     )
     .bind(client_id)
@@ -122,7 +132,7 @@ fn resolve_policy(
     let chosen = specific_client.or(client_any).or(returnable).or(global);
     match chosen {
         Some((id, _, _, delay, auto, _late)) => (Some(id), delay, auto != 0),
-        None => (None, 30, true),
+        None => (None, 15, true),
     }
 }
 
@@ -152,21 +162,30 @@ pub(crate) async fn process_due_obligations_tx(
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let due: Vec<DueRow> = sqlx::query_as(
         "SELECT di.id, di.client_id, di.returnable_id, di.pieces, di.returned_pieces,
-                di.lost_pieces + di.destroyed_pieces + di.converted_pieces, di.unit_value
+                di.lost_pieces + di.destroyed_pieces + di.converted_pieces, di.unit_value,
+                di.policy_id, pp.auto_convert_on_due
          FROM deposit_issues di
-         JOIN packaging_policies pp ON pp.id = di.policy_id AND pp.auto_convert_on_due = 1
+         LEFT JOIN packaging_policies pp ON pp.id = di.policy_id
          WHERE di.status IN ('pending', 'partially_returned')
            AND di.due_date IS NOT NULL AND date(di.due_date) < date('now')",
     )
     .fetch_all(&mut **tx)
     .await?;
-    let _ = &policies;
-    let _ = resolve_policy(&policies, None, 0);
     let _ = MIN_SUPPORTED_SCHEMA_VERSION;
 
     let mut conversions = 0i64;
     let mut total_amount = 0i64;
-    for (issue_id, client_id, _rid, pieces, returned, already_out, unit_value) in due {
+    for (issue_id, client_id, rid, pieces, returned, already_out, unit_value, pol_id, auto_opt) in
+        due
+    {
+        let should_auto_convert = match (pol_id, auto_opt) {
+            (Some(_), Some(auto)) => auto != 0,
+            (Some(_), None) => false,
+            (None, _) => resolve_policy(&policies, client_id, rid).2,
+        };
+        if !should_auto_convert {
+            continue;
+        }
         let pending = pieces - returned - already_out;
         if pending <= 0 {
             continue;
@@ -211,6 +230,26 @@ pub(crate) async fn process_due_obligations_tx(
                 Some(format!(
                     "Conversion échéance : {pending} pièce(s) non restituée(s)."
                 )),
+            )
+            .await?;
+            sqlx::query(
+                "UPDATE customer_packaging_accounts
+                 SET balance_pieces = MAX(0, balance_pieces - ?),
+                     deposit_held_amount = CASE
+                         WHEN balance_pieces - ? <= 0 THEN 0
+                         ELSE MAX(0, deposit_held_amount - ?)
+                     END
+                 WHERE client_id = ? AND returnable_id = ?",
+            )
+            .bind(pending)
+            .bind(pending)
+            .bind(amount)
+            .bind(cid)
+            .bind(rid)
+            .execute(&mut **tx)
+            .await?;
+            crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                tx, cid, rid, -pending, unit_value,
             )
             .await?;
         }

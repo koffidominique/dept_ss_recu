@@ -1,4 +1,4 @@
-import type { DepositComponent } from '../../../types/erp.ts';
+import type { ClientPackagingBalance, DepositComponent } from '../../../types/erp.ts';
 import {
   MAX_SAFE_BIG,
   type SharedDepositAccumulator,
@@ -289,4 +289,128 @@ export function calculateSaleCart(
     remainingAmount: Number(remainingBig),
     overpaidAmount: Number(overpaidBig),
   };
+}
+
+/* ============================================================================
+ * Calcul des retours d'emballages client au comptoir POS (hors total commande)
+ * ============================================================================ */
+
+export interface PosReturnableRow {
+  returnable_id: number;
+  packaging_name: string;
+  packaging_code: string;
+  deposit_value: number;
+  prior_due_pieces: number;
+  cart_outgoing_pieces: number;
+  max_returnable_pieces: number;
+}
+
+/**
+ * Fusionne les soldes d'emballages antérieurs du client et les emballages consignés
+ * sortant dans le panier courant afin de calculer le plafond exact restituable par type.
+ */
+export function computeAvailableReturnableRows(
+  clientBalances: readonly ClientPackagingBalance[],
+  cartItems: readonly SaleCalculationItem[]
+): PosReturnableRow[] {
+  const byId = new Map<number, PosReturnableRow>();
+
+  for (const bal of clientBalances) {
+    if (bal.balance_pieces <= 0 && bal.deposit_held_amount <= 0) continue;
+    byId.set(bal.returnable_id, {
+      returnable_id: bal.returnable_id,
+      packaging_name: bal.packaging_name,
+      packaging_code: bal.packaging_code,
+      deposit_value: Math.max(0, Math.trunc(bal.deposit_value)),
+      prior_due_pieces: Math.max(0, Math.trunc(bal.balance_pieces)),
+      cart_outgoing_pieces: 0,
+      max_returnable_pieces: Math.max(0, Math.trunc(bal.balance_pieces)),
+    });
+  }
+
+  const milliByReturnable = new Map<
+    number,
+    { name: string; code: string; depositValue: number; milliPieces: bigint }
+  >();
+
+  for (const item of cartItems) {
+    if (item.depositMode !== 'deposit' || !item.depositComponents?.length) continue;
+    const parsedQty = parseQtyInputToMilliBigInt(item.quantity);
+    if (!parsedQty.ok) continue;
+    for (const comp of item.depositComponents) {
+      const addMilli = parsedQty.milli * BigInt(comp.pieces_per_pack);
+      const prev = milliByReturnable.get(comp.returnable_id);
+      milliByReturnable.set(comp.returnable_id, {
+        name: comp.name,
+        code: comp.code,
+        depositValue: Math.max(0, Math.trunc(comp.deposit_value)),
+        milliPieces: (prev?.milliPieces ?? 0n) + addMilli,
+      });
+    }
+  }
+
+  for (const [returnableId, acc] of milliByReturnable.entries()) {
+    if (acc.milliPieces <= 0n || acc.milliPieces % 1000n !== 0n) continue;
+    const outgoing = Number(acc.milliPieces / 1000n);
+    const existing = byId.get(returnableId);
+    if (existing) {
+      existing.cart_outgoing_pieces = outgoing;
+      existing.max_returnable_pieces = existing.prior_due_pieces + outgoing;
+    } else {
+      byId.set(returnableId, {
+        returnable_id: returnableId,
+        packaging_name: acc.name,
+        packaging_code: acc.code,
+        deposit_value: acc.depositValue,
+        prior_due_pieces: 0,
+        cart_outgoing_pieces: outgoing,
+        max_returnable_pieces: outgoing,
+      });
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.packaging_name.localeCompare(b.packaging_name, 'fr')
+  );
+}
+
+/**
+ * Calcule le montant valorisé des emballages retournés par le client (hors total commande)
+ * en bornant chaque ligne à son plafond autorisé.
+ */
+export function computeReturnedPackagingSummary(
+  rows: readonly PosReturnableRow[],
+  received: ReadonlyArray<{ returnable_id: number; pieces: number }>
+): {
+  normalized: Array<{ returnable_id: number; pieces: number }>;
+  totalPieces: number;
+  totalAmountFcfa: number;
+} {
+  const rowMap = new Map(rows.map((r) => [r.returnable_id, r]));
+  const agg = new Map<number, number>();
+
+  for (const item of received) {
+    const row = rowMap.get(item.returnable_id);
+    if (!row) continue;
+    const raw = Number.isFinite(item.pieces) ? Math.trunc(item.pieces) : 0;
+    if (raw <= 0) continue;
+    const next = Math.min(row.max_returnable_pieces, (agg.get(item.returnable_id) ?? 0) + raw);
+    if (next > 0) {
+      agg.set(item.returnable_id, next);
+    }
+  }
+
+  const normalized: Array<{ returnable_id: number; pieces: number }> = [];
+  let totalPieces = 0;
+  let totalAmountFcfa = 0;
+
+  for (const [returnable_id, pieces] of agg.entries()) {
+    const row = rowMap.get(returnable_id);
+    if (!row || pieces <= 0) continue;
+    normalized.push({ returnable_id, pieces });
+    totalPieces += pieces;
+    totalAmountFcfa += pieces * row.deposit_value;
+  }
+
+  return { normalized, totalPieces, totalAmountFcfa };
 }

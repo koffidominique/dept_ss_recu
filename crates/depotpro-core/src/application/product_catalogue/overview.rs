@@ -194,7 +194,7 @@ pub async fn create_catalogue_product(
 pub async fn initialize_initial_catalogue(db: &DepotDb) -> CoreResult<()> {
     require_current_actor_permission(Permission::CatalogWrite)?;
 
-    let mut tx = db.pool.begin().await?;
+    let (_guard, mut tx) = db.begin_write().await?;
 
     let brand_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM brands")
         .fetch_one(&mut *tx)

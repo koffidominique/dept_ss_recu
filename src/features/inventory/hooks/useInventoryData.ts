@@ -26,6 +26,9 @@ export function useAdjustStockMutation(options: {
     onSuccess: (mv) => {
       qc.invalidateQueries({ queryKey: ['stock'] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['products-pos'] });
+      qc.invalidateQueries({ queryKey: ['products-orders'] });
+      qc.invalidateQueries({ queryKey: ['products-all'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
       const refDoc = typeof mv.reference_document === 'string' ? mv.reference_document : '';
@@ -77,7 +80,11 @@ export function useInventoryMutations(options: {
       qc.invalidateQueries({ queryKey: ['inventories'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['products-pos'] });
+      qc.invalidateQueries({ queryKey: ['products-orders'] });
+      qc.invalidateQueries({ queryKey: ['products-all'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       options.onValidated();
     },
     onError: (err) =>

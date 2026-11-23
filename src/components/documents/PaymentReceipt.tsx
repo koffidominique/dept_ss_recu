@@ -1,5 +1,14 @@
 import * as React from "react";
+import type { AppSettings } from '../../types/erp.ts';
 import { formatFcfa } from '../../utils/format';
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Espèces',
+  wave: 'Wave',
+  orange_money: 'Orange Money',
+  mtn_money: 'MTN MoMo',
+  moov_money: 'Moov Money',
+};
 
 export interface PaymentReceiptData {
   reference: string;
@@ -12,46 +21,45 @@ export interface PaymentReceiptData {
   partyPhone?: string | null;
   externalReferences?: string[] | null;
   payments?: Array<{ label: string; amount: number }>;
-  balanceAfterXof?: number | null; plannedPaymentMethod?: string;
+  balanceAfterXof?: number | null;
+  plannedPaymentMethod?: string;
 }
 
 export function PaymentReceipt({
   data,
-  company,
+  company: _company,
 }: {
   data: PaymentReceiptData;
-  company: any;
+  company?: AppSettings;
 }): React.ReactNode {
-  const getPaymentMethodLabel = (method: string) => {
-    const labels: Record<string, string> = {
-      cash: 'Espèces',
-      wave: 'Wave',
-      orange_money: 'Orange Money',
-      mtn_money: 'MTN MoMo',
-      moov_money: 'Moov Money',
-    };
-    return labels[method] || method;
-  };
-
   const paidMethods = data.payments || [];
   const totalPaid = paidMethods.reduce((sum, p) => sum + p.amount, 0);
+  const displayedAmount =
+    totalPaid > 0
+      ? formatFcfa(totalPaid)
+      : data.balanceAfterXof !== null && typeof data.balanceAfterXof === 'number' && data.balanceAfterXof >= 0
+        ? formatFcfa(data.balanceAfterXof)
+        : '—';
+  const methodLabel = data.plannedPaymentMethod
+    ? PAYMENT_METHOD_LABELS[data.plannedPaymentMethod] || data.plannedPaymentMethod
+    : '—';
 
   return (
     <div className="space-y-4 p-4 border-t border-orange-500 border-2">
       <h3 className="text-orange-700 text-xs font-bold uppercase tracking-wider mb-3">
-        RÉCU DE PAIEMENT CLIENT
+        REÇU DE PAIEMENT CLIENT
       </h3>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div>
           <p className="font-bold text-slate-600">Montant encaissé</p>
           <p className="font-mono-num text-orange-700 font-bold">
-    {data.balanceAfterXof !== null && typeof data.balanceAfterXof === "number" && data.balanceAfterXof >= 0 ? formatFcfa(data.balanceAfterXof) : "—"}
+            {displayedAmount}
           </p>
         </div>
         <div>
           <p className="font-bold text-slate-600">Mode de règlement</p>
-          <p className="font-mono-num">{data.plannedPaymentMethod || '—'}</p>
+          <p className="font-mono-num">{methodLabel}</p>
         </div>
         <div>
           <p className="font-bold text-slate-600">Date / Heure</p>

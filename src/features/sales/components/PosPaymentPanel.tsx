@@ -12,6 +12,8 @@ interface PosPaymentPanelProps {
   globalDiscount: number;
   onGlobalDiscountChange: (value: number) => void;
   totals: SaleCalculationResult;
+  returnedPackagingAmount?: number;
+  returnedPackagingPieces?: number;
   paymentRows: Array<{ method_code: string; amount: number }>;
   onPaymentRowsChange: (
     updater: (
@@ -30,6 +32,8 @@ export function PosPaymentPanel({
   globalDiscount,
   onGlobalDiscountChange,
   totals,
+  returnedPackagingAmount = 0,
+  returnedPackagingPieces = 0,
   paymentRows,
   onPaymentRowsChange,
   activeMethods,
@@ -54,7 +58,7 @@ export function PosPaymentPanel({
           <MoneyInput value={globalDiscount} onChange={onGlobalDiscountChange} className="w-40" />
         </div>
         <div className="flex justify-between">
-          <span className="text-[#667085] dark:text-slate-400">Retour emballages</span>
+          <span className="text-[#667085] dark:text-slate-400">Consignes emballages</span>
           <span className="font-mono-num font-medium text-[#D9901A] dark:text-amber-400">
             {totals.totalDeposit !== null ? formatFcfa(totals.totalDeposit) : '—'}
           </span>
@@ -65,6 +69,16 @@ export function PosPaymentPanel({
             {totals.isValid && totals.grandTotal !== null ? formatFcfa(totals.grandTotal) : '—'}
           </span>
         </div>
+        {returnedPackagingPieces > 0 && (
+          <div className="flex justify-between rounded-md bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 px-2.5 py-1.5 text-[11px]">
+            <span className="font-medium text-emerald-800 dark:text-emerald-300">
+              Retour emballages ({returnedPackagingPieces} pcs · hors total)
+            </span>
+            <span className="font-mono-num font-semibold text-emerald-700 dark:text-emerald-400">
+              {formatFcfa(returnedPackagingAmount)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">

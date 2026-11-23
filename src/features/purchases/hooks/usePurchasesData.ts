@@ -92,6 +92,8 @@ export function usePurchasesMutations({
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['purchases'] });
       qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+      qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       onCreatedPo(created);
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur commande.'),
@@ -126,6 +128,8 @@ export function usePurchasesMutations({
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: ['purchases'] });
       qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+      qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       onUpdatedPo(updated);
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur correction bon fournisseur.'),
@@ -190,9 +194,14 @@ export function usePurchasesMutations({
       qc.invalidateQueries({ queryKey: ['commercial-documents'] });
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['products-all'] });
+      qc.invalidateQueries({ queryKey: ['products-pos'] });
+      qc.invalidateQueries({ queryKey: ['products-orders'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       qc.invalidateQueries({ queryKey: ['supplier-debts'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       onReceivedPo(received);
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur réception.'),
@@ -204,6 +213,8 @@ export function usePurchasesMutations({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchases'] });
       qc.invalidateQueries({ queryKey: ['commercial-documents'] });
+      qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       onCancelledPo();
     },
     onError: (err) =>

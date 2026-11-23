@@ -54,7 +54,8 @@ pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
         }
         if policy == "limited" {
             let outstanding: i64 = sqlx::query_scalar(
-                "SELECT COALESCE(SUM(remaining_amount), 0) FROM customer_receivables WHERE client_id = ? AND status IN ('open', 'partial')",
+                "SELECT COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables WHERE client_id = ?1 AND status IN ('open', 'partial')), 0)
+                      + MAX(0, COALESCE((SELECT SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END) FROM customer_packaging_financial_ledger WHERE client_id = ?1), 0))",
             ).bind(customer_id).fetch_one(&mut *tx).await?;
             if outstanding.saturating_add(balance) > limit.unwrap_or(0) {
                 return Err(CoreError::CreditPolicyViolation("La limite de crédit client serait dépassée par cette facture.".into()));
@@ -118,6 +119,77 @@ pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
         ).bind(sale_id).bind(customer_id).bind(balance).bind(balance)
          .bind(if paid > 0 { "partial" } else { "open" }).execute(&mut *tx).await?;
     }
+
+    let was_delivered: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM packaging_movements WHERE order_id = ? AND movement_type = 'LIVRAISON_CLIENT'",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if status == "delivered" || was_delivered > 0 {
+        let consigned_allocs: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+            "SELECT pa.returnable_id, opa.quantity, opa.returned_quantity, opa.deposit_amount_xof
+             FROM order_packaging_allocations opa
+             JOIN packaging_assets pa ON pa.id = opa.packaging_asset_id
+             WHERE opa.order_id = ? AND opa.is_consigned = 1 AND pa.returnable_id IS NOT NULL AND opa.quantity > 0",
+        )
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        for (rid, qty, ret_qty, unit_dep) in consigned_allocs {
+            let (policy_id, return_delay_days): (Option<i64>, i64) = sqlx::query_as(
+                "SELECT id, return_delay_days FROM packaging_policies
+                 WHERE is_active = 1
+                   AND ((client_id = ?1 AND returnable_id = ?2)
+                     OR (client_id = ?1 AND returnable_id IS NULL)
+                     OR (client_id IS NULL AND returnable_id = ?2)
+                     OR (client_id IS NULL AND returnable_id IS NULL))
+                 ORDER BY (client_id = ?1) DESC, (returnable_id = ?2) DESC
+                 LIMIT 1",
+            )
+            .bind(customer_id)
+            .bind(rid)
+            .fetch_optional(&mut *tx)
+            .await?
+            .unwrap_or((None, 15));
+            let due_date: String = sqlx::query_scalar(
+                "SELECT date(COALESCE((SELECT delivery_date FROM orders WHERE id = ?), 'now'), '+' || ? || ' days')",
+            )
+            .bind(id)
+            .bind(return_delay_days)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            let returned = ret_qty.clamp(0, qty);
+            let di_status = if returned >= qty {
+                "settled"
+            } else if returned > 0 {
+                "partially_returned"
+            } else {
+                "pending"
+            };
+            sqlx::query(
+                "INSERT INTO deposit_issues (
+                    sale_id, sale_line_id, client_id, returnable_id,
+                    pieces, returned_pieces, unit_value, amount, due_date, policy_id, status
+                 ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(sale_id)
+            .bind(customer_id)
+            .bind(rid)
+            .bind(qty)
+            .bind(returned)
+            .bind(unit_dep)
+            .bind(qty.saturating_mul(unit_dep))
+            .bind(&due_date)
+            .bind(policy_id)
+            .bind(di_status)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
     sqlx::query("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?")
         .bind(if paid == total { "paid" } else { "invoiced" }).bind(id).execute(&mut *tx).await?;
     audit_log_tx(&mut tx, "invoice_order", "order", Some(id.to_string()), &format!("Reçu {receipt} créé à partir de la commande {order_number}; stock déjà décrémenté lors de la confirmation.")).await?;

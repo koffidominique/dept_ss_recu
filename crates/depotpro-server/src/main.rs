@@ -36,6 +36,12 @@ async fn main() {
         .await
         .expect("Impossible de connecter SQLite via SQLx");
 
+    if let Err(e) =
+        depotpro_core::application::packaging_obligations::process_due_obligations(&db, Some("system")).await
+    {
+        tracing::warn!("Traitement initial des échéances d'emballages ignoré : {e}");
+    }
+
     let state = AppState {
         db: Arc::new(RwLock::new(db)),
         backup_dir,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Seed de stocks, seuils d'alerte, packaging consigné, mouvements, clients et inventaire
-pour DEPOTPRO PREMIUM V3. Idempotent : r�ex�cutable sans cr�er de doublons.
+Seed de stocks, seuils d'alerte, emballages consignés, mouvements, clients et inventaire
+pour DEPOTPRO PREMIUM V3+. Idempotent : réexécutable sans créer de doublons ni violer les FK.
 Usage : python3 scripts/seed_stock_workflow.py [--db data/depotpro_v3.db]
 """
 from __future__ import annotations
@@ -15,8 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = ROOT / "data" / "depotpro_v3.db"
 
-# product_id -> stock_milli (unit�s milli ; 1000 = 1 unit�)
-# Valeurs coh�rentes avec le catalogue d�j� implant� (bières 65cl/33cl, sodas, eaux, vins, maltas).
+# product_id -> stock_milli (unités milli ; 1000 = 1 unité)
 STOCK_BY_PRODUCT: dict[int, int] = {
     1: 288000,   # Bock Solibra 65cl  -> 288 btles (12 casiers x24)
     2: 240000,   # Bock Solibra 33cl  -> 240 btles (10 casiers x24)
@@ -69,7 +68,7 @@ STOCK_BY_PRODUCT: dict[int, int] = {
     49: 120000,  # Mützig Classique 33cl -> 120
     50: 120000,  # Mützig Canette 33cl -> 120
     51: 72000,   # Desperados Canette 33cl -> 72
-    52: 66000,   # Amstel Lager Canette 33cl (d�j� pr�sent) -> 66
+    52: 66000,   # Amstel Lager Canette 33cl -> 66
     53: 48000,   # Strongbow Gold Apple 33cl -> 48
     54: 96000,   # Maltina Bouteille 33cl -> 96
     55: 96000,   # Maltina Vanille 33cl -> 96
@@ -80,24 +79,24 @@ STOCK_BY_PRODUCT: dict[int, int] = {
     60: 96000,   # Fayrouz Pêche 33cl -> 96
 }
 
-# packaging_id -> quantit� consign�e (unit�s, pas milli)
+# packaging_id -> quantité consignée (unités entières)
 RETURNABLE_BY_PACKAGING: dict[int, int] = {
-    1: 2400,  # Bouteille verre 65cl SOLIBRA
-    2: 120,   # Casier 12 alvéoles 65cl SOLIBRA
-    3: 3600,  # Bouteille verre 33cl SOLIBRA
-    4: 150,   # Casier 24 alvéoles 33cl SOLIBRA
-    5: 1440,  # Bouteille verre 50cl SOLIBRA
-    6: 120,   # Casier 12 alvéoles 50cl SOLIBRA
-    7: 2400,  # Bouteille verre 30cl SOLIBRA
-    8: 150,   # Casier 24 alvéoles 30cl SOLIBRA
-    9: 1200,  # Bouteille verre 60/65cl BRASSIVOIRE
-    10: 60,   # Casier 12 alvéoles 60/65cl BRASSIVOIRE
-    11: 1800, # Bouteille verre 33cl BRASSIVOIRE
-    12: 75,   # Casier 24 alvéoles 33cl BRASSIVOIRE
+    1: 2400,   # Bouteille verre 65cl SOLIBRA
+    2: 120,    # Casier 12 alvéoles 65cl SOLIBRA
+    3: 3600,   # Bouteille verre 33cl SOLIBRA
+    4: 150,    # Casier 24 alvéoles 33cl SOLIBRA
+    5: 1440,   # Bouteille verre 50cl SOLIBRA
+    6: 120,    # Casier 12 alvéoles 50cl SOLIBRA
+    7: 2400,   # Bouteille verre 30cl SOLIBRA
+    8: 150,    # Casier 24 alvéoles 30cl SOLIBRA
+    9: 1200,   # Bouteille verre 60/65cl BRASSIVOIRE
+    10: 60,    # Casier 12 alvéoles 60/65cl BRASSIVOIRE
+    11: 1800,  # Bouteille verre 33cl BRASSIVOIRE
+    12: 75,    # Casier 24 alvéoles 33cl BRASSIVOIRE
 }
 
 CLIENTS = [
-    ("CLI-001", "Client Comptoir", "particulier", "", "Vente directe au dépôt", "Abidjan", "forbidden", None, 0),
+    ("CLI-001", "Client Comptoir", "particulier", None, "Vente directe au dépôt", "Abidjan", "forbidden", None, 0),
     ("CLI-002", "Maquis Le Prestige", "professionnel", "+225 05 44 12 88 90", "Rue des Jardins, Cocody", "Abidjan", "limited", 500000, 15),
     ("CLI-003", "Hôtel La Lagune", "professionnel", "+225 01 02 33 44 55", "Boulevard de Marseille", "Abidjan", "unlimited", None, 30),
     ("CLI-004", "Super Marché Bon Prix", "professionnel", "+225 07 00 11 22 33", "Zone 4, Yopougon", "Abidjan", "limited", 800000, 30),
@@ -108,7 +107,7 @@ NOW = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Seed stocks et workflow inventaire DEPOTPRO V3")
+    ap = argparse.ArgumentParser(description="Seed stocks et workflow inventaire DEPOTPRO V3+")
     ap.add_argument("--db", type=Path, default=DEFAULT_DB, help="Chemin base SQLite")
     args = ap.parse_args()
 
@@ -119,81 +118,118 @@ def main() -> int:
     con.execute("PRAGMA foreign_keys = ON")
     cur = con.cursor()
 
-    # Vérifier que la table products est remplie
-    n_products = cur.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-    if n_products == 0:
-        raise SystemExit("Aucun produit en base. Lancez d'abord le seed catalogue.")
+    existing_products = {
+        row[0]: row[1]
+        for row in cur.execute("SELECT id, purchase_price FROM products").fetchall()
+    }
+    if not existing_products:
+        con.close()
+        raise SystemExit("Aucun produit dans la table 'products'. Lancez d'abord le seed produits.")
 
-    location_id = cur.execute(
-        "SELECT id FROM stock_locations WHERE is_default = 1 LIMIT 1"
-    ).fetchone()[0]
+    loc_row = cur.execute(
+        "SELECT id FROM stock_locations WHERE is_default = 1 ORDER BY id LIMIT 1"
+    ).fetchone()
+    location_id = loc_row[0] if loc_row else None
+
+    existing_returnables = {
+        row[0]: row[1]
+        for row in cur.execute("SELECT id, deposit_value FROM returnable_packaging_types").fetchall()
+    }
+
+    seeded_products = 0
+    seeded_returnables = 0
 
     try:
         cur.execute("BEGIN")
 
-        # --- 1. Mettre à jour les produits : stock, seuils min/max ---
-        for pid, stock in STOCK_BY_PRODUCT.items():
-            min_stock = stock // 4          # alerte de réappro à 25% du stock
-            max_stock = stock * 2           # capacité stockage 2x le stock actuel
+        # --- 1 & 2 & 3. Produits présents : stock, stock_balances, stock_movements ---
+        cur.execute(
+            "DELETE FROM stock_movements WHERE reference_document = 'INIT-STOCK' AND movement_type = 'purchase_in'"
+        )
+        for pid, cost in sorted(existing_products.items()):
+            stock = STOCK_BY_PRODUCT.get(pid, 96000)
+            min_stock = stock // 4
+            max_stock = stock * 2
             cur.execute(
                 "UPDATE products SET stock_milli = ?, min_stock_milli = ?, max_stock_milli = ? WHERE id = ?",
                 (stock, min_stock, max_stock, pid),
             )
-
-        # --- 2. Soldes de stock par emplacement (stock_balances) ---
-        cur.execute("DELETE FROM stock_balances WHERE location_id = ?", (location_id,))
-        for pid, stock in STOCK_BY_PRODUCT.items():
-            cur.execute(
-                "INSERT INTO stock_balances (product_id, variant_id, location_id, quantity_milli, updated_at) VALUES (?, NULL, ?, ?, ?)",
-                (pid, location_id, stock, NOW),
-            )
-
-        # --- 3. Mouvements de stock (réception initiale) ---
-        cur.execute("DELETE FROM stock_movements WHERE location_id = ? AND movement_type = 'purchase_in'", (location_id,))
-        for pid, stock in STOCK_BY_PRODUCT.items():
-            cost = cur.execute("SELECT purchase_price FROM products WHERE id = ?", (pid,)).fetchone()[0]
+            if location_id is not None:
+                bal_row = cur.execute(
+                    "SELECT id FROM stock_balances WHERE product_id = ? AND variant_id IS NULL AND location_id = ?",
+                    (pid, location_id),
+                ).fetchone()
+                if bal_row:
+                    cur.execute(
+                        "UPDATE stock_balances SET quantity_milli = ?, updated_at = ? WHERE id = ?",
+                        (stock, NOW, bal_row[0]),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO stock_balances (product_id, variant_id, location_id, quantity_milli, updated_at) VALUES (?, NULL, ?, ?, ?)",
+                        (pid, location_id, stock, NOW),
+                    )
             cur.execute(
                 "INSERT INTO stock_movements (product_id, movement_type, quantity_milli, stock_before_milli, stock_after_milli, unit_cost, reason, reference_document, location_id, created_at) VALUES (?, 'purchase_in', ?, 0, ?, ?, 'Réception initiale de stock', 'INIT-STOCK', ?, ?)",
                 (pid, stock, stock, cost, location_id, NOW),
             )
+            seeded_products += 1
 
-        # --- 4. Packaging consigné : soldes + mouvements initiaux ---
-        cur.execute("DELETE FROM returnable_stock_balances")
-        cur.execute("DELETE FROM returnable_stock_movements WHERE movement_type = 'initial'")
-        for pid, qty in RETURNABLE_BY_PACKAGING.items():
-            dep = cur.execute("SELECT deposit_value FROM returnable_packaging_types WHERE id = ?", (pid,)).fetchone()[0]
+        # --- 4. Emballages consignés : soldes + actifs + mouvements initiaux ---
+        for rid, dep in sorted(existing_returnables.items()):
+            qty = RETURNABLE_BY_PACKAGING.get(rid, 100)
             cur.execute(
-                "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)",
-                (pid, qty),
+                "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?) ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
+                (rid, qty),
             )
             cur.execute(
-                "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, unit_deposit_value, total_value, date) VALUES (?, ?, 'initial', ?, 0, ?, 'Stock initial de démonstration', 'INIT-DEMO', ?, ?, ?)",
-                (f"init-ret-{pid}", pid, qty, qty, dep, qty * dep, NOW),
+                "UPDATE packaging_assets SET stock_empty = ? WHERE returnable_id = ?",
+                (qty, rid),
             )
+            cur.execute(
+                "INSERT OR REPLACE INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, unit_deposit_value, total_value, date) VALUES (?, ?, 'initial', ?, 0, ?, 'Stock initial de démonstration', 'INIT-DEMO', ?, ?, ?)",
+                (f"init-ret-{rid}", rid, qty, qty, dep, qty * dep, NOW),
+            )
+            seeded_returnables += 1
 
-        # --- 5. Clients + paramètres de crédit ---
-        cur.execute("DELETE FROM clients")
-        cur.execute("DELETE FROM client_credit_settings")
+        # --- 5. Clients + paramètres de crédit (idempotent, respecte les FK) ---
         for (code, name, ctype, phone, address, city, policy, limit_val, terms) in CLIENTS:
             cur.execute(
-                "INSERT INTO clients (code, name, client_type, phone, address, city) VALUES (?, ?, ?, ?, ?, ?)",
+                """INSERT INTO clients (code, name, client_type, phone, address, city)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(code) DO UPDATE SET
+                     name = excluded.name,
+                     client_type = excluded.client_type,
+                     phone = excluded.phone,
+                     address = excluded.address,
+                     city = excluded.city""",
                 (code, name, ctype, phone, address, city),
             )
             cid = cur.execute("SELECT id FROM clients WHERE code = ?", (code,)).fetchone()[0]
             cur.execute(
-                "INSERT INTO client_credit_settings (client_id, policy, credit_limit, payment_terms_days) VALUES (?, ?, ?, ?)",
+                """INSERT INTO client_credit_settings (client_id, policy, credit_limit, payment_terms_days)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(client_id) DO UPDATE SET
+                     policy = excluded.policy,
+                     credit_limit = excluded.credit_limit,
+                     payment_terms_days = excluded.payment_terms_days""",
                 (cid, policy, limit_val, terms),
             )
 
-        # --- 6. Inventaire validé (théorique = compté) pour aperçu immédiat ---
-        cur.execute("DELETE FROM inventory_lines")
-        cur.execute("DELETE FROM inventories WHERE reference = 'INV-2026-0001'")
-        cur.execute(
-            "INSERT INTO inventories (reference, status, notes, created_at, validated_at) VALUES (?, 'validated', 'Inventaire initial de démarrage — stock cohérent', ?, ?)",
-            ("INV-2026-0001", NOW, NOW),
-        )
-        inv_id = cur.execute("SELECT id FROM inventories WHERE reference = 'INV-2026-0001'").fetchone()[0]
-        for pid, stock in STOCK_BY_PRODUCT.items():
+        # --- 6. Inventaire validé (théorique = compté) ---
+        inv_row = cur.execute("SELECT id FROM inventories WHERE reference = 'INV-2026-0001'").fetchone()
+        if inv_row:
+            inv_id = inv_row[0]
+            cur.execute("DELETE FROM inventory_lines WHERE inventory_id = ?", (inv_id,))
+        else:
+            cur.execute(
+                "INSERT INTO inventories (reference, status, notes, created_at, validated_at) VALUES (?, 'validated', 'Inventaire initial de démarrage — stock cohérent', ?, ?)",
+                ("INV-2026-0001", NOW, NOW),
+            )
+            inv_id = cur.execute("SELECT id FROM inventories WHERE reference = 'INV-2026-0001'").fetchone()[0]
+
+        for pid in sorted(existing_products.keys()):
+            stock = STOCK_BY_PRODUCT.get(pid, 96000)
             cur.execute(
                 "INSERT INTO inventory_lines (inventory_id, product_id, theoretical_milli, counted_milli, reason) VALUES (?, ?, ?, ?, 'Conforme')",
                 (inv_id, pid, stock, stock),
@@ -208,8 +244,8 @@ def main() -> int:
         con.close()
 
     print(
-        f"Seed stock OK : {len(STOCK_BY_PRODUCT)} produits approvisionnés, "
-        f"{len(RETURNABLE_BY_PACKAGING)} packagings consignés, "
+        f"Seed stock OK : {seeded_products} produits approvisionnés, "
+        f"{seeded_returnables} emballages consignés, "
         f"{len(CLIENTS)} clients, inventaire INV-2026-0001 validé."
     )
     return 0

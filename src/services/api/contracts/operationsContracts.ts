@@ -58,6 +58,9 @@ export interface ConsignmentsApiClient {
       returnable_id: number;
       pieces: number;
       returned_pieces: number;
+      lost_pieces: number;
+      destroyed_pieces: number;
+      converted_pieces: number;
       pending_pieces: number;
       unit_value: number;
       total_reference_value: number;
@@ -80,6 +83,39 @@ export interface ConsignmentsApiClient {
     request_key: string;
     note?: string;
   }): Promise<{ client_id: number; packaging_financial_balance: number }>;
+  processDuePackagingObligations(): Promise<{
+    conversions: number;
+    total_amount: number;
+  }>;
+  registerPackagingLateReturn(
+    depositIssueId: number,
+    pieces: number,
+  ): Promise<{ deposit_issue_id: number; credited_amount: number }>;
+  listPackagingLossDeclarations(clientId?: number): Promise<
+    Array<{
+      id: number;
+      request_key: string;
+      deposit_issue_id: number;
+      sale_reference: string | null;
+      client_id: number | null;
+      client_name: string | null;
+      packaging_name: string;
+      pieces: number;
+      unit_value: number;
+      estimated_amount: number;
+      status: string;
+      reason: string;
+      created_at: string;
+    }>
+  >;
+  declarePackagingLoss(input: {
+    deposit_issue_id: number;
+    pieces: number;
+    reason: string;
+  }): Promise<{ declaration_id: number }>;
+  validatePackagingLoss(
+    declarationId: number,
+  ): Promise<{ declaration_id: number; converted_amount: number }>;
   getProductCatalogueOverview(): Promise<Record<string, unknown>>;
   setCatalogueProductActive(id: number, is_active: boolean): Promise<unknown>;
   setCatalogueReferencePrice(

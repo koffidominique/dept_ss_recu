@@ -125,19 +125,19 @@ pub async fn update_component_stock(
 ) -> CoreResult<PackagingComponentStockDto> {
     require_current_actor_permission(Permission::ConsignmentsWrite)?;
 
-    let mut tx = db.pool.begin().await?;
+    let (_guard, mut tx) = db.begin_write().await?;
 
-    let current_stock = sqlx::query_scalar::<_, i64>(
-        "SELECT stock_quantity FROM packaging_component_stock
+    let existing_row: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT id, stock_quantity FROM packaging_component_stock
          WHERE component_type = ? AND component_profile_id IS NOT DISTINCT FROM ? AND crate_type_id IS NOT DISTINCT FROM ?",
     )
     .bind(&input.component_type)
     .bind(input.component_profile_id)
     .bind(input.crate_type_id)
     .fetch_optional(&mut *tx)
-    .await?
-    .unwrap_or(0);
+    .await?;
 
+    let current_stock = existing_row.map(|(_, sq)| sq).unwrap_or(0);
     let new_stock = current_stock + input.quantity;
 
     if new_stock < 0 {
@@ -150,24 +150,42 @@ pub async fn update_component_stock(
     let stock_before = current_stock;
     let stock_after = new_stock;
 
-    sqlx::query(
-        "INSERT INTO packaging_component_stock (component_type, component_profile_id, crate_type_id, stock_quantity, deposit_value)
-         VALUES (?, ?, ?, ?, 0)
-         ON CONFLICT(component_type, component_profile_id, crate_type_id) DO UPDATE SET stock_quantity = excluded.stock_quantity, updated_at = datetime('now')",
-    )
-    .bind(&input.component_type)
-    .bind(input.component_profile_id)
-    .bind(input.crate_type_id)
-    .bind(new_stock)
-    .execute(&mut *tx)
-    .await?;
+    let stock_id = if let Some((id, _)) = existing_row {
+        sqlx::query(
+            "UPDATE packaging_component_stock
+             SET stock_quantity = ?, updated_at = datetime('now')
+             WHERE id = ?",
+        )
+        .bind(new_stock)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        id
+    } else {
+        sqlx::query_scalar::<_, i64>(
+            "INSERT INTO packaging_component_stock (component_type, component_profile_id, crate_type_id, stock_quantity, deposit_value)
+             VALUES (?, ?, ?, ?, 0)
+             RETURNING id",
+        )
+        .bind(&input.component_type)
+        .bind(input.component_profile_id)
+        .bind(input.crate_type_id)
+        .bind(new_stock)
+        .fetch_one(&mut *tx)
+        .await?
+    };
 
+    let mov_comp_type = if input.component_type == "crate_assembled" {
+        "other"
+    } else {
+        input.component_type.as_str()
+    };
     sqlx::query(
         "INSERT INTO packaging_component_movements (component_type, component_profile_id, crate_type_id,
                                                     movement_type, quantity, stock_before, stock_after, reason, reference_document)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(&input.component_type)
+    .bind(mov_comp_type)
     .bind(input.component_profile_id)
     .bind(input.crate_type_id)
     .bind(&input.movement_type)
@@ -184,11 +202,9 @@ pub async fn update_component_stock(
     let stock = sqlx::query_as::<_, PackagingComponentStockDto>(
         "SELECT id, component_type, component_profile_id, crate_type_id, stock_quantity, reserved_quantity, deposit_value, last_counted_at
          FROM packaging_component_stock
-         WHERE component_type = ? AND component_profile_id IS NOT DISTINCT FROM ? AND crate_type_id IS NOT DISTINCT FROM ?",
+         WHERE id = ?",
     )
-    .bind(&input.component_type)
-    .bind(input.component_profile_id)
-    .bind(input.crate_type_id)
+    .bind(stock_id)
     .fetch_one(&db.pool)
     .await?;
 

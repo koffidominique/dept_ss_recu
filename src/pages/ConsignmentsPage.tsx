@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Download, Plus, Printer } from 'lucide-react';
@@ -30,7 +31,13 @@ import type {
 } from '../features/consignments/types.ts';
 
 export function ConsignmentsPage() {
-  const [activeTab, setActiveTab] = useState('issues');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['issues', 'balances', 'catalog', 'movements', 'financial', 'returns'];
+  const paramTab = searchParams.get('tab');
+  const activeTab = paramTab && validTabs.includes(paramTab) ? paramTab : 'issues';
+  const setActiveTab = (next: string) => {
+    setSearchParams(next === 'issues' ? {} : { tab: next }, { replace: true });
+  };
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [printDoc, setPrintDoc] = useState<PrintableDocumentData | null>(null);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -104,7 +111,7 @@ export function ConsignmentsPage() {
               value="issues"
               className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
-              Retour emballages clients ouverts ({openIssues.length})
+              Consignes clients ouvertes ({openIssues.length})
             </Tabs.Trigger>
             <Tabs.Trigger
               value="balances"

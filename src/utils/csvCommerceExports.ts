@@ -5,6 +5,38 @@ import { downloadCsv, todayTag } from './csvCore.ts';
  * Exports CSV : Ventes, Créances, Approvisionnements, Dépenses & Caisse
  * ============================================================================ */
 
+const PRICE_TIER_LABELS: Record<string, string> = {
+  retail: 'Détail',
+  semi_wholesale: 'Demi-gros',
+  wholesale: 'Gros',
+};
+
+const SALE_STATUS_LABELS: Record<string, string> = {
+  validated: 'Validée',
+  partially_returned: 'Partiellement retournée',
+  returned: 'Retournée',
+  cancelled: 'Annulée',
+};
+
+const RECEIVABLE_STATUS_LABELS: Record<string, string> = {
+  open: 'Ouverte',
+  partial: 'Partielle',
+  paid: 'Soldée',
+  cancelled: 'Annulée',
+};
+
+const PURCHASE_STATUS_LABELS: Record<string, string> = {
+  draft: 'Brouillon',
+  submitted: 'Soumise',
+  approved: 'Approuvée',
+  ordered: 'Commandée',
+  partial: 'Partiellement reçue',
+  partially_received: 'Partiellement reçue',
+  received: 'Reçue',
+  cancelled: 'Annulée',
+  rejected: 'Rejetée',
+};
+
 export function exportSalesCsv(items: SaleSummary[]) {
   return downloadCsv(
     `depotpro_ventes_${todayTag()}.csv`,
@@ -17,7 +49,7 @@ export function exportSalesCsv(items: SaleSummary[]) {
       'Sous-total marchandises (FCFA)',
       'Remise (FCFA)',
       'Net marchandises (FCFA)',
-      'Consignes (FCFA)',
+      'Consignes emballages (FCFA)',
       'Total TTC (FCFA)',
       'Payé (FCFA)',
       'Reste dû (FCFA)',
@@ -29,7 +61,7 @@ export function exportSalesCsv(items: SaleSummary[]) {
       s.created_at,
       s.client_name,
       s.sale_type === 'credit' ? 'Crédit' : 'Comptant',
-      s.price_tier,
+      PRICE_TIER_LABELS[s.price_tier] || s.price_tier,
       s.subtotal_merchandise,
       s.discount_amount,
       s.total_merchandise,
@@ -38,14 +70,14 @@ export function exportSalesCsv(items: SaleSummary[]) {
       s.paid_amount,
       s.remaining_amount,
       s.payment_labels || '',
-      s.status,
+      SALE_STATUS_LABELS[s.status] || s.status,
     ])
   );
 }
 
 export function exportReceivablesCsv(items: Receivable[]) {
   return downloadCsv(
-    `depotpro_creances_${todayTag()}.csv`,
+    `depotpro_creances_marchandises_${todayTag()}.csv`,
     [
       'Client',
       'Code client',
@@ -68,7 +100,7 @@ export function exportReceivablesCsv(items: Receivable[]) {
       r.initial_amount,
       Math.max(0, r.initial_amount - r.remaining_amount),
       r.remaining_amount,
-      r.status,
+      RECEIVABLE_STATUS_LABELS[r.status] || r.status,
     ])
   );
 }
@@ -99,8 +131,31 @@ export function exportExpensesCsv(items: ExpenseItem[]) {
   );
 }
 
+export const CASH_MOVEMENT_KIND_LABELS: Record<string, string> = {
+  sale: 'Vente',
+  receivable: 'Règlement créance client',
+  expense: 'Dépense',
+  supplier_payment: 'Règlement fournisseur',
+  deposit_refund: 'Dédommagement emballages',
+  sale_refund: 'Remboursement avoir',
+  income: 'Entrée diverse',
+  outflow: 'Sortie diverse',
+};
+
+export function formatCashMovementKind(
+  kind?: string | null,
+  referenceDocument?: string | null
+): string {
+  if (referenceDocument?.startsWith('pkg-debt-pay:')) {
+    return 'Règlement créance emballages';
+  }
+  if (!kind) return 'Opération';
+  return CASH_MOVEMENT_KIND_LABELS[kind] ?? kind;
+}
+
 export interface CashMovementCsvRow {
   created_at: string;
+  kind?: string;
   description: string;
   method_label: string;
   is_cash: number;
@@ -112,9 +167,10 @@ export interface CashMovementCsvRow {
 export function exportCashMovementsCsv(sessionRef: string, movements: CashMovementCsvRow[]) {
   return downloadCsv(
     `depotpro_caisse_mouvements_${sessionRef}_${todayTag()}.csv`,
-    ['Date & heure', 'Opération', 'Moyen', 'Canal', 'Sens', 'Montant (FCFA)', 'Document'],
+    ['Date & heure', 'Nature', 'Opération', 'Moyen', 'Canal', 'Sens', 'Montant (FCFA)', 'Document'],
     movements.map((m) => [
       m.created_at,
+      formatCashMovementKind(m.kind, m.reference_document),
       m.description,
       m.method_label,
       m.is_cash === 1 ? 'Espèces' : 'Digital',
@@ -174,7 +230,7 @@ export function exportPurchasesCsv(orders: PurchaseOrder[]) {
       o.received_amount,
       o.lines.length,
       o.receipts.length,
-      o.status,
+      PURCHASE_STATUS_LABELS[o.status] || o.status,
     ])
   );
 }

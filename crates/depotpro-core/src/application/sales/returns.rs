@@ -197,6 +197,96 @@ pub async fn create_sale_return(
             .bind(&avo_ref)
             .execute(&mut *tx)
             .await?;
+
+            let sold_base_milli: i64 =
+                sqlx::query_scalar("SELECT base_quantity_milli FROM sale_lines WHERE id = ?")
+                    .bind(sl_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if sold_base_milli > 0 {
+                let cum_restocked_milli: i64 = sqlx::query_scalar(
+                    "SELECT COALESCE(SUM(srl.base_quantity_milli), 0)
+                     FROM sales_return_lines srl
+                     JOIN sales_returns sr ON sr.id = srl.return_id
+                     WHERE srl.sale_line_id = ? AND sr.restock_approved = 1",
+                )
+                .bind(sl_id)
+                .fetch_one(&mut *tx)
+                .await?;
+                let prev_restocked_milli = (cum_restocked_milli - *base_qty_milli).max(0);
+
+                let line_issues: Vec<(i64, Option<i64>, i64, i64, i64, i64, i64)> = sqlx::query_as(
+                    "SELECT id, client_id, returnable_id, pieces, returned_pieces,
+                            lost_pieces + destroyed_pieces + converted_pieces, unit_value
+                     FROM deposit_issues
+                     WHERE sale_line_id = ? AND status IN ('pending', 'partially_returned')
+                     ORDER BY id ASC",
+                )
+                .bind(sl_id)
+                .fetch_all(&mut *tx)
+                .await?;
+
+                for (di_id, di_cid, di_rid, di_pieces, di_ret, di_other_out, di_unit_val) in
+                    line_issues
+                {
+                    let prev_pieces = ((di_pieces as i128 * prev_restocked_milli as i128)
+                        / sold_base_milli as i128) as i64;
+                    let cum_pieces = ((di_pieces as i128 * cum_restocked_milli as i128)
+                        / sold_base_milli as i128) as i64;
+                    let delta_pieces = (cum_pieces - prev_pieces).max(0);
+                    let open_rem = (di_pieces - di_ret - di_other_out).max(0);
+                    let settle_pieces = delta_pieces.min(open_rem);
+                    if settle_pieces <= 0 {
+                        continue;
+                    }
+
+                    let next_ret = di_ret + settle_pieces;
+                    let next_status = if next_ret + di_other_out >= di_pieces {
+                        "settled"
+                    } else {
+                        "partially_returned"
+                    };
+                    sqlx::query(
+                        "UPDATE deposit_issues
+                         SET returned_pieces = ?, status = ?, updated_at = datetime('now')
+                         WHERE id = ?",
+                    )
+                    .bind(next_ret)
+                    .bind(next_status)
+                    .bind(di_id)
+                    .execute(&mut *tx)
+                    .await?;
+
+                    if let Some(cid) = di_cid {
+                        let dec_amt = settle_pieces.saturating_mul(di_unit_val);
+                        sqlx::query(
+                            "UPDATE customer_packaging_accounts
+                             SET balance_pieces = MAX(0, balance_pieces - ?),
+                                 deposit_held_amount = CASE
+                                     WHEN balance_pieces - ? <= 0 THEN 0
+                                     ELSE MAX(0, deposit_held_amount - ?)
+                                 END
+                             WHERE client_id = ? AND returnable_id = ?",
+                        )
+                        .bind(settle_pieces)
+                        .bind(settle_pieces)
+                        .bind(dec_amt)
+                        .bind(cid)
+                        .bind(di_rid)
+                        .execute(&mut *tx)
+                        .await?;
+
+                        crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
+                            &mut tx,
+                            cid,
+                            di_rid,
+                            -settle_pieces,
+                            di_unit_val,
+                        )
+                        .await?;
+                    }
+                }
+            }
         }
     }
 

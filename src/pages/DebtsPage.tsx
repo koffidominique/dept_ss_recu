@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Download, Printer } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Download, Package, Printer } from 'lucide-react';
 import {
   DocumentPrintModal,
   type PrintableDocumentData,
@@ -41,6 +42,23 @@ export function DebtsPage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 px-4 py-2.5 text-xs">
+        <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+          <Package className="h-4 w-4 text-[#D9901A] shrink-0" />
+          <span>
+            Les <strong>créances financières d&apos;emballages</strong> (non restitués après 15 jours
+            max ou pertes validées) sont suivies dans un registre comptable séparé.
+          </span>
+        </div>
+        <Link
+          to="/consignments?tab=financial"
+          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-[#111A2E] px-3 py-1.5 font-semibold text-amber-900 dark:text-amber-200 hover:bg-amber-100/60 dark:hover:bg-amber-900/30 shrink-0"
+        >
+          Voir les créances d&apos;emballages
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs text-[#667085] dark:text-slate-400">

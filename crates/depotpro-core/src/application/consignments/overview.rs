@@ -50,7 +50,9 @@ pub async fn get_overview(db: &DepotDb) -> CoreResult<ConsignmentsOverviewDto> {
     let open_issues = sqlx::query_as::<_, OpenDepositIssueDto>(
         "SELECT di.id, di.sale_id, s.reference AS sale_reference, di.client_id, c.name AS client_name,
                 di.returnable_id, rpt.name AS packaging_name, rpt.code AS packaging_code,
-                di.pieces, di.returned_pieces, di.unit_value, di.amount,
+                di.pieces, di.returned_pieces,
+                (di.lost_pieces + di.destroyed_pieces + di.converted_pieces) AS other_out_pieces,
+                di.due_date, di.unit_value, di.amount,
                 CASE
                     WHEN rpt.kind = 'bottle' THEN (
                         SELECT sl.product_name || ' (' ||
@@ -79,7 +81,9 @@ pub async fn get_overview(db: &DepotDb) -> CoreResult<ConsignmentsOverviewDto> {
          JOIN sales s ON s.id = di.sale_id
          LEFT JOIN clients c ON c.id = di.client_id
          JOIN returnable_packaging_types rpt ON rpt.id = di.returnable_id
-         WHERE s.status != 'cancelled' AND di.returned_pieces < di.pieces
+         WHERE s.status != 'cancelled'
+           AND COALESCE(di.status, 'pending') NOT IN ('returned', 'settled', 'cancelled', 'converted')
+           AND (di.returned_pieces + di.lost_pieces + di.destroyed_pieces + di.converted_pieces) < di.pieces
          ORDER BY di.id DESC",
     )
     .fetch_all(&db.pool)
@@ -112,7 +116,13 @@ pub async fn get_client_packaging_balances(
     db: &DepotDb,
     client_id: i64,
 ) -> CoreResult<Vec<ClientPackagingBalanceDto>> {
-    require_current_actor_permission(Permission::ConsignmentsRead)?;
+    if let Some(actor) = crate::application::auth::current_actor() {
+        if !actor.has_permission(Permission::ConsignmentsRead)
+            && !actor.has_permission(Permission::SalesRead)
+        {
+            crate::application::auth::require_permission(&actor, Permission::ConsignmentsRead)?;
+        }
+    }
     let rows: Vec<ClientPackagingBalanceDto> = sqlx::query_as(
         "SELECT cpa.rowid AS id, cpa.client_id, c.name AS client_name, c.code AS client_code,
                 cpa.returnable_id, rpt.name AS packaging_name, rpt.code AS packaging_code, rpt.deposit_value,

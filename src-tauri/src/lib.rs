@@ -108,6 +108,13 @@ pub fn run() {
             ))
             .map_err(|e| format!("Échec initialisation SQLite DEPOTPRO : {e}"))?;
 
+            let _ = tauri::async_runtime::block_on(
+                depotpro_core::application::packaging_obligations::process_due_obligations(
+                    &db,
+                    Some("system"),
+                ),
+            );
+
             app.manage(DesktopState::new(db, backup_dir, lock_path));
             Ok(())
         })
@@ -175,6 +182,11 @@ pub fn run() {
             commands::consignments_and_obligations::get_packaging_dashboard,
             commands::consignments_and_obligations::get_client_packaging_balances,
             commands::consignments_and_obligations::pay_packaging_debt,
+            commands::consignments_and_obligations::process_due_packaging_obligations,
+            commands::consignments_and_obligations::register_packaging_late_return,
+            commands::consignments_and_obligations::list_packaging_loss_declarations,
+            commands::consignments_and_obligations::declare_packaging_loss,
+            commands::consignments_and_obligations::validate_packaging_loss,
             commands::catalogue_v3::set_catalogue_product_active_pc,
             commands::catalogue_v3::set_catalogue_reference_price_pc,
             commands::catalogue_v3::get_catalogue_reference_price_history_pc,

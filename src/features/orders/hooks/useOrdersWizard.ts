@@ -145,9 +145,22 @@ export function useOrdersWizard() {
     qc.invalidateQueries({ queryKey: ['customer-orders'] });
     qc.invalidateQueries({ queryKey: ['customer-deposits'] });
     qc.invalidateQueries({ queryKey: ['customer-deposit-history'] });
+    qc.invalidateQueries({ queryKey: ['packaging-assets'] });
+    qc.invalidateQueries({ queryKey: ['consignments'] });
+    qc.invalidateQueries({ queryKey: ['packaging-obligations'] });
+    qc.invalidateQueries({ queryKey: ['packaging-dashboard'] });
+    qc.invalidateQueries({ queryKey: ['client-packaging-balances'] });
+    qc.invalidateQueries({ queryKey: ['clients'] });
+    qc.invalidateQueries({ queryKey: ['sales'] });
+    qc.invalidateQueries({ queryKey: ['receivables'] });
     qc.invalidateQueries({ queryKey: ['products-orders'] });
+    qc.invalidateQueries({ queryKey: ['products-pos'] });
+    qc.invalidateQueries({ queryKey: ['products'] });
+    qc.invalidateQueries({ queryKey: ['stock'] });
     qc.invalidateQueries({ queryKey: ['commercial-documents'] });
     qc.invalidateQueries({ queryKey: ['cash'] });
+    qc.invalidateQueries({ queryKey: ['dashboard'] });
+    qc.invalidateQueries({ queryKey: ['reports'] });
   };
 
   const createMutation = useMutation({

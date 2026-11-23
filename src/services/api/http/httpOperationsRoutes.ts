@@ -51,6 +51,32 @@ export const httpConsignmentsApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  processDuePackagingObligations: () =>
+    httpRequest<Awaited<ReturnType<ApiClient['processDuePackagingObligations']>>>(
+      '/api/packaging-obligations/process-due',
+      { method: 'POST' },
+    ),
+  registerPackagingLateReturn: (depositIssueId: number, pieces: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['registerPackagingLateReturn']>>>(
+      `/api/packaging-obligations/${depositIssueId}/late-return`,
+      { method: 'POST', body: JSON.stringify({ pieces }) },
+    ),
+  listPackagingLossDeclarations: (clientId?: number) => {
+    const query = clientId ? `?client_id=${clientId}` : '';
+    return httpRequest<Awaited<ReturnType<ApiClient['listPackagingLossDeclarations']>>>(
+      `/api/packaging-obligations/losses${query}`,
+    );
+  },
+  declarePackagingLoss: (input: Parameters<ApiClient['declarePackagingLoss']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['declarePackagingLoss']>>>(
+      '/api/packaging-obligations/losses',
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
+  validatePackagingLoss: (declarationId: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['validatePackagingLoss']>>>(
+      `/api/packaging-obligations/losses/${declarationId}/validate`,
+      { method: 'POST' },
+    ),
   getCatalogueReferencePriceHistory: (id: number) =>
     httpRequest<Awaited<ReturnType<ApiClient['getCatalogueReferencePriceHistory']>>>(
       `/api/catalogue-products/${id}/reference-price`,

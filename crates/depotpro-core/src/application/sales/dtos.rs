@@ -256,6 +256,18 @@ pub struct SaleDepositDto {
 }
 
 #[derive(Debug, Serialize, FromRow)]
+pub struct SaleReceivedReturnableDto {
+    pub id: i64,
+    pub returnable_id: i64,
+    pub kind: String,
+    pub packaging_name: String,
+    pub packaging_code: String,
+    pub pieces: i64,
+    pub unit_value: i64,
+    pub amount: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
 pub struct SaleCancellationDto {
     pub id: i64,
     pub reason: String,
@@ -297,6 +309,8 @@ pub struct SaleDetailDto {
     pub lines: Vec<SaleLineDto>,
     pub payments: Vec<SalePaymentDto>,
     pub deposits: Vec<SaleDepositDto>,
+    pub received_returnables: Vec<SaleReceivedReturnableDto>,
+    pub total_returned_packaging_amount: i64,
     pub cancellation: Option<SaleCancellationDto>,
     pub returns: Vec<SaleReturnDto>,
 }

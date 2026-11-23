@@ -72,10 +72,17 @@ pub async fn pay_packaging_financial_debt(
     .fetch_optional(&mut **tx0)
     .await?;
     if existing.is_some() {
-        let bal = get_client_packaging_financial_balance(db, input.client_id).await?;
+        let bal_raw: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END), 0)
+             FROM customer_packaging_financial_ledger WHERE client_id = ?",
+        )
+        .bind(input.client_id)
+        .fetch_one(&mut **tx0)
+        .await?;
+        g.1.rollback().await?;
         return Ok(PayPackagingDebtDto {
             client_id: input.client_id,
-            packaging_financial_balance: bal.packaging_financial_balance,
+            packaging_financial_balance: bal_raw.max(0),
         });
     }
 
@@ -110,9 +117,14 @@ pub async fn pay_packaging_financial_debt(
             "Le règlement doit être positif.".to_string(),
         ));
     }
-    let balance = get_client_packaging_financial_balance(db, input.client_id)
-        .await?
-        .packaging_financial_balance;
+    let balance_raw: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END), 0)
+         FROM customer_packaging_financial_ledger WHERE client_id = ?",
+    )
+    .bind(input.client_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    let balance = balance_raw.max(0);
     if total > balance {
         return Err(CoreError::Validation(format!(
             "Le règlement ({total}) dépasse la créance d'emballages restante ({balance})."
@@ -131,6 +143,31 @@ pub async fn pay_packaging_financial_debt(
         input.note.clone(),
     )
     .await?;
+
+    let open_session_id: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM cash_sessions WHERE status = 'open' LIMIT 1")
+            .fetch_optional(&mut **tx)
+            .await?;
+    if let Some(sid) = open_session_id {
+        for (idx, (method_code, part_amount)) in parts.iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO cash_movements (session_id, request_key, kind, method_code, direction, amount, description, reference_document)
+                 VALUES (?, ?, 'receivable', ?, 'in', ?, ?, ?)",
+            )
+            .bind(sid)
+            .bind(format!("pkg-debt-pay:{}:{idx}", input.request_key.trim()))
+            .bind(method_code)
+            .bind(part_amount)
+            .bind(format!(
+                "Règlement créance emballages client #{}",
+                input.client_id
+            ))
+            .bind(input.request_key.trim())
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+
     sqlx::query(
         "INSERT INTO audit_logs (entity_type, entity_id, action, details, actor_name)
          VALUES ('customer_packaging_financial_ledger', ?, 'PAY_PACKAGING_DEBT', ?, ?)",

@@ -3,7 +3,7 @@
 // ============================================================================
 
 use crate::error::CoreResult;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{Acquire, Sqlite, SqlitePool, Transaction};
 use std::collections::HashSet;
 
 pub use super::sql_defs::{
@@ -14,7 +14,7 @@ pub use super::sql_defs::{
     V3_MIGRATION_0012_SQL, V3_MIGRATION_0013_SQL, V3_MIGRATION_0014_SQL, V3_MIGRATION_0015_SQL,
     V3_MIGRATION_0016_SQL, V3_MIGRATION_0017_SQL, V3_MIGRATION_0018_SQL, V3_MIGRATION_0019_SQL,
     V3_MIGRATION_0020_SQL, V3_MIGRATION_0021_SQL, V3_MIGRATION_0022_SQL, V3_MIGRATION_0023_SQL,
-    V3_MIGRATION_0024_SQL, V3_SCHEMA_SQL,
+    V3_MIGRATION_0024_SQL, V3_MIGRATION_0025_SQL, V3_SCHEMA_SQL,
 };
 use super::DepotDb;
 
@@ -189,26 +189,46 @@ impl DepotDb {
         let mut skipped_legacy_columns_for = Vec::new();
 
         for migration in pending {
-            let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
-            let skip_sql = should_skip_sql_due_to_existing_column(&mut tx, &migration).await?;
-            if skip_sql {
-                skipped_legacy_columns_for.push(migration.version);
-            } else {
-                let statements = split_sql_statements(migration.sql);
-                for stmt in statements {
-                    sqlx::query(&stmt).execute(&mut *tx).await?;
-                }
+            let needs_fk_off = matches!(migration.version, 14 | 25);
+            let mut conn = pool.acquire().await?;
+            if needs_fk_off {
+                sqlx::query("PRAGMA foreign_keys = OFF")
+                    .execute(&mut *conn)
+                    .await?;
             }
 
-            sqlx::query(
-                "INSERT INTO schema_version (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING",
-            )
-            .bind(migration.version)
-            .bind(migration.name)
-            .execute(&mut *tx)
-            .await?;
+            let step_result: CoreResult<()> = async {
+                let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
+                let skip_sql = should_skip_sql_due_to_existing_column(&mut tx, &migration).await?;
+                if skip_sql {
+                    skipped_legacy_columns_for.push(migration.version);
+                } else {
+                    let statements = split_sql_statements(migration.sql);
+                    for stmt in statements {
+                        sqlx::query(&stmt).execute(&mut *tx).await?;
+                    }
+                }
 
-            tx.commit().await?;
+                sqlx::query(
+                    "INSERT INTO schema_version (version, name) VALUES (?, ?) ON CONFLICT(version) DO NOTHING",
+                )
+                .bind(migration.version)
+                .bind(migration.name)
+                .execute(&mut *tx)
+                .await?;
+
+                tx.commit().await?;
+                Ok(())
+            }
+            .await;
+
+            if needs_fk_off {
+                let _ = sqlx::query("PRAGMA foreign_keys = ON")
+                    .execute(&mut *conn)
+                    .await;
+            }
+            step_result?;
+
             newly_applied.push(migration.version);
             applied_set.insert(migration.version);
         }

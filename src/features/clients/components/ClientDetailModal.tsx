@@ -1,6 +1,9 @@
-import { Edit3 } from 'lucide-react';
+import { ArrowRight, Edit3, PackageCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ModalDialog } from '../../../components/dialogs/ModalDialog.tsx';
 import { StatusBadge } from '../../../components/common/StatusBadge.tsx';
+import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { Client, Receivable, SaleSummary } from '../../../types/erp.ts';
 import { formatDate, formatDateTime, formatFcfa } from '../../../utils/format.ts';
 
@@ -36,6 +39,13 @@ export function ClientDetailModal({
     ? consignmentBalances.filter((b) => b.client_id === target.id)
     : [];
   const today = new Date().toISOString().slice(0, 10);
+
+  const pkgDashboardQuery = useQuery({
+    queryKey: ['packaging-dashboard', target?.id],
+    queryFn: () => apiClient.getPackagingDashboard(target!.id),
+    enabled: Boolean(target),
+  });
+  const pkgDebt = pkgDashboardQuery.data?.packaging_financial_debt ?? 0;
 
   return (
     <ModalDialog
@@ -79,6 +89,11 @@ export function ClientDetailModal({
               <div className="mt-1 font-mono-num text-sm font-bold text-[#D9901A]">
                 {formatFcfa(target.unpaid_balance)}
               </div>
+              {pkgDebt > 0 && (
+                <div className="mt-0.5 text-[11px] text-[#667085]">
+                  dont {formatFcfa(pkgDebt)} emballages
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
               <div className="text-[#667085]">Politique crédit</div>
@@ -100,11 +115,30 @@ export function ClientDetailModal({
 
           <div>
             <h4 className="font-display font-semibold mb-2">
-              Échéances &amp; créances ({clientRecs.length})
+              Échéances &amp; créances ({clientRecs.length + (pkgDebt > 0 ? 1 : 0)})
             </h4>
-            {clientRecs.length === 0 ? (
+            {pkgDebt > 0 && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2">
+                <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                  <PackageCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>
+                    Créance d&apos;emballages exigible (&gt; 15j / pertes) :{' '}
+                    <strong className="font-mono-num">{formatFcfa(pkgDebt)}</strong>
+                  </span>
+                </div>
+                <Link
+                  to="/consignments?tab=financial"
+                  onClick={onClose}
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 shrink-0"
+                >
+                  Régler
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
+            {clientRecs.length === 0 && pkgDebt <= 0 ? (
               <p className="text-[#667085]">Aucune créance enregistrée.</p>
-            ) : (
+            ) : clientRecs.length === 0 ? null : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {clientRecs.map((r) => {
                   const overdue = r.due_date && r.remaining_amount > 0 && r.due_date < today;
@@ -134,9 +168,16 @@ export function ClientDetailModal({
           </div>
 
           <div>
-            <h4 className="font-display font-semibold mb-2">
-              Retour emballages détenus ({clientBalances.length})
-            </h4>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="font-display font-semibold">
+                Emballages consignés dus ({clientBalances.length})
+              </h4>
+              {clientBalances.length > 0 && (
+                <span className="text-[11px] text-[#667085]">
+                  Délai de restitution : 15 jours max
+                </span>
+              )}
+            </div>
             {clientBalances.length === 0 ? (
               <p className="text-[#667085]">Aucun emballage en attente de retour.</p>
             ) : (
@@ -148,7 +189,7 @@ export function ClientDetailModal({
                       <span className="font-mono-num text-[#667085]">({b.packaging_code})</span>
                     </span>
                     <span className="font-mono-num font-semibold">
-                      {b.balance_pieces} pcs · Caution {formatFcfa(b.deposit_held_amount)}
+                      {b.balance_pieces} pcs dues · Val. réf. {formatFcfa(b.deposit_held_amount)}
                     </span>
                   </div>
                 ))}

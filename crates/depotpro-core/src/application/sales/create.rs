@@ -194,7 +194,8 @@ pub async fn create_sale_v4(db: &DepotDb, input: CreateSaleV4Input) -> CoreResul
     if input.sale_type == "credit" && credit_policy.as_deref() == Some("limited") {
         let cid = input.client_id.unwrap();
         let current_due: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(remaining_amount), 0) FROM customer_receivables WHERE client_id = ? AND status IN ('open', 'partial')",
+            "SELECT COALESCE((SELECT SUM(remaining_amount) FROM customer_receivables WHERE client_id = ?1 AND status IN ('open', 'partial')), 0)
+                  + MAX(0, COALESCE((SELECT SUM(CASE WHEN direction = 'debit' THEN amount ELSE -amount END) FROM customer_packaging_financial_ledger WHERE client_id = ?1), 0))",
         )
         .bind(cid)
         .fetch_one(&mut *tx)

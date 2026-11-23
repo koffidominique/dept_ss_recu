@@ -85,6 +85,95 @@ pub async fn get_customer_deposit_history(
     Ok(rows)
 }
 
+pub(crate) async fn sync_customer_deposit_asset_delta_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    customer_id: i64,
+    returnable_id: i64,
+    delta_pieces: i64,
+    unit_deposit_xof: i64,
+) -> CoreResult<()> {
+    if delta_pieces == 0 {
+        return Ok(());
+    }
+    if delta_pieces > 0 {
+        let asset_row: Option<(i64, i64)> = sqlx::query_as(
+            "SELECT id, deposit_value FROM packaging_assets
+             WHERE returnable_id = ? AND is_active = 1
+             ORDER BY id ASC LIMIT 1",
+        )
+        .bind(returnable_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+        if let Some((asset_id, asset_dep)) = asset_row {
+            let eff_unit = if unit_deposit_xof > 0 {
+                unit_deposit_xof
+            } else {
+                asset_dep
+            };
+            let add_amt = eff_unit.saturating_mul(delta_pieces);
+            sqlx::query(
+                "INSERT INTO customer_deposit_balances (
+                    customer_id, packaging_asset_id, quantity_held,
+                    amount_held_xof, last_movement_at
+                 ) VALUES (?, ?, ?, ?, datetime('now'))
+                 ON CONFLICT(customer_id, packaging_asset_id) DO UPDATE SET
+                    quantity_held = quantity_held + excluded.quantity_held,
+                    amount_held_xof = amount_held_xof + excluded.amount_held_xof,
+                    last_movement_at = datetime('now')",
+            )
+            .bind(customer_id)
+            .bind(asset_id)
+            .bind(delta_pieces)
+            .bind(add_amt)
+            .execute(&mut **tx)
+            .await?;
+        }
+    } else {
+        let mut rem_to_deduct = -delta_pieces;
+        let held_rows: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+            "SELECT cdb.id, cdb.quantity_held, cdb.amount_held_xof, pa.deposit_value
+             FROM customer_deposit_balances cdb
+             JOIN packaging_assets pa ON pa.id = cdb.packaging_asset_id
+             WHERE cdb.customer_id = ? AND pa.returnable_id = ? AND cdb.quantity_held > 0
+             ORDER BY cdb.id ASC",
+        )
+        .bind(customer_id)
+        .bind(returnable_id)
+        .fetch_all(&mut **tx)
+        .await?;
+
+        for (cdb_id, qty_held, amt_held, asset_dep) in held_rows {
+            if rem_to_deduct <= 0 {
+                break;
+            }
+            let deduct = rem_to_deduct.min(qty_held);
+            let eff_unit = if unit_deposit_xof > 0 {
+                unit_deposit_xof
+            } else {
+                asset_dep
+            };
+            let next_qty = qty_held - deduct;
+            let next_amt = if next_qty <= 0 {
+                0
+            } else {
+                (amt_held - deduct.saturating_mul(eff_unit)).max(0)
+            };
+            sqlx::query(
+                "UPDATE customer_deposit_balances
+                 SET quantity_held = ?, amount_held_xof = ?, last_movement_at = datetime('now')
+                 WHERE id = ?",
+            )
+            .bind(next_qty)
+            .bind(next_amt)
+            .bind(cdb_id)
+            .execute(&mut **tx)
+            .await?;
+            rem_to_deduct -= deduct;
+        }
+    }
+    Ok(())
+}
+
 async fn apply_customer_empty_return_tx(
     tx: &mut Transaction<'_, Sqlite>,
     customer_id: i64,
@@ -99,8 +188,8 @@ async fn apply_customer_empty_return_tx(
             "La quantité retournée doit être > 0.".into(),
         ));
     }
-    let held_row: Option<(i64, i64, i64)> = sqlx::query_as(
-        "SELECT cdb.quantity_held, cdb.amount_held_xof, pa.deposit_value
+    let held_row: Option<(i64, i64, i64, Option<i64>)> = sqlx::query_as(
+        "SELECT cdb.quantity_held, cdb.amount_held_xof, pa.deposit_value, pa.returnable_id
          FROM customer_deposit_balances cdb
          JOIN packaging_assets pa ON pa.id = cdb.packaging_asset_id
          WHERE cdb.customer_id = ? AND cdb.packaging_asset_id = ?",
@@ -109,7 +198,7 @@ async fn apply_customer_empty_return_tx(
     .bind(packaging_asset_id)
     .fetch_optional(&mut **tx)
     .await?;
-    let (held_qty, held_amt, unit_dep) = held_row.ok_or_else(|| {
+    let (held_qty, held_amt, unit_dep, returnable_id_opt) = held_row.ok_or_else(|| {
         CoreError::Validation(
             "Aucun solde consigné détenu par ce client pour cet emballage.".into(),
         )
@@ -139,7 +228,7 @@ async fn apply_customer_empty_return_tx(
         .execute(&mut **tx)
         .await?;
 
-    sqlx::query(
+    let pm_id = sqlx::query(
         "INSERT INTO packaging_movements (
             packaging_asset_id, customer_id, order_id, order_packaging_allocation_id,
             movement_type, quantity, unit_deposit_xof, total_deposit_xof, notes
@@ -154,7 +243,115 @@ async fn apply_customer_empty_return_tx(
     .bind(dec_amt)
     .bind(notes.unwrap_or("Retour d'emballage vide client"))
     .execute(&mut **tx)
-    .await?;
+    .await?
+    .last_insert_rowid();
+
+    if let Some(rid) = returnable_id_opt {
+        sqlx::query(
+            "UPDATE customer_packaging_accounts
+             SET balance_pieces = MAX(0, balance_pieces - ?),
+                 deposit_held_amount = CASE
+                     WHEN balance_pieces - ? <= 0 THEN 0
+                     ELSE MAX(0, deposit_held_amount - ?)
+                 END
+             WHERE client_id = ? AND returnable_id = ?",
+        )
+        .bind(quantity)
+        .bind(quantity)
+        .bind(dec_amt)
+        .bind(customer_id)
+        .bind(rid)
+        .execute(&mut **tx)
+        .await?;
+
+        let order_sale_id: Option<i64> = if let Some(oid) = order_id {
+            sqlx::query_scalar("SELECT id FROM sales WHERE order_id = ?")
+                .bind(oid)
+                .fetch_optional(&mut **tx)
+                .await?
+        } else {
+            None
+        };
+
+        let mut remaining_to_settle = quantity;
+        let open_issues: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+            "SELECT id, pieces, returned_pieces, lost_pieces + destroyed_pieces + converted_pieces
+             FROM deposit_issues
+             WHERE client_id = ? AND returnable_id = ?
+               AND status IN ('pending', 'partially_returned')
+             ORDER BY CASE WHEN ? IS NOT NULL AND sale_id = ? THEN 0 ELSE 1 END ASC,
+                      COALESCE(due_date, '9999-12-31') ASC,
+                      id ASC",
+        )
+        .bind(customer_id)
+        .bind(rid)
+        .bind(order_sale_id)
+        .bind(order_sale_id)
+        .fetch_all(&mut **tx)
+        .await?;
+
+        for (issue_id, iss_pieces, iss_returned, iss_other_out) in open_issues {
+            if remaining_to_settle <= 0 {
+                break;
+            }
+            let iss_pending = (iss_pieces - iss_returned - iss_other_out).max(0);
+            if iss_pending <= 0 {
+                continue;
+            }
+            let applied = remaining_to_settle.min(iss_pending);
+            let next_returned = iss_returned + applied;
+            let next_status = if next_returned + iss_other_out >= iss_pieces {
+                "settled"
+            } else {
+                "partially_returned"
+            };
+            sqlx::query(
+                "UPDATE deposit_issues
+                 SET returned_pieces = ?, status = ?, updated_at = datetime('now')
+                 WHERE id = ?",
+            )
+            .bind(next_returned)
+            .bind(next_status)
+            .bind(issue_id)
+            .execute(&mut **tx)
+            .await?;
+            remaining_to_settle -= applied;
+        }
+
+        let before_stock: i64 = sqlx::query_scalar(
+            "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",
+        )
+        .bind(rid)
+        .fetch_one(&mut **tx)
+        .await?;
+        let after_stock = before_stock.saturating_add(quantity);
+        sqlx::query(
+            "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
+             ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
+        )
+        .bind(rid)
+        .bind(after_stock)
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO returnable_stock_movements
+                (request_key, packaging_id, movement_type, quantity, stock_before, stock_after,
+                 reason, reference_document, customer_id, unit_deposit_value, total_value)
+             VALUES (?, ?, 'entry', ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(format!("ord-ret:{pm_id}"))
+        .bind(rid)
+        .bind(quantity)
+        .bind(before_stock)
+        .bind(after_stock)
+        .bind(notes.unwrap_or("Retour d'emballage vide client (commande)"))
+        .bind(order_id.map(|oid| format!("CMD-{oid}")))
+        .bind(customer_id)
+        .bind(unit_dep)
+        .bind(dec_amt)
+        .execute(&mut **tx)
+        .await?;
+    }
     Ok(())
 }
 

@@ -3,7 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Download } from 'lucide-react';
 import { DataTable } from '../../../components/tables/DataTable.tsx';
 import type { CashStatus } from '../../../types/erp.ts';
-import { exportCashMovementsCsv } from '../../../utils/csv.ts';
+import { exportCashMovementsCsv, formatCashMovementKind } from '../../../utils/csv.ts';
 import { formatDateTime, formatFcfa } from '../../../utils/format.ts';
 
 type CashMovementRow = NonNullable<CashStatus['summary']>['movements'][number];
@@ -22,6 +22,26 @@ export function CashMovementsTable({ sessionReference, movements }: CashMovement
         cell: ({ row }) => (
           <span className="font-mono-num text-xs">{formatDateTime(row.original.created_at)}</span>
         ),
+      },
+      {
+        accessorKey: 'kind',
+        header: 'Nature',
+        cell: ({ row }) => {
+          const isPkgPay = row.original.reference_document?.startsWith('pkg-debt-pay:');
+          return (
+            <span
+              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                isPkgPay
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
+                  : row.original.direction === 'in'
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+              }`}
+            >
+              {formatCashMovementKind(row.original.kind, row.original.reference_document)}
+            </span>
+          );
+        },
       },
       { accessorKey: 'description', header: 'Opération' },
       {

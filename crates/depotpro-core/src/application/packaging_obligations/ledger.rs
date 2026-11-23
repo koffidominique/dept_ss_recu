@@ -34,12 +34,13 @@ pub(crate) async fn mark_converted(
         "UPDATE deposit_issues
          SET converted_pieces = converted_pieces + ?,
              status = CASE WHEN returned_pieces + lost_pieces + destroyed_pieces
-                                + converted_pieces >= pieces
+                                + converted_pieces + ? >= pieces
                            THEN 'converted' ELSE status END,
              converted_at = datetime('now'),
              updated_at = datetime('now')
          WHERE id = ?",
     )
+    .bind(pending)
     .bind(pending)
     .bind(issue_id)
     .execute(&mut **tx)

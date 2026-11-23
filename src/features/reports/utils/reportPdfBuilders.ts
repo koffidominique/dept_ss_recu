@@ -60,7 +60,7 @@ export function buildReceivablesPdfDoc(
     docType: 'ÉTAT DES CRÉANCES CLIENTS',
     reference: `RAP-CRE-${today}`,
     date: new Date().toISOString(),
-    statusLabel: `${openRecs.length} dossier(s) ouvert(s)`,
+    statusLabel: `${openRecs.length} dossier(s) marchandises ouvert(s)`,
     lines: openRecs.map((r) => ({
       label: r.client_name,
       sublabel: `Facture ${r.sale_reference}${r.due_date ? ` · Échéance ${formatDate(r.due_date)}` : ''}`,
@@ -70,7 +70,7 @@ export function buildReceivablesPdfDoc(
     })),
     summaryRows: [
       { label: 'Dossiers ouverts', value: String(openRecs.length) },
-      { label: 'Total à recouvrer', value: formatFcfa(total), bold: true, tone: 'warning' },
+      { label: 'Total marchandises à recouvrer', value: formatFcfa(total), bold: true, tone: 'warning' },
     ],
   };
 }
@@ -93,8 +93,8 @@ export function buildCommercialPdfDoc(
       total: pm.total_in - pm.total_out,
     })),
     summaryRows: [
-      { label: 'CA Marchandises', value: formatFcfa(data.commercial.merchandise_revenue) },
-      { label: 'Consignes facturées', value: formatFcfa(data.commercial.deposit_billed) },
+      { label: 'CA Marchandises (hors consignes)', value: formatFcfa(data.commercial.merchandise_revenue) },
+      { label: 'Consignes emballages facturées (hors CA)', value: formatFcfa(data.commercial.deposit_billed) },
       {
         label: 'Marge brute connue',
         value: formatFcfa(data.profitability.knownGrossMargin),
@@ -225,7 +225,7 @@ export function buildConsignmentsPdfDoc(
   }>;
   const totalDepotVides = types.reduce((s, t) => s + t.stock_quantity, 0);
   const totalClientPieces = balances.reduce((s, b) => s + b.balance_pieces, 0);
-  const totalCaution = balances.reduce((s, b) => s + b.deposit_held_amount, 0);
+  const totalRefValue = balances.reduce((s, b) => s + b.deposit_held_amount, 0);
   return {
     docType: 'ÉTAT DES CONSIGNATIONS',
     reference: `RAP-CON-${today}`,
@@ -234,7 +234,7 @@ export function buildConsignmentsPdfDoc(
     lines: [
       ...types.map((t) => ({
         label: `Dépôt · ${t.name} (${t.code})`,
-        sublabel: `Producteur : ${t.producer} · Tarif consigne ${formatFcfa(t.deposit_value)}`,
+        sublabel: `Producteur : ${t.producer} · Valeur réf. ${formatFcfa(t.deposit_value)}`,
         quantity: `${t.stock_quantity} vides`,
         unitPrice: t.deposit_value,
         total: t.stock_quantity * t.deposit_value,
@@ -242,21 +242,21 @@ export function buildConsignmentsPdfDoc(
       ...balances.map((b) => ({
         label: `Client · ${b.client_name}`,
         sublabel: `Emballage : ${b.packaging_name}`,
-        quantity: `${b.balance_pieces} pcs détenues`,
+        quantity: `${b.balance_pieces} pcs dues (échéance 15j)`,
         unitPrice: null,
         total: b.deposit_held_amount,
       })),
     ],
     summaryRows: [
-      { label: 'Stock de vides au dépôt', value: `${totalDepotVides} pièce(s)` },
+      { label: 'Stock de vides au sous-dépôt', value: `${totalDepotVides} pièce(s)` },
       {
-        label: 'Emballages détenus par les clients',
+        label: 'Emballages dus par les clients',
         value: `${totalClientPieces} pièce(s)`,
         tone: 'warning',
       },
       {
-        label: 'Total cautions clients détenues',
-        value: formatFcfa(totalCaution),
+        label: 'Valeur réf. totale des emballages dus',
+        value: formatFcfa(totalRefValue),
         bold: true,
       },
     ],

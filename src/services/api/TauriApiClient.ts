@@ -115,6 +115,11 @@ export class TauriApiClient implements ApiClient {
   listPackagingObligations = tauriConsignmentsApi.listPackagingObligations;
   getPackagingDashboard = tauriConsignmentsApi.getPackagingDashboard;
   payPackagingDebt = tauriConsignmentsApi.payPackagingDebt;
+  processDuePackagingObligations = tauriConsignmentsApi.processDuePackagingObligations;
+  registerPackagingLateReturn = tauriConsignmentsApi.registerPackagingLateReturn;
+  listPackagingLossDeclarations = tauriConsignmentsApi.listPackagingLossDeclarations;
+  declarePackagingLoss = tauriConsignmentsApi.declarePackagingLoss;
+  validatePackagingLoss = tauriConsignmentsApi.validatePackagingLoss;
   getClientPackagingBalances = tauriSalesApi.getClientPackagingBalances;
   getProductCatalogueOverview = tauriConsignmentsApi.getProductCatalogueOverview;
   setCatalogueProductActive = tauriConsignmentsApi.setCatalogueProductActive;

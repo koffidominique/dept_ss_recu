@@ -8,7 +8,7 @@ use crate::infrastructure::db::DepotDb;
 
 use super::{
     PaginatedSalesDto, SaleCancellationDto, SaleDepositDto, SaleDetailDto, SaleLineDto,
-    SalePaymentDto, SaleReturnDto, SaleSummaryDto,
+    SalePaymentDto, SaleReceivedReturnableDto, SaleReturnDto, SaleSummaryDto,
 };
 
 pub async fn get_sale_detail(db: &DepotDb, sale_id: i64) -> CoreResult<SaleDetailDto> {
@@ -78,9 +78,9 @@ pub async fn get_sale_detail(db: &DepotDb, sale_id: i64) -> CoreResult<SaleDetai
 
     let deposits = sqlx::query_as::<_, SaleDepositDto>(
         "SELECT di.id, di.sale_line_id, di.returnable_id,
-                COALESCE(json_extract(component.value, '$.kind'), 'other') AS kind,
-                COALESCE(json_extract(component.value, '$.name'), 'Détail non disponible sur cette opération historique') AS packaging_name,
-                COALESCE(json_extract(component.value, '$.code'), 'INCONNU') AS packaging_code,
+                COALESCE(json_extract(component.value, '$.kind'), rpt.kind, 'other') AS kind,
+                COALESCE(json_extract(component.value, '$.name'), rpt.name, 'Détail non disponible sur cette opération historique') AS packaging_name,
+                COALESCE(json_extract(component.value, '$.code'), rpt.code, 'INCONNU') AS packaging_code,
                 di.pieces, di.returned_pieces, di.unit_value, di.amount,
                 COALESCE(
                     (SELECT GROUP_CONCAT(
@@ -103,11 +103,34 @@ pub async fn get_sale_detail(db: &DepotDb, sale_id: i64) -> CoreResult<SaleDetai
          LEFT JOIN sale_lines sl ON sl.id = di.sale_line_id
          LEFT JOIN json_each(sl.packaging_snapshot_json, '$.depositItems') component
               ON CAST(json_extract(component.value, '$.returnableId') AS INTEGER) = di.returnable_id
-         WHERE di.sale_id = ?",
+         LEFT JOIN returnable_packaging_types rpt ON rpt.id = di.returnable_id
+         WHERE di.sale_id = ? AND COALESCE(di.status, 'pending') != 'returned'",
     )
     .bind(sale_id)
     .fetch_all(&db.pool)
     .await?;
+
+    let received_returnables = sqlx::query_as::<_, SaleReceivedReturnableDto>(
+        "SELECT di.id, di.returnable_id,
+                COALESCE(rpt.kind, 'other') AS kind,
+                COALESCE(rpt.name, 'Emballage retourné') AS packaging_name,
+                COALESCE(rpt.code, 'INCONNU') AS packaging_code,
+                di.pieces,
+                COALESCE(NULLIF(di.unit_value, 0), rpt.deposit_value, 0) AS unit_value,
+                CASE
+                    WHEN di.amount > 0 THEN di.amount
+                    ELSE di.pieces * COALESCE(NULLIF(di.unit_value, 0), rpt.deposit_value, 0)
+                END AS amount
+         FROM deposit_issues di
+         LEFT JOIN returnable_packaging_types rpt ON rpt.id = di.returnable_id
+         WHERE di.sale_id = ? AND di.status = 'returned'
+         ORDER BY di.id ASC",
+    )
+    .bind(sale_id)
+    .fetch_all(&db.pool)
+    .await?;
+
+    let total_returned_packaging_amount: i64 = received_returnables.iter().map(|r| r.amount).sum();
 
     let cancellation = sqlx::query_as::<_, SaleCancellationDto>(
         "SELECT id, reason, refund_method_code, refunded_amount, created_at FROM sales_cancellations WHERE sale_id = ?",
@@ -133,6 +156,8 @@ pub async fn get_sale_detail(db: &DepotDb, sale_id: i64) -> CoreResult<SaleDetai
         lines,
         payments,
         deposits,
+        received_returnables,
+        total_returned_packaging_amount,
         cancellation,
         returns,
     })

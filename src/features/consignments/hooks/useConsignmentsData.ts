@@ -50,6 +50,8 @@ export function useConsignmentsMutations({
     }) => apiClient.createReturnableType(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
+      qc.invalidateQueries({ queryKey: ['packaging-stock'] });
       onTypeCreated();
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur création emballage.'),
@@ -68,6 +70,8 @@ export function useConsignmentsMutations({
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-assets'] });
+      qc.invalidateQueries({ queryKey: ['packaging-stock'] });
       onAdjusted();
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur ajustement.'),
@@ -83,7 +87,12 @@ export function useConsignmentsMutations({
       method_code: string;
       reason: string;
     }) => {
-      const remPieces = Math.max(0, input.target.pieces - input.target.returned_pieces);
+      const remPieces = Math.max(
+        0,
+        input.target.pieces -
+          input.target.returned_pieces -
+          (input.target.other_out_pieces ?? 0)
+      );
       if (!Number.isSafeInteger(input.pieces) || input.pieces <= 0 || input.pieces > remPieces) {
         throw new Error(`Nombre de pièces retournées invalide (max ${remPieces}).`);
       }
@@ -112,9 +121,14 @@ export function useConsignmentsMutations({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['consignments'] });
+      qc.invalidateQueries({ queryKey: ['packaging-obligations'] });
+      qc.invalidateQueries({ queryKey: ['packaging-dashboard'] });
+      qc.invalidateQueries({ queryKey: ['pos-client-packaging-balances'] });
+      qc.invalidateQueries({ queryKey: ['packaging-stock'] });
       qc.invalidateQueries({ queryKey: ['cash'] });
       qc.invalidateQueries({ queryKey: ['receivables'] });
       qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       onReturned();
     },
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur retour client.'),

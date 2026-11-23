@@ -146,6 +146,14 @@ pub(super) fn build_receipt_pdf_input(
         order_summary.status.as_str(),
         "delivered" | "invoiced" | "paid"
     );
+    let returned_packaging_amount_xof: i64 = order
+        .allocations
+        .iter()
+        .filter(|a| a.is_consigned == 1 && a.returned_quantity > 0)
+        .map(|a| a.returned_quantity.saturating_mul(a.deposit_amount_xof))
+        .sum();
+    let has_consigned_packaging = order.allocations.iter().any(|a| a.is_consigned == 1);
+
     let packaging_lines = order
         .allocations
         .iter()
@@ -160,7 +168,7 @@ pub(super) fn build_receipt_pdf_input(
             returned_quantity: Some(allocation.returned_quantity),
             unit_deposit_xof: (allocation.is_consigned == 1).then_some(allocation.deposit_amount_xof),
             status_label: if allocation.is_consigned == 1 {
-                "Consigné — suivi distinct des boissons".to_string()
+                "Consigné — retour sous 15 jours".to_string()
             } else {
                 "Emballage non consigné".to_string()
             },
@@ -227,6 +235,14 @@ pub(super) fn build_receipt_pdf_input(
             tone: Some("danger".to_string()),
         },
     ]);
+    if has_consigned_packaging || returned_packaging_amount_xof > 0 {
+        summary_rows.push(DocumentPdfSummaryRow {
+            label: "Retour emballages (hors total)".to_string(),
+            value: format_fcfa(returned_packaging_amount_xof),
+            bold: false,
+            tone: Some("warning".to_string()),
+        });
+    }
 
     let external_references = payments
         .iter()
@@ -310,7 +326,7 @@ pub(super) fn build_receipt_pdf_input(
     .filter(|note| !note.trim().is_empty())
     .collect::<Vec<_>>();
     note_lines.push(
-        "Les consignes correspondent à des emballages récupérables, suivies séparément de la valeur des boissons et régularisées selon les retours physiques."
+        "Délai de retour des emballages : 15 jours maximum. Le montant du retour d'emballages est géré séparément, hors total commande ; passé le délai de 15 jours sans restitution physique, la valeur des emballages non restitués reste exigible."
             .to_string(),
     );
     let notes = note_lines.join("\n");

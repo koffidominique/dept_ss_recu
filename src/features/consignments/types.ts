@@ -31,7 +31,8 @@ export interface ReturnableMovementRow {
     | 'breakage'
     | 'loss'
     | 'correction_in'
-    | 'correction_out';
+    | 'correction_out'
+    | 'supplier_exchange';
   quantity: number;
   stock_before: number | null;
   stock_after: number;
@@ -51,6 +52,8 @@ export interface OpenIssue {
   packaging_code: string;
   pieces: number;
   returned_pieces: number;
+  other_out_pieces?: number;
+  due_date?: string | null;
   unit_value: number;
   amount: number;
   expected_products?: string | null;

@@ -34,14 +34,20 @@ function ConsignmentReturnFormBody({
   isPending: boolean;
   onSubmit: ConsignmentReturnModalProps['onSubmit'];
 }) {
-  const initialRem = Math.max(1, target.pieces - target.returned_pieces);
-  const [pieces, setPieces] = useState(initialRem);
+  const maxRem = Math.max(
+    1,
+    target.pieces - target.returned_pieces - (target.other_out_pieces ?? 0)
+  );
+  const [pieces, setPieces] = useState(maxRem);
   const [conditionState, setConditionState] = useState<'good' | 'damaged'>('good');
-  const [refundAmount, setRefundAmount] = useState(initialRem * target.unit_value);
+  const [refundAmount, setRefundAmount] = useState(maxRem * target.unit_value);
   const [creditReduction, setCreditReduction] = useState(0);
   const [methodCode, setMethodCode] = useState('cash');
   const [reason, setReason] = useState('Retour emballages vides');
   const [confirmMatchingProducts, setConfirmMatchingProducts] = useState(false);
+
+  const maxCounterpart = Math.max(0, pieces) * Math.max(0, target.unit_value);
+  const counterpartExceeded = refundAmount + creditReduction > maxCounterpart;
 
   return (
     <>
@@ -73,14 +79,17 @@ function ConsignmentReturnFormBody({
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block font-medium">Pièces retournées</label>
+            <label className="block font-medium">Pièces retournées (max {maxRem})</label>
             <input
               type="number"
               min={1}
-              max={target.pieces - target.returned_pieces}
+              max={maxRem}
               value={pieces}
               onChange={(e) => {
-                const val = Math.max(1, Math.trunc(Number(e.target.value) || 1));
+                const val = Math.min(
+                  maxRem,
+                  Math.max(1, Math.trunc(Number(e.target.value) || 1))
+                );
                 setPieces(val);
                 const maxValBig = BigInt(val) * BigInt(Math.max(0, target.unit_value));
                 setRefundAmount(
@@ -118,6 +127,11 @@ function ConsignmentReturnFormBody({
             onChange={setCreditReduction}
           />
         </div>
+        {counterpartExceeded && (
+          <p className="rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 px-2.5 py-1.5 text-[11px] font-medium text-[#DC4545]">
+            La somme remboursement + déduction créance ({formatFcfa(refundAmount + creditReduction)}) dépasse la valeur maximale restituable ({formatFcfa(maxCounterpart)}).
+          </p>
+        )}
         <div>
           <label className="block font-medium">Moyen de remboursement</label>
           <select
@@ -153,7 +167,12 @@ function ConsignmentReturnFormBody({
         </Dialog.Close>
         <button
           type="button"
-          disabled={isPending || (Boolean(target.expected_products) && !confirmMatchingProducts)}
+          disabled={
+            isPending ||
+            counterpartExceeded ||
+            !reason.trim() ||
+            (Boolean(target.expected_products) && !confirmMatchingProducts)
+          }
           onClick={() =>
             onSubmit({
               target,
