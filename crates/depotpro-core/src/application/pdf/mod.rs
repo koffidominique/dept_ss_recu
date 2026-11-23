@@ -173,7 +173,8 @@ async fn try_render_snapshot_pdf(
     clean_ref: &str,
     logo: Option<String>,
 ) -> CoreResult<Option<Vec<u8>>> {
-    let sql = format!("SELECT snapshot_json FROM {table} WHERE {col} = ? ORDER BY version DESC LIMIT 1");
+    let sql =
+        format!("SELECT snapshot_json FROM {table} WHERE {col} = ? ORDER BY version DESC LIMIT 1");
     let snapshot_json: Option<String> = sqlx::query_scalar(&sql)
         .bind(clean_ref)
         .fetch_optional(&db.pool)
@@ -338,14 +339,24 @@ pub async fn generate_payment_receipt(
     input: PaymentReceiptInput,
 ) -> CoreResult<(String, Vec<u8>)> {
     let mut notes = Vec::new();
-    if let Some(method) = input.planned_payment_method.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(method) = input
+        .planned_payment_method
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         notes.push(format!("Mode de règlement : {method}"));
     }
     if let Some(balance) = input.balance_after_xof {
-        notes.push(format!("Solde après encaissement : {}", format_fcfa_ascii(balance)));
+        notes.push(format!(
+            "Solde après encaissement : {}",
+            format_fcfa_ascii(balance)
+        ));
     }
     if let Some(ext) = input.external_references.as_ref().filter(|v| !v.is_empty()) {
-        notes.push(format!("Réf. transaction(s) externe(s) : {}", ext.join(", ")));
+        notes.push(format!(
+            "Réf. transaction(s) externe(s) : {}",
+            ext.join(", ")
+        ));
     }
 
     let doc = DocumentPdfInput {
@@ -361,7 +372,11 @@ pub async fn generate_payment_receipt(
         cashier_name: input.cashier_name,
         external_references: input.external_references,
         payments: input.payments,
-        notes: if notes.is_empty() { None } else { Some(notes.join(" · ")) },
+        notes: if notes.is_empty() {
+            None
+        } else {
+            Some(notes.join(" · "))
+        },
         ..Default::default()
     };
     generate_document_pdf(db, doc).await
@@ -459,7 +474,10 @@ mod tests {
         let pdf = render_document_pdf(&company, &doc);
         let text = String::from_utf8_lossy(&pdf);
         assert!(text.starts_with("%PDF-1.4\n"));
-        assert!(text.contains("/Count 1"), "un petit reçu ne doit pas avoir de page vide");
+        assert!(
+            text.contains("/Count 1"),
+            "un petit reçu ne doit pas avoir de page vide"
+        );
         assert!(text.contains("DE COMMANDE"));
         assert!(text.contains("CMD-2026-0001"));
         assert!(text.contains("INFORMATIONS DU CLIENT"));

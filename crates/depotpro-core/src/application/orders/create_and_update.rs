@@ -361,9 +361,9 @@ pub async fn update_order(
     if let Some(ref val) = input.notes {
         sqlx::query("UPDATE orders SET notes = ?, updated_at = datetime('now') WHERE id = ?")
             .bind(val.as_deref().map(str::trim).filter(|s| !s.is_empty()))
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
     }
     tx.commit().await?;
     get_order(db, id).await

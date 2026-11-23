@@ -167,7 +167,11 @@ async fn persist_purchase_receipt_snapshot_tx(
                 format_milli(l.ordered_quantity_milli),
                 l.packaging_name
             )),
-            quantity: format!("{} {}", format_milli(l.received_quantity_milli), l.packaging_name),
+            quantity: format!(
+                "{} {}",
+                format_milli(l.received_quantity_milli),
+                l.packaging_name
+            ),
             unit_price: Some(l.unit_price),
             total: Some(l.amount),
             ordered_quantity: Some(format!(
