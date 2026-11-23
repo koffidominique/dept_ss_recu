@@ -112,6 +112,7 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
     .fetch_all(&mut **tx)
     .await?;
 
+    #[allow(clippy::type_complexity)]
     let client_info: Option<(
         String,
         String,

@@ -285,6 +285,7 @@ async fn document_snapshot(
 ) -> CoreResult<serde_json::Value> {
     match document_type {
         "customer_order" => {
+            #[allow(clippy::type_complexity)]
             let header: Option<(String, String, i64, i64, i64, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT o.order_number, c.name, o.subtotal_xof, o.discount_xof, o.total_to_collect_xof, o.notes, o.status
@@ -542,6 +543,7 @@ pub async fn get_document_detail(
             .map(|(label, amount_xof)| CommercialDocumentDetailPayment { label, amount_xof })
             .collect();
 
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT version, receipt_number, issued_at, issued_by_name, issued_by_role, revision_reason, snapshot_json
@@ -636,6 +638,7 @@ pub async fn get_document_detail(
                 },
             )
             .collect();
+            #[allow(clippy::type_complexity)]
             let deposits: Vec<(String, String, i64, i64, String, i64, String)> = sqlx::query_as(
                 "SELECT COALESCE(json_extract(component.value, '$.kind'), rpt.kind, 'other'),
                         COALESCE(json_extract(component.value, '$.name'), rpt.name, 'Détail non disponible sur cette opération historique'),
@@ -818,6 +821,7 @@ pub async fn get_document_detail(
                     },
                 )
                 .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT version, document_number, issued_at, issued_by_name, issued_by_role, revision_reason, snapshot_json

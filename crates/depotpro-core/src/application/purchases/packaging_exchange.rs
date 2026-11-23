@@ -17,6 +17,7 @@ pub(crate) async fn issue_reserved_packaging_tx(
     rec_ref: &str,
     po_ref: &str,
 ) -> CoreResult<()> {
+    #[allow(clippy::type_complexity)]
     let reservations: Vec<(i64, i64, i64, i64, String, String, String)> = sqlx::query_as(
         "SELECT returnable_id, required_pieces, reserved_pieces, issued_pieces, code_snapshot, name_snapshot, kind_snapshot
          FROM purchase_order_packaging_requirements WHERE purchase_order_line_id = ? AND reservation_status IN ('reserved', 'partially_issued')",

@@ -100,6 +100,7 @@ fn make_line(line: &OrderLineDto, order: &OrderDetailDto) -> DocumentPdfLine {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn build_receipt_pdf_input(
     order: &OrderDetailDto,
     customer: &CustomerReceiptProfile<'_>,

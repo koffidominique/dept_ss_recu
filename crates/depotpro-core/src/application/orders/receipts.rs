@@ -156,6 +156,7 @@ async fn load_settings_tx(tx: &mut Transaction<'_, Sqlite>) -> CoreResult<AppSet
     .await?)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_insert_snapshot_tx(
     tx: &mut Transaction<'_, Sqlite>,
     order_id: i64,

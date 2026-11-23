@@ -110,6 +110,7 @@ pub async fn cancel_sale(
     .execute(&mut *tx)
     .await?;
 
+    #[allow(clippy::type_complexity)]
     let deposits: Vec<(i64, Option<i64>, i64, i64, i64, i64, i64, i64, String)> = sqlx::query_as(
         "SELECT id, client_id, returnable_id, pieces, returned_pieces,
                 lost_pieces + destroyed_pieces + converted_pieces,

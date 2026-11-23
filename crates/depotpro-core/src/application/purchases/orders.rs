@@ -893,6 +893,7 @@ pub async fn update_purchase_order(
         ));
     }
 
+    #[allow(clippy::type_complexity)]
     let (
         reference,
         cur_expected_date,

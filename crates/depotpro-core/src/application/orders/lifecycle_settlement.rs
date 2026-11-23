@@ -118,6 +118,7 @@ pub async fn invoice_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
      .bind(subtotal).bind(discount).bind(merchandise_total).bind(deposit).bind(total).bind(paid)
      .bind(notes.as_deref().map(|note| format!("Commande {order_number}: {note}" )).or_else(|| Some(format!("Commande {order_number}"))))
      .execute(&mut *tx).await?.last_insert_rowid();
+    #[allow(clippy::type_complexity)]
     let lines: Vec<(i64, i64, i64, i64, i64, i64, i64, String, String, String)> = sqlx::query_as(
         "SELECT ol.product_id, ol.variant_id, ol.requested_quantity, ol.base_quantity, ol.unit_price_xof,
                 ol.discount_xof, ol.line_total_xof, ol.requested_unit, p.base_unit, p.name
