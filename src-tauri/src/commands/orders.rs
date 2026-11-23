@@ -73,9 +73,12 @@ pub async fn list_order_receipts_v4(
 ) -> Result<serde_json::Value, String> {
     let actor = verify_desktop_perm(&state, &token, Permission::SalesRead).await?;
     let db = state.db().await;
-    let res = auth::with_actor(actor, orders::list_customer_order_receipt_snapshots(&db, id))
-        .await
-        .map_err(|e| e.to_string())?;
+    let res = auth::with_actor(
+        actor,
+        orders::list_customer_order_receipt_snapshots(&db, id),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     serde_json::to_value(res).map_err(|e| e.to_string())
 }
 
