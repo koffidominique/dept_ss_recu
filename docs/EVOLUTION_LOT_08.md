@@ -156,9 +156,14 @@ ligne ci-dessous correspond à un run réellement observé.
 | 6. Migration SQLite | ✓ | ✓ | — |
 | 7. Tests Rust Core | ✗ | ✓ | runs `45192149332`, `45194525075` |
 | 8. Tests Axum | ✗ | ✓ | run `45194525075` |
-| 9. Clippy `-D warnings` | ✗ 22 erreurs | ✗ → traité | 22 erreurs préexistantes de `depotpro-core`, toutes de style, aucune de logique |
+| 9. Clippy `-D warnings` | ✗ 22 erreurs | **✓** | run `45275991003` : job vert |
 | 10. `cargo fmt --check` | ✗ 52 fichiers | **✓** | run `45272815817` : job vert |
-| 11/12. Tauri Windows / macOS | ✗ au build | ✗ au clippy desktop | le build passe désormais ; seul le clippy bloquant reste |
+| 11. Tauri Windows | ✗ au build | **✓** | run `45279470032` |
+| 12. Tauri macOS | ✗ au build | **✓** | run `45279470032` |
+
+**Le run `45279470032` est entièrement vert : `conclusion: success`, 12 jobs
+sur 12** (le job 13 est un utilitaire manuel, volontairement `skipped`). C'est
+la première fois de la branche qu'aucun job n'échoue.
 
 Deux constats vérifiés expliquent l'essentiel des échecs `fmt` :
 
@@ -179,15 +184,31 @@ ne s'exécute que sur `workflow_dispatch` ou sur un message de commit contenant
 poussé par le bot ne déclenche pas de nouveau run (protection anti-récursion de
 `GITHUB_TOKEN`) : un commit vide a servi à relancer la vérification.
 
-Sur Clippy, les 22 erreurs sont **toutes préexistantes** et **toutes de style** :
-11 « very complex type » (tuples de `SELECT` SQLx), 6 `.is_multiple_of()`,
-1 `str::replace` consécutif, 1 référence de référence, 1 comparaison de chars,
-2 signatures à 9 et 10 arguments. Aucune règle métier n'a été touchée : les
-corrections sont soit une réécriture strictement équivalente (`% 2 == 0` →
-`.is_multiple_of(2)`), soit un `#[allow(...)]` ciblé, suivant les trois
+Sur Clippy, le diagnostic a été mené en deux temps. Les **22 erreurs
+initiales** sont **toutes préexistantes** et **toutes de style** : 11 « very
+complex type » (tuples de `SELECT` SQLx), 6 `.is_multiple_of()`, 1
+`str::replace` consécutif, 1 référence de référence, 1 comparaison de chars,
+2 signatures à 9 et 10 arguments. Une fois celles-ci corrigées, le compilateur
+a révélé les couches suivantes, jusque-là masquées : 20
+`struct update has no effect` dans les tests (un `..Default::default()` devenu
+inutile sur des structures entièrement renseignées), 1 dans l'exemple
+`benchmark_perf`, et 1 fonction morte (`generate_payment_receipt_pdf` dans
+`depotpro-server`, sans route associée — le reçu passe par
+`GET /api/payments/:id/receipt`).
+
+Aucune règle métier n'a été touchée. Les corrections sont soit une réécriture
+strictement équivalente (`% 2 == 0` → `.is_multiple_of(2)`), soit la
+suppression d'une mise à jour sans effet (vérifiée champ par champ contre la
+définition de la structure), soit un `#[allow(...)]` ciblé suivant les trois
 précédents déjà présents dans le dépôt (`too_many_arguments` dans
 `pdf/primitives.rs`, `packaging_obligations/ledger.rs` et
-`purchases/packaging_exchange.rs`).
+`purchases/packaging_exchange.rs`). Le code mort a été supprimé, pas masqué.
+
+**Leçon de méthode** : les annotations GitHub tronquent les rapports
+`rustfmt` et `clippy`, qui révèlent leurs erreurs par vagues. Le diagnostic du
+job Clippy a dû être enrichi (chemin + ligne + contexte) pour trouver les
+dernières erreurs : sans cela, l'analyse statique locale ne les distinguait
+pas des tuples homogènes acceptés.
 
 **Non exécutés localement, et non revendiqués** : `cargo test`, `cargo clippy`,
 `cargo fmt --check` (binaire `cargo` absent de l'environnement) et Playwright en
@@ -218,15 +239,19 @@ d'une simulation.
 
 ## 6. Prochaine étape recommandée
 
-1. **Committer et pousser** ce lot : `git push` déclenchera le CI, qui devrait
-   enfin passer l'étape `npm ci` — c'est la première fois que ce sera
-   vérifiable.
-2. **Valider avec un vrai backend** : démarrer `cargo run -p depotpro-server` et
-   rejouer le parcours caissier (menu réduit, 403 directs) et propriétaire
-   (accès catalogue, modification d'un prix de référence). C'est le seul
-   contrôle encore impossible sans serveur local.
-3. **Décider** si `/catalogue-admin` doit rester réservé à `catalog:write` ou
-   exiger une permission dédiée.
+La CI est désormais verte de bout en bout (`45279470032`, 12/12). Les étapes
+restantes sortent du déblocage et reviennent au périmètre produit.
+
+1. **Valider avec un vrai backend DÉJÀ COUVERT par la CI** : les jobs 7, 8 et 5
+   exécutent réellement les tests Rust Core, Axum et les 7 scénarios Playwright,
+   ce serveur compris. Ce qui reste impossible ici, c'est le **contrôle visuel
+   humain** : démarrer `cargo run -p depotpro-server` et regarder le menu réduit
+   du caissier, les 403 directs et la modification d'un prix de référence.
+2. **Décider** si `/catalogue-admin` doit rester réservé à `catalog:write` ou
+   exiger une permission dédiée — décision métier, non prise.
+3. **Décider** si le job manuel 13 (`rustfmt-apply`) est conservé. Il ne
+   s'exécute que sur `workflow_dispatch` ou marqueur `[rustfmt]`, mais il
+   donne à un run le droit d'écrire sur la branche.
 4. Élargir éventuellement le filtrage aux **actions** (boutons) et non plus
    seulement aux écrans, avec la même table de permissions.
 
