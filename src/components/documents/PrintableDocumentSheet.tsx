@@ -40,11 +40,9 @@ export function PrintableDocumentSheet({
   doc: PrintableDocumentData;
   company: AppSettings | undefined;
 }) {
-  const isOrderReceipt =
-    doc.docType === 'REÇU DE COMMANDE' ||
-    doc.docType === 'BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION';
+  const isOrderReceipt = doc.docType === 'REÇU DE COMMANDE';
   const isPaymentReceipt = doc.docType === 'REÇU DE PAIEMENT';
-  const isCustomerReceipt = ['REÇU DE VENTE', 'REÇU DE COMMANDE', 'BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION'].includes(doc.docType);
+  const isCustomerReceipt = ['REÇU DE VENTE', 'REÇU DE COMMANDE'].includes(doc.docType);
   const isPurchaseOrder = doc.docType === 'BON DE COMMANDE' || doc.docType === 'BON DE COMMANDE FOURNISSEUR';
   const isPurchaseReceipt = doc.docType === 'BON DE RÉCEPTION' || doc.docType === 'BON DE RÉCEPTION FOURNISSEUR';
   const secondaryName = doc.secondaryPartyName || company?.company_name || 'Sous-dépôt';

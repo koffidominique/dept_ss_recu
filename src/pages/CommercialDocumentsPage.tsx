@@ -7,6 +7,7 @@ import { useUiStore } from '../stores/uiStore.ts';
 import type { CommercialApprovalEvent, CommercialDocument, CommercialDocumentDetail, CommercialDocumentType } from '../types/erp.ts';
 import { ErrorState, LoadingState } from '../components/common/States.tsx';
 import { DocumentPrintModal, type PrintableDocumentData } from '../components/documents/DocumentPrintModal.tsx';
+import { buildOrderReceiptDocument } from '../features/orders/utils/orderPrintDocument.ts';
 import { formatFcfa, formatQty, packagingContentsLabel } from '../utils/format.ts';
 
 const PAGE_SIZE = 20;
@@ -103,7 +104,19 @@ export function CommercialDocumentsPage() {
   const documentDetailQuery = useQuery({
     queryKey: ['commercial-document-detail', printTarget?.documentType, printTarget?.documentId],
     queryFn: () => apiClient.getCommercialDocumentDetail(printTarget!.documentType, printTarget!.documentId),
-    enabled: Boolean(printTarget),
+    enabled: Boolean(printTarget && printTarget.documentType !== 'customer_order'),
+  });
+  const customerOrderReceiptQuery = useQuery({
+    queryKey: ['customer-order-receipt-print', printTarget?.documentId],
+    enabled: Boolean(printTarget?.documentType === 'customer_order'),
+    queryFn: async () => {
+      const order = await apiClient.getCustomerOrder(printTarget!.documentId);
+      const clients = order.order.customer_id
+        ? await apiClient.listClients(order.order.customer_name)
+        : [];
+      const client = clients.find((entry) => entry.id === order.order.customer_id) ?? null;
+      return { order, client };
+    },
   });
 
   const reviewDetailsQuery = useQuery({
@@ -215,7 +228,7 @@ export function CommercialDocumentsPage() {
 
   const reviewData = reviewDetailsQuery.data;
   const printableType: Record<CommercialDocumentType, PrintableDocumentData['docType']> = {
-    customer_order: 'BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION', sales_receipt: 'REÇU DE VENTE',
+    customer_order: 'REÇU DE COMMANDE', sales_receipt: 'REÇU DE VENTE',
     purchase_order: 'BON DE COMMANDE', supplier_reception: 'BON DE RÉCEPTION',
     payment_receipt: 'REÇU DE PAIEMENT', credit_note: 'AVOIR CLIENT', cancellation: 'ANNULATION',
   };
@@ -230,7 +243,16 @@ export function CommercialDocumentsPage() {
         )
         .reduce((sum, line) => sum + (line.amount ?? 0), 0)
     : 0;
-  const printableDocument: PrintableDocumentData | null = detail ? {
+  const printableDocument: PrintableDocumentData | null =
+    printTarget?.documentType === 'customer_order'
+      ? customerOrderReceiptQuery.data
+        ? buildOrderReceiptDocument(
+            customerOrderReceiptQuery.data.order,
+            customerOrderReceiptQuery.data.client,
+            currentUser?.displayName ?? null,
+          )
+        : null
+      : detail ? {
     docType: printableType[detail.documentType], reference: detail.documentNumber,
     date: detail.createdAt, statusLabel: statusLabel(detail.status),
     partyTitle: ['purchase_order', 'supplier_reception'].includes(detail.documentType) ? 'Fournisseur' : 'Client',
@@ -268,7 +290,13 @@ export function CommercialDocumentsPage() {
         : undefined,
     payments: detail.payments.map((payment) => ({ label: payment.label, amount: payment.amountXof })),
     notes: detail.notes,
-  } : null;
+      } : null;
+  const printLoading = printTarget?.documentType === 'customer_order'
+    ? customerOrderReceiptQuery.isLoading
+    : documentDetailQuery.isLoading;
+  const printError = printTarget?.documentType === 'customer_order'
+    ? customerOrderReceiptQuery.error
+    : documentDetailQuery.error;
 
   if (documentsQuery.isLoading) return <LoadingState rows={7} />;
   if (documentsQuery.error) return <ErrorState message={documentsQuery.error instanceof Error ? documentsQuery.error.message : 'Chargement impossible.'} onRetry={() => void documentsQuery.refetch()} />;
@@ -345,7 +373,7 @@ export function CommercialDocumentsPage() {
       {isOwner && reviewTarget.approvalStatus === 'pending_owner_approval' && <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-800"><button type="button" onClick={() => { setReasonTarget({ doc: reviewTarget, action: 'changes_requested' }); setReason(''); }} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-300">Demander modification</button><button type="button" onClick={() => { setReasonTarget({ doc: reviewTarget, action: 'rejected' }); setReason(''); }} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300">Rejeter</button><button type="button" disabled={reviewMutation.isPending || reviewDetailsQuery.isLoading || Boolean(reviewDetailsQuery.error)} onClick={() => reviewMutation.mutate({ doc: reviewTarget, action: 'approved' })} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Approuver</button></div>}
       </section></div>}
     {reasonTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="approval-reason-title" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-[#111A2E]"><h2 id="approval-reason-title" className="font-display text-base font-semibold">{reasonTarget.action === 'rejected' ? 'Rejeter le document' : 'Demander une modification'}</h2><p className="mt-1 text-xs text-slate-500">{reasonTarget.doc.documentNumber} · {reasonTarget.doc.counterparty}</p><textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={4} placeholder="Motif obligatoire…" className="mt-4 w-full rounded-lg border border-slate-200 bg-transparent p-3 text-sm dark:border-slate-700" /><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setReasonTarget(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs dark:border-slate-700">Annuler</button><button type="button" disabled={!reason.trim() || reviewMutation.isPending} onClick={() => reviewMutation.mutate({ doc: reasonTarget.doc, action: reasonTarget.action, note: reason.trim() })} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Confirmer</button></div></section></div>}
-    {printTarget && (documentDetailQuery.isLoading || documentDetailQuery.error) && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4"><div role="status" className="rounded-xl bg-white p-5 text-sm shadow-xl dark:bg-[#111A2E]">{documentDetailQuery.isLoading ? 'Chargement du document…' : documentDetailQuery.error instanceof Error ? documentDetailQuery.error.message : 'Impossible de charger le document.'}<button type="button" onClick={() => setPrintTarget(null)} className="ml-4 font-semibold text-blue-600">Fermer</button></div></div>}
+    {printTarget && (printLoading || printError) && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4"><div role="status" className="rounded-xl bg-white p-5 text-sm shadow-xl dark:bg-[#111A2E]">{printLoading ? 'Chargement du document…' : printError instanceof Error ? printError.message : 'Impossible de charger le document.'}<button type="button" onClick={() => setPrintTarget(null)} className="ml-4 font-semibold text-blue-600">Fermer</button></div></div>}
     <DocumentPrintModal doc={printableDocument} onClose={() => setPrintTarget(null)} />
     {eventTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setEventTarget(null); }}><section role="dialog" aria-modal="true" aria-labelledby="approval-history-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl dark:bg-[#111A2E]"><div className="flex items-start justify-between"><div><h2 id="approval-history-title" className="font-display text-base font-semibold">Historique documentaire</h2><p className="mt-1 text-xs text-slate-500">{eventTarget.documentNumber} · {eventTarget.counterparty}</p></div><button type="button" onClick={() => setEventTarget(null)} className="rounded-lg px-2 py-1 text-slate-500">Fermer</button></div>{eventsQuery.isLoading ? <div className="py-4"><LoadingState rows={2} /></div> : eventsQuery.error ? <p className="py-4 text-xs text-rose-600">{eventsQuery.error instanceof Error ? eventsQuery.error.message : 'Historique indisponible.'}</p> : <ApprovalHistory events={eventsQuery.data ?? []} />}</section></div>}
   </div>;
