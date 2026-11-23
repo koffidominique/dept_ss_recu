@@ -161,7 +161,7 @@ export function ProductFormModal({
               <button
                 type="button"
                 onClick={() => setStep((s) => Math.min(6, s + 1))}
-                className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs font-medium text-[#2563EB]"
+                className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]"
               >
                 Suivant
               </button>
@@ -179,7 +179,7 @@ export function ProductFormModal({
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+              className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               Enregistrer
             </button>

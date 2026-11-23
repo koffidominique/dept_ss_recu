@@ -81,7 +81,7 @@ function SaleCancelBody({
               refund_method_code: refundMethodCode,
             })
           }
-          className="rounded-lg bg-[#DC4545] px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
+          className="rounded-lg bg-[#BE123C] px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:bg-[#F3C6D1] disabled:text-[#6B0F26] disabled:opacity-100"
         >
           Confirmer contre-écriture
         </button>
@@ -108,7 +108,7 @@ export function SaleCancelModal({
       tipsTopicId="sales-history"
       tipsLabel="Règles"
       maxWidthClass="max-w-md"
-      titleClassName="text-[#DC4545]"
+      titleClassName="text-[#BE123C]"
     >
       {sale && (
         <SaleCancelBody

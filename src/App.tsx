@@ -32,6 +32,9 @@ const ExpensesPage = lazy(() => import('./pages/ExpensesPage.tsx').then((m) => (
 const ReportsPage = lazy(() => import('./pages/ReportsPage.tsx').then((m) => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.tsx').then((m) => ({ default: m.SettingsPage })));
 const BackupsPage = lazy(() => import('./pages/BackupsPage.tsx').then((m) => ({ default: m.BackupsPage })));
+const CatalogueAdminPage = lazy(() =>
+  import('./pages/CatalogueAdminPage.tsx').then((m) => ({ default: m.CatalogueAdminPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -126,6 +129,7 @@ export default function App() {
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/debts" element={<DebtsPage />} />
                   <Route path="/products" element={<ProductsPage />} />
+                <Route path="/catalogue-admin" element={<CatalogueAdminPage />} />
                   <Route path="/stock" element={<StockPage />} />
                   <Route path="/inventories" element={<InventoryPage />} />
                   <Route path="/consignments" element={<ConsignmentsPage />} />

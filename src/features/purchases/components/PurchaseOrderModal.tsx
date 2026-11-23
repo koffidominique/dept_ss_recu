@@ -5,7 +5,7 @@ import { ModalDialog } from '../../../components/dialogs/ModalDialog.tsx';
 import { MoneyInput } from '../../../components/common/MoneyInput.tsx';
 import { QuantityInput } from '../../../components/common/QuantityInput.tsx';
 import type { Product, PurchaseOrder, Supplier } from '../../../types/erp.ts';
-import { formatFcfa, packagingContentsLabel } from '../../../utils/format.ts';
+import { formatFcfa, newRequestKey, packagingContentsLabel } from '../../../utils/format.ts';
 
 interface PoLineInput {
   product_id: number;
@@ -27,6 +27,7 @@ export interface PurchaseOrderSubmitValues {
   extra_fees_xof?: number;
   paid_deposit_xof?: number;
   notes?: string | null;
+  request_key?: string;
 }
 
 interface PackagingPreview {
@@ -96,6 +97,10 @@ function PurchaseOrderFormBody({
   const [extraFeesXof, setExtraFeesXof] = useState(correctionTarget?.extra_fees_xof ?? 0);
   const [paidDepositXof, setPaidDepositXof] = useState(correctionTarget?.paid_deposit_xof ?? 0);
   const [notes, setNotes] = useState(correctionTarget?.notes ?? '');
+  const [keyState, setKeyState] = useState<{ key: string; sig: string | null }>(() => ({
+    key: newRequestKey('po'),
+    sig: null,
+  }));
 
   const packagingPreviews = poLines.map((line) => calculatePackagingPreview(
     line,
@@ -127,7 +132,7 @@ function PurchaseOrderFormBody({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-medium">Fournisseur *</label>
-            <select
+            <select aria-label="Fournisseur"
               value={supplierId}
               onChange={(e) => setSupplierId(Number(e.target.value))}
               className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
@@ -155,7 +160,7 @@ function PurchaseOrderFormBody({
           <button
             type="button"
             onClick={addLine}
-            className="inline-flex items-center gap-1 text-xs font-medium text-[#2563EB]"
+            className="inline-flex items-center gap-1 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]"
           >
             <Plus className="h-3.5 w-3.5" />
             Ajouter un article
@@ -172,8 +177,8 @@ function PurchaseOrderFormBody({
               className="grid grid-cols-12 items-end gap-2 rounded-lg border border-slate-200 dark:border-slate-800 p-3"
             >
               <div className="col-span-4">
-                <label className="block text-[11px] text-[#667085]">Produit</label>
-                <select
+                <label className="block text-[11px] text-[#667085] dark:text-[#94A3B8]">Produit</label>
+                <select aria-label="Produit"
                   value={line.product_id}
                   onChange={(e) => {
                     const pid = Number(e.target.value);
@@ -202,8 +207,8 @@ function PurchaseOrderFormBody({
                 </select>
               </div>
               <div className="col-span-3">
-                <label className="block text-[11px] text-[#667085]">Conditionnement</label>
-                <select
+                <label className="block text-[11px] text-[#667085] dark:text-[#94A3B8]">Conditionnement</label>
+                <select aria-label="Conditionnement"
                   value={line.packaging_id}
                   onChange={(e) => {
                     const pkId = Number(e.target.value);
@@ -260,7 +265,7 @@ function PurchaseOrderFormBody({
                 <button
                   type="button"
                   onClick={() => setPoLines((prev) => prev.filter((_, i) => i !== idx))}
-                  className="text-slate-400 hover:text-[#DC4545]"
+                  className="text-slate-400 hover:text-[#BE123C]"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -336,7 +341,7 @@ function PurchaseOrderFormBody({
           {poLines.length > 0 && (
             <div className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-900 px-3 py-2 font-semibold">
               <span>Net estimé bon de commande</span>
-              <span className="font-mono-num text-[#2563EB]">{formatFcfa(netEstimated)}</span>
+              <span className="font-mono-num text-[#1D4ED8] dark:text-[#60A5FA]">{formatFcfa(netEstimated)}</span>
             </div>
           )}
         </div>
@@ -354,7 +359,21 @@ function PurchaseOrderFormBody({
         <button
           type="button"
           disabled={poLines.length === 0 || isPending || hasPackagingErrors}
-          onClick={() =>
+          onClick={() => {
+            const sig = JSON.stringify({
+              supplierId,
+              poLines,
+              expectedDate: expectedDate.trim(),
+              discountXof,
+              taxXof,
+              extraFeesXof,
+              paidDepositXof,
+            });
+            const effectiveKey =
+              keyState.sig !== null && keyState.sig !== sig
+                ? newRequestKey('po')
+                : keyState.key;
+            setKeyState({ key: effectiveKey, sig });
             onSubmit({
               supplierId,
               lines: poLines,
@@ -368,9 +387,10 @@ function PurchaseOrderFormBody({
               extra_fees_xof: extraFeesXof,
               paid_deposit_xof: paidDepositXof,
               notes: notes.trim() || null,
-            })
-          }
-          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+              request_key: effectiveKey,
+            });
+          }}
+          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           {correctionTarget ? 'Corriger et resoumettre à l’Owner' : 'Valider la commande'}
         </button>

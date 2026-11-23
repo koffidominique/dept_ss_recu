@@ -19,7 +19,7 @@ export function OnboardingBanner({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-[#2563EB]" />
+            <Building2 className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
             <h2 className="font-display text-sm font-semibold text-[#182230] dark:text-slate-100">
               Assistant de première configuration
             </h2>
@@ -33,7 +33,7 @@ export function OnboardingBanner({
             <span className="inline-flex items-center gap-1 text-[#16A36A]">
               <CheckCircle2 className="h-3.5 w-3.5" /> 1. PIN propriétaire configuré
             </span>
-            <span className="inline-flex items-center gap-1 text-[#2563EB]">
+            <span className="inline-flex items-center gap-1 text-[#1D4ED8] dark:text-[#60A5FA]">
               2. Identité du dépôt à renseigner
             </span>
             <Link to="/suppliers" className="hover:underline text-[#667085] dark:text-slate-300">
@@ -200,7 +200,7 @@ function OnboardingFormBody({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           Enregistrer et terminer
         </button>

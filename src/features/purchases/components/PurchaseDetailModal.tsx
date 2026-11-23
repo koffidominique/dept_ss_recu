@@ -43,7 +43,7 @@ export function PurchaseDetailModal({
                 {target.payment_terms_label || 'Conditions standard'}
                 {target.delivery_address ? ` · Livraison : ${target.delivery_address}` : ''}
               </div>
-              <div className="text-[11px] text-[#667085]">
+              <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                 Net commandé : <span className="font-mono-num font-semibold">{formatFcfa(target.total_amount)}</span>
                 {(target.discount_xof ?? 0) > 0 ? ` · Remise ${formatFcfa(target.discount_xof ?? 0)}` : ''}
                 {(target.tax_xof ?? 0) > 0 ? ` · Taxes ${formatFcfa(target.tax_xof ?? 0)}` : ''}
@@ -74,14 +74,14 @@ export function PurchaseDetailModal({
                       <div className="font-medium">
                         {l.product_name} · Conditionnement : {l.packaging_name}
                       </div>
-                      <div className="font-mono-num text-[11px] text-[#667085]">
+                      <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
                         {packagingContentsLabel(l.packaging_name, l.base_unit, l.coefficient_milli)} · Commandé : {formatQty(l.ordered_quantity_milli)} ({formatQty(l.ordered_quantity_milli * l.coefficient_milli / 1000)} {l.base_unit}) · Reçu :{' '}
                         {formatQty(l.received_quantity_milli)}
                       </div>
                     </div>
                     <span
                       className={`font-mono-num font-semibold ${
-                        gapMilli === 0 ? 'text-[#16A36A]' : 'text-[#D9901A]'
+                        gapMilli === 0 ? 'text-[#16A36A]' : 'text-[#8A5A0B] dark:text-[#FBBF24]'
                       }`}
                     >
                       {gapMilli === 0 ? 'Complet' : `Écart restant : ${formatQty(gapMilli)}`}
@@ -95,7 +95,7 @@ export function PurchaseDetailModal({
           <div>
             <h4 className="font-display font-semibold mb-2">Emballages fournisseur réservés</h4>
             {target.packaging_requirements.length === 0 ? (
-              <p className="text-[#667085]">Aucun emballage fournisseur consigné pour cette commande.</p>
+              <p className="text-[#667085] dark:text-[#94A3B8]">Aucun emballage fournisseur consigné pour cette commande.</p>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {target.packaging_requirements.map((requirement) => {
@@ -110,11 +110,11 @@ export function PurchaseDetailModal({
                     <div key={`${requirement.purchase_order_line_id}-${requirement.returnable_id}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                       <div>
                         <div className="font-medium">{requirement.name} ({requirement.code})</div>
-                        <div className="text-[11px] text-[#667085]">Conditionnement : {requirement.pieces_per_pack} pièce(s) · Besoin initial : {requirement.required_pieces}</div>
+                        <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Conditionnement : {requirement.pieces_per_pack} pièce(s) · Besoin initial : {requirement.required_pieces}</div>
                       </div>
                       <div className="text-right font-mono-num">
                         <div>Réservé : {requirement.reserved_pieces} · Émis : {requirement.issued_pieces}</div>
-                        <div className="text-[11px] text-[#667085]">{status}</div>
+                        <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">{status}</div>
                       </div>
                     </div>
                   );
@@ -128,7 +128,7 @@ export function PurchaseDetailModal({
               Réceptions enregistrées ({target.receipts.length})
             </h4>
             {target.receipts.length === 0 ? (
-              <p className="text-[#667085]">Aucune réception effectuée sur cette commande.</p>
+              <p className="text-[#667085] dark:text-[#94A3B8]">Aucune réception effectuée sur cette commande.</p>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {target.receipts.map((rec) => (
@@ -136,16 +136,16 @@ export function PurchaseDetailModal({
                     <div>
                       <span className="font-mono-num font-semibold">{rec.reference}</span>
                       {rec.status && (
-                        <span className="ml-2 text-[11px] uppercase font-medium text-[#667085]">
+                        <span className="ml-2 text-[11px] uppercase font-medium text-[#667085] dark:text-[#94A3B8]">
                           {rec.status === 'discrepancy' ? 'Écart signalé' : rec.status === 'partial' ? 'Partielle' : 'Complète'}
                         </span>
                       )}
                       {rec.received_by_name && (
-                        <span className="ml-2 text-[11px] text-[#667085]">· Par {rec.received_by_name}</span>
+                        <span className="ml-2 text-[11px] text-[#667085] dark:text-[#94A3B8]">· Par {rec.received_by_name}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono-num text-[#667085]">
+                      <span className="font-mono-num text-[#667085] dark:text-[#94A3B8]">
                         {formatDateTime(rec.created_at)}
                       </span>
                       <span className="font-mono-num font-semibold text-[#16A36A]">
@@ -173,7 +173,7 @@ export function PurchaseDetailModal({
               Dettes &amp; échéances générées ({linkedDebts.length})
             </h4>
             {linkedDebts.length === 0 ? (
-              <p className="text-[#667085]">
+              <p className="text-[#667085] dark:text-[#94A3B8]">
                 Aucune dette fournisseur ouverte issue de ces réceptions.
               </p>
             ) : (
@@ -182,12 +182,12 @@ export function PurchaseDetailModal({
                   <div key={d.id} className="flex items-center justify-between px-3 py-2">
                     <div>
                       <span className="font-mono-num font-semibold">{d.receipt_reference}</span>
-                      <span className="ml-2 text-[#667085]">
+                      <span className="ml-2 text-[#667085] dark:text-[#94A3B8]">
                         Échéance : {formatDate(d.due_date)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono-num font-semibold text-[#DC4545]">
+                      <span className="font-mono-num font-semibold text-[#BE123C]">
                         Reste {formatFcfa(d.remaining_amount)}
                       </span>
                       <StatusBadge status={d.status} />

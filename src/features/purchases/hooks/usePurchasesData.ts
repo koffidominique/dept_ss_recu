@@ -75,7 +75,7 @@ export function usePurchasesMutations({
         if (!lineExact.ok) throw new Error(lineExact.error);
       }
       return apiClient.createPurchaseOrder({
-        request_key: newRequestKey('po'),
+        request_key: input.request_key || newRequestKey('po'),
         supplier_id: input.supplierId,
         expected_date: input.expected_date ?? null,
         payment_terms_label: input.payment_terms_label ?? null,
@@ -106,7 +106,11 @@ export function usePurchasesMutations({
         if (!parsedQty.ok) throw new Error(parsedQty.error);
         const parsedPrice = toNonNegativeIntFcfaBigInt(line.unit_price, 'Prix unitaire achat');
         if (!parsedPrice.ok) throw new Error(parsedPrice.error);
-        const lineExact = computeExactLineGrossFcfa(parsedQty.milli, parsedPrice.fcfa, 'Ligne commande');
+        const lineExact = computeExactLineGrossFcfa(
+          parsedQty.milli,
+          parsedPrice.fcfa,
+          'Ligne commande'
+        );
         if (!lineExact.ok) throw new Error(lineExact.error);
       }
       return apiClient.updatePurchaseOrder(input.purchaseOrderId, {
@@ -121,7 +125,10 @@ export function usePurchasesMutations({
         paid_deposit_xof: input.paid_deposit_xof ?? 0,
         notes: input.notes ?? null,
         lines: input.lines.map(({ product_id, packaging_id, quantity, unit_price }) => ({
-          product_id, packaging_id, quantity, unit_price,
+          product_id,
+          packaging_id,
+          quantity,
+          unit_price,
         })),
       });
     },
@@ -132,7 +139,8 @@ export function usePurchasesMutations({
       qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       onUpdatedPo(updated);
     },
-    onError: (err) => onError(err instanceof Error ? err.message : 'Erreur correction bon fournisseur.'),
+    onError: (err) =>
+      onError(err instanceof Error ? err.message : 'Erreur correction bon fournisseur.'),
   });
 
   const receiveMutation = useMutation({
@@ -167,7 +175,8 @@ export function usePurchasesMutations({
           );
         }
         const reason = input.receiveReason[l.id]?.trim();
-        const hasDiscrepancy = missMilli > 0 || dmgMilli > 0 || refMilli > 0 || qtyMilli < remMilli;
+        const hasDiscrepancy =
+          missMilli > 0 || dmgMilli > 0 || refMilli > 0 || qtyMilli < remMilli;
         if (hasDiscrepancy && !reason) {
           throw new Error(`Motif d'écart obligatoire pour ${l.product_name}.`);
         }
@@ -184,7 +193,7 @@ export function usePurchasesMutations({
         throw new Error('Saisissez au moins une ligne reçue.');
       }
       return apiClient.receivePurchaseOrder(input.target.id, {
-        request_key: newRequestKey('rec'),
+        request_key: input.request_key || newRequestKey('rec'),
         notes: input.notes.trim() || undefined,
         lines,
       });

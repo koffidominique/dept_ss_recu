@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { motion } from 'motion/react';
-import { Package, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Keyboard, Loader2, Package, Plus, RefreshCw, SearchX, X } from 'lucide-react';
 import { SearchInput } from '../../../components/forms/SearchInput.tsx';
 import {
   DP_BUTTON_HOVER,
@@ -18,14 +18,25 @@ import type {
 } from '../../../types/erp.ts';
 import { getSalesUnitTierPrice, getTierPrice } from '../hooks/usePosData.ts';
 
+export interface BarcodeScanFeedback {
+  tone: 'success' | 'error';
+  message: string;
+}
+
 interface PosCatalogPanelProps {
   searchInputRef: RefObject<HTMLInputElement | null>;
   search: string;
   onSearchChange: (value: string) => void;
   onScanEnter: (rawCode: string) => Promise<void>;
+  scanFeedback?: BarcodeScanFeedback | null;
+  onDismissScanFeedback?: () => void;
   priceTier: PriceTier;
   onPriceTierChange: (tier: PriceTier) => void;
   products: Product[];
+  isLoadingProducts?: boolean;
+  isFetchingProducts?: boolean;
+  productsError?: string | null;
+  onRetryProducts?: () => void;
   onAddPackaging: (product: Product, pkg: ProductPackaging) => void;
   onAddSalesUnit?: (product: Product, unit: ProductSalesUnit) => void;
 }
@@ -41,30 +52,46 @@ export function PosCatalogPanel({
   search,
   onSearchChange,
   onScanEnter,
+  scanFeedback = null,
+  onDismissScanFeedback,
   priceTier,
   onPriceTierChange,
   products,
+  isLoadingProducts = false,
+  isFetchingProducts = false,
+  productsError = null,
+  onRetryProducts,
   onAddPackaging,
   onAddSalesUnit,
 }: PosCatalogPanelProps) {
   return (
-    <div className="space-y-4 lg:col-span-7">
+    <div className="space-y-3 lg:col-span-7">
       <div className="flex flex-wrap items-center gap-3">
-        <SearchInput
-          ref={searchInputRef}
-          value={search}
-          onChange={onSearchChange}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void onScanEnter(search);
-            }
-          }}
-          clearable
-          placeholder="Scanner code-barres ou chercher (F2)..."
-          className="flex-1 min-w-[220px]"
-          inputClassName="py-2.5"
-        />
+        <div className="relative flex-1 min-w-[220px]">
+          <SearchInput
+            ref={searchInputRef}
+            value={search}
+            onChange={onSearchChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void onScanEnter(search);
+              }
+            }}
+            clearable
+            placeholder="Scanner code-barres + Entrée ou chercher (F2)..."
+            className="w-full"
+            inputClassName="py-2.5"
+          />
+          {isFetchingProducts && (
+            <span
+              aria-live="polite"
+              className="pointer-events-none absolute right-9 top-1/2 -translate-y-1/2 text-slate-400"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            </span>
+          )}
+        </div>
         <div
           role="group"
           aria-label="Grille tarifaire POS"
@@ -74,6 +101,7 @@ export function PosCatalogPanel({
             <button
               key={t.id}
               type="button"
+              aria-pressed={priceTier === t.id}
               onClick={() => onPriceTierChange(t.id)}
               className={`rounded-md px-2.5 py-1.5 font-medium transition-colors ${
                 priceTier === t.id
@@ -87,7 +115,124 @@ export function PosCatalogPanel({
         </div>
       </div>
 
-      <MotionStaggerGrid className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#667085] dark:text-slate-400">
+        <div className="inline-flex flex-wrap items-center gap-2">
+          <Keyboard className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono-num text-[10px]">
+              F2
+            </kbd>{' '}
+            Recherche / Scan
+          </span>
+          <span>·</span>
+          <span>
+            <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono-num text-[10px]">
+              F4
+            </kbd>{' '}
+            Attente
+          </span>
+          <span>·</span>
+          <span>
+            <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono-num text-[10px]">
+              F8
+            </kbd>{' '}
+            Solder comptant
+          </span>
+          <span>·</span>
+          <span>
+            <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 font-mono-num text-[10px]">
+              F9
+            </kbd>{' '}
+            Valider
+          </span>
+        </div>
+        <span className="font-mono-num">
+          Tarif actif :{' '}
+          <strong className="text-[#182230] dark:text-slate-200">
+            {TIERS.find((t) => t.id === priceTier)?.label}
+          </strong>
+        </span>
+      </div>
+
+      {scanFeedback && (
+        <div
+          role={scanFeedback.tone === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+          className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs font-medium ${
+            scanFeedback.tone === 'success'
+              ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300'
+              : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/30 text-[#BE123C] dark:text-rose-300'
+          }`}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            {scanFeedback.tone === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            ) : (
+              <AlertCircle className="h-4 w-4 shrink-0" />
+            )}
+            <span className="truncate">{scanFeedback.message}</span>
+          </span>
+          {onDismissScanFeedback && (
+            <button
+              type="button"
+              onClick={onDismissScanFeedback}
+              aria-label="Masquer le message de scan"
+              className="rounded p-0.5 opacity-70 hover:opacity-100 shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {productsError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/20 p-4 text-xs text-[#BE123C] dark:text-rose-300"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>Impossible de charger le catalogue : {productsError}</span>
+          </div>
+          {onRetryProducts && (
+            <button
+              type="button"
+              onClick={onRetryProducts}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 dark:border-rose-800 bg-white dark:bg-slate-900 px-3 py-1.5 font-semibold"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Réessayer
+            </button>
+          )}
+        </div>
+      ) : isLoadingProducts && products.length === 0 ? (
+        <div
+          role="status"
+          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-8 text-center text-xs text-[#667085] dark:text-slate-400"
+        >
+          <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-[#1D4ED8] dark:text-[#60A5FA]" />
+          Chargement des produits disponibles…
+        </div>
+      ) : products.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-8 text-center space-y-2">
+          <SearchX className="mx-auto h-6 w-6 text-slate-400" />
+          <p className="text-xs font-medium text-[#182230] dark:text-slate-200">
+            {search.trim()
+              ? `Aucun produit actif ne correspond à « ${search.trim()} ».`
+              : 'Aucun produit actif dans le catalogue.'}
+          </p>
+          {search.trim() && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Afficher tout le catalogue
+            </button>
+          )}
+        </div>
+      ) : (
+        <MotionStaggerGrid className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {products.map((prod) => {
           const activePkgs = prod.packagings.filter(
             (pk) =>
@@ -140,9 +285,9 @@ export function PosCatalogPanel({
                   <span
                     className={`font-mono-num text-xs font-semibold shrink-0 ${
                       prod.stock_milli <= 0
-                        ? 'text-[#DC4545]'
+                        ? 'text-[#BE123C]'
                         : prod.stock_milli <= prod.min_stock_milli
-                          ? 'text-[#D9901A]'
+                          ? 'text-[#8A5A0B] dark:text-[#FBBF24]'
                           : 'text-[#16A36A] dark:text-emerald-400'
                     }`}
                   >
@@ -172,7 +317,7 @@ export function PosCatalogPanel({
                       whileTap={DP_BUTTON_TAP}
                       transition={DP_SPRING_SNAPPY}
                       onClick={() => onAddPackaging(prod, pk)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-[#182230] dark:text-slate-200 hover:border-[#2563EB] hover:text-[#2563EB] hover:shadow-sm transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-[#182230] dark:text-slate-200 hover:border-[#2563EB] hover:text-[#1D4ED8] dark:text-[#60A5FA] hover:shadow-sm transition-colors"
                     >
                       <Plus className="h-3 w-3" />
                       <span className="capitalize">{pk.display_label || pk.name}</span>
@@ -180,7 +325,7 @@ export function PosCatalogPanel({
                         {formatFcfa(getTierPrice(pk, priceTier))}
                       </span>
                       {depAmt > 0 && (
-                        <span className="text-[10px] text-[#D9901A] font-mono-num">
+                        <span className="text-[10px] text-[#8A5A0B] dark:text-[#FBBF24] font-mono-num">
                           +{formatFcfa(depAmt)}
                         </span>
                       )}
@@ -198,7 +343,7 @@ export function PosCatalogPanel({
                         whileTap={DP_BUTTON_TAP}
                         transition={DP_SPRING_SNAPPY}
                         onClick={() => onAddSalesUnit(prod, unit)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 px-2.5 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-blue-100 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 px-2.5 py-1.5 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-blue-100 transition-colors"
                       >
                         <Plus className="h-3 w-3" />
                         <span>{unit.label}</span>
@@ -206,7 +351,7 @@ export function PosCatalogPanel({
                           {formatFcfa(getSalesUnitTierPrice(unit, priceTier))}
                         </span>
                         {depAmt > 0 && (
-                          <span className="text-[10px] text-[#D9901A] font-mono-num">
+                          <span className="text-[10px] text-[#8A5A0B] dark:text-[#FBBF24] font-mono-num">
                             +{formatFcfa(depAmt)}
                           </span>
                         )}
@@ -217,7 +362,8 @@ export function PosCatalogPanel({
             </MotionStaggerItem>
           );
         })}
-      </MotionStaggerGrid>
+        </MotionStaggerGrid>
+      )}
     </div>
   );
 }

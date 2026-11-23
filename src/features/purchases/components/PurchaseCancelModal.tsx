@@ -40,7 +40,7 @@ export function PurchaseCancelModal({
       open={Boolean(target)}
       onOpenChange={(o) => !o && onClose()}
       title={`Annuler la commande · ${target?.reference ?? ''}`}
-      titleClassName="text-[#DC4545]"
+      titleClassName="text-[#BE123C]"
       description="Cette commande n'a fait l'objet d'aucune réception. Son annulation la marquera définitivement comme annulée sans impact sur le stock."
       maxWidthClass="max-w-md"
       error={error}
@@ -65,7 +65,7 @@ export function PurchaseCancelModal({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.reason && (
-            <p className="mt-1 text-[11px] text-[#DC4545]" role="alert">
+            <p className="mt-1 text-[11px] text-[#BE123C]" role="alert">
               {form.formState.errors.reason.message}
             </p>
           )}
@@ -82,7 +82,7 @@ export function PurchaseCancelModal({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-[#DC4545] px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
+            className="rounded-lg bg-[#BE123C] px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:bg-[#F3C6D1] disabled:text-[#6B0F26] disabled:opacity-100"
           >
             Confirmer l&apos;annulation
           </button>

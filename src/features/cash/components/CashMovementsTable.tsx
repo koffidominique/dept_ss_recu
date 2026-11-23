@@ -60,7 +60,7 @@ export function CashMovementsTable({ sessionReference, movements }: CashMovement
         cell: ({ row }) => (
           <span
             className={`font-mono-num font-semibold ${
-              row.original.direction === 'in' ? 'text-[#16A36A]' : 'text-[#DC4545]'
+              row.original.direction === 'in' ? 'text-[#16A36A]' : 'text-[#BE123C]'
             }`}
           >
             {row.original.direction === 'in' ? '+' : '-'}
@@ -72,7 +72,7 @@ export function CashMovementsTable({ sessionReference, movements }: CashMovement
         accessorKey: 'reference_document',
         header: 'Document',
         cell: ({ row }) => (
-          <span className="font-mono-num text-xs text-[#667085]">
+          <span className="font-mono-num text-xs text-[#667085] dark:text-[#94A3B8]">
             {row.original.reference_document || '—'}
           </span>
         ),
@@ -89,7 +89,7 @@ export function CashMovementsTable({ sessionReference, movements }: CashMovement
           type="button"
           disabled={movements.length === 0}
           onClick={() => exportCashMovementsCsv(sessionReference, movements)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <Download className="h-3.5 w-3.5" />
           CSV Mouvements

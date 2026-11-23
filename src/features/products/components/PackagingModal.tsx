@@ -67,7 +67,7 @@ export function PackagingModal({
             type="button"
             disabled={isPending}
             onClick={onSubmit}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             {state.id ? 'Mettre à jour le conditionnement' : 'Enregistrer le conditionnement'}
           </button>
@@ -102,8 +102,8 @@ export function PackagingModal({
               onClick={() => onStartNew(product)}
               className={`inline-flex items-center gap-1 rounded-lg border border-dashed px-2.5 py-1 text-xs font-medium transition-colors ${
                 state.id === undefined
-                  ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#2563EB]'
-                  : 'border-slate-300 dark:border-slate-700 text-[#667085] hover:border-[#2563EB] hover:text-[#2563EB]'
+                  ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#1D4ED8] dark:text-[#60A5FA]'
+                  : 'border-slate-300 dark:border-slate-700 text-[#667085] dark:text-[#94A3B8] hover:border-[#2563EB] hover:text-[#1D4ED8] dark:text-[#60A5FA]'
               }`}
             >
               <Plus className="h-3 w-3" />
@@ -200,7 +200,7 @@ export function PackagingModal({
             onChange={(e) =>
               onChangeState((prev) => ({ ...prev, allow_fraction: e.target.checked }))
             }
-            className="rounded border-slate-300 text-[#2563EB]"
+            className="rounded border-slate-300 text-[#1D4ED8] dark:text-[#60A5FA]"
           />
           Autoriser quantités fractionnaires (demi-casier)
         </label>
@@ -209,7 +209,7 @@ export function PackagingModal({
             type="checkbox"
             checked={state.is_active}
             onChange={(e) => onChangeState((prev) => ({ ...prev, is_active: e.target.checked }))}
-            className="rounded border-slate-300 text-[#2563EB]"
+            className="rounded border-slate-300 text-[#1D4ED8] dark:text-[#60A5FA]"
           />
           Conditionnement actif à la vente
         </label>
@@ -240,7 +240,7 @@ export function PackagingModal({
           <>
             <div>
               <label className="block text-xs font-medium">Type d'emballage consigné</label>
-              <select
+              <select aria-label="Type d'emballage consigné"
                 value={state.returnable_id}
                 onChange={(e) =>
                   onChangeState((prev) => ({ ...prev, returnable_id: Number(e.target.value) }))

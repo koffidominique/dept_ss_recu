@@ -167,7 +167,7 @@ export function MonthlySalesChart({
                       <div className="mt-1 space-y-0.5 font-mono-num">
                         <div className="flex items-center justify-between gap-4">
                           <span className="text-[#667085] dark:text-slate-400">CA marchandises</span>
-                          <span className="font-semibold text-[#2563EB] dark:text-[#60A5FA]">
+                          <span className="font-semibold text-[#1D4ED8] dark:text-[#60A5FA]">
                             {formatFcfa(row.revenue)}
                           </span>
                         </div>

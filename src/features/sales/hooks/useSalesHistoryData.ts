@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { SaleDetail } from '../../../types/erp.ts';
-import { newRequestKey } from '../../../utils/format.ts';
+import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
 
 export function useSalesHistoryQueries(filters: {
   search: string;
@@ -74,14 +75,20 @@ export function useSalesHistoryMutations(options: {
     qc.invalidateQueries({ queryKey: ['reports'] });
   };
 
+  const cancelKeyRef = useRef(createIdempotentRequestTracker('cancel'));
+  const returnKeyRef = useRef(createIdempotentRequestTracker('ret'));
+
   const cancelMutation = useMutation({
     mutationFn: (args: { saleId: number; reason: string; refund_method_code: string }) =>
       apiClient.cancelSale(args.saleId, {
         reason: args.reason,
         refund_method_code: args.refund_method_code,
-        request_key: newRequestKey('cancel'),
+        request_key: cancelKeyRef.current.resolveKey(
+          `${args.saleId}:${args.refund_method_code}:${args.reason.trim()}`
+        ),
       }),
     onSuccess: (updated) => {
+      cancelKeyRef.current.reset();
       invalidateAll();
       options.onCancelled(updated);
     },
@@ -98,13 +105,22 @@ export function useSalesHistoryMutations(options: {
       lines: Array<{ sale_line_id: number; base_quantity: string }>;
     }) =>
       apiClient.createSaleReturn(args.saleId, {
-        request_key: newRequestKey('ret'),
+        request_key: returnKeyRef.current.resolveKey(
+          JSON.stringify({
+            saleId: args.saleId,
+            reason: args.reason.trim(),
+            restock_approved: args.restock_approved,
+            refund_method_code: args.refund_method_code,
+            lines: args.lines,
+          })
+        ),
         reason: args.reason,
         restock_approved: args.restock_approved,
         refund_method_code: args.refund_method_code,
         lines: args.lines,
       }),
     onSuccess: (updated) => {
+      returnKeyRef.current.reset();
       invalidateAll();
       options.onReturned(updated);
     },

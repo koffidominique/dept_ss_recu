@@ -6,6 +6,8 @@ import {
   type PrintableDocumentData,
 } from '../components/documents/DocumentPrintModal.tsx';
 import { ErrorState, LoadingState } from '../components/common/States.tsx';
+import { OfflineWorkBanner } from '../features/dashboard/components/WorkQueuePanel.tsx';
+import { useConnectionState } from '../features/dashboard/hooks/useConnectionState.ts';
 import { formatDateTime, formatFcfa } from '../utils/format.ts';
 import { useCashMutations, useCashQuery } from '../features/cash/hooks/useCashData.ts';
 import { CashSummaryCards } from '../features/cash/components/CashSummaryCards.tsx';
@@ -18,6 +20,7 @@ export function CashPage() {
   const [openModal, setOpenModal] = useState(false);
   const [closeModal, setCloseModal] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintableDocumentData | null>(null);
+  const { isOnline, offlineSince, serverState } = useConnectionState();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useCashQuery();
@@ -61,6 +64,11 @@ export function CashPage() {
 
   return (
     <div className="space-y-6">
+      <OfflineWorkBanner
+        isOnline={isOnline}
+        offlineSince={offlineSince}
+        serverState={serverState}
+      />
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-5">
         <div>
           <div className="flex items-center gap-3">
@@ -166,7 +174,7 @@ export function CashPage() {
         onOpenChange={setOpenModal}
         error={errorMsg}
         isPending={openMut.isPending}
-        onSubmit={(openingCash) => openMut.mutate(openingCash)}
+        onSubmit={(payload) => openMut.mutate(payload)}
       />
 
       <CloseCashModal

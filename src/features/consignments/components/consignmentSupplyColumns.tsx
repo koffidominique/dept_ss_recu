@@ -24,7 +24,7 @@ export function buildTypeColumns(
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.original.name}</div>
-          <div className="text-xs text-[#667085]">
+          <div className="text-xs text-[#667085] dark:text-[#94A3B8]">
             {row.original.producer} ·{' '}
             {row.original.kind === 'crate' ? 'Casier' : 'Bouteille verre'}
           </div>
@@ -81,7 +81,7 @@ export function buildIssueColumns(
             {due && (
               <div
                 className={`font-mono-num text-[11px] ${
-                  overdue ? 'text-[#DC4545] font-semibold' : 'text-[#667085]'
+                  overdue ? 'text-[#BE123C] font-semibold' : 'text-[#667085] dark:text-[#94A3B8]'
                 }`}
               >
                 Échéance : {formatDate(due)} {overdue ? '(> 15j)' : ''}
@@ -121,7 +121,7 @@ export function buildIssueColumns(
           row.original.pieces - row.original.returned_pieces - (row.original.other_out_pieces ?? 0)
         );
         return (
-          <span className="font-mono-num font-semibold text-[#D9901A]">
+          <span className="font-mono-num font-semibold text-[#8A5A0B] dark:text-[#FBBF24]">
             {rem} / {row.original.pieces} pcs
           </span>
         );
@@ -146,7 +146,7 @@ export function buildIssueColumns(
         <button
           type="button"
           onClick={() => onStartReturn(row.original)}
-          className="inline-flex items-center gap-1 rounded-lg bg-[#16A36A] px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+          className="inline-flex items-center gap-1 rounded-lg bg-[#0D7A4C] px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
         >
           <PackageCheck className="h-3.5 w-3.5" />
           Enregistrer retour
@@ -164,7 +164,7 @@ export function buildBalanceColumns(): ColumnDef<ClientBalance>[] {
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.original.client_name}</div>
-          <div className="font-mono-num text-[11px] text-[#667085]">
+          <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
             {row.original.client_code}
           </div>
         </div>
@@ -176,7 +176,7 @@ export function buildBalanceColumns(): ColumnDef<ClientBalance>[] {
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.original.packaging_name}</div>
-          <div className="font-mono-num text-[11px] text-[#667085]">
+          <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
             {row.original.packaging_code}
           </div>
         </div>
@@ -186,7 +186,7 @@ export function buildBalanceColumns(): ColumnDef<ClientBalance>[] {
       accessorKey: 'balance_pieces',
       header: 'Solde vides détenus',
       cell: ({ row }) => (
-        <span className="font-mono-num font-semibold text-[#D9901A]">
+        <span className="font-mono-num font-semibold text-[#8A5A0B] dark:text-[#FBBF24]">
           {formatNumber(row.original.balance_pieces)} pcs
         </span>
       ),

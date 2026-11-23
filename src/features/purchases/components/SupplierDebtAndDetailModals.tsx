@@ -35,7 +35,7 @@ function PayDebtBody({
       <div className="mt-4 space-y-3">
         <div>
           <label className="block text-xs font-medium">Moyen de paiement</label>
-          <select
+          <select aria-label="Moyen de paiement"
             value={payMethod}
             onChange={(e) => setPayMethod(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
@@ -143,7 +143,7 @@ export function SupplierDetailModal({
                       <Dialog.Title className="font-display text-base font-bold">
                         {supplier.name} · {supplier.code}
                       </Dialog.Title>
-                      <p className="mt-0.5 text-[#667085]">
+                      <p className="mt-0.5 text-[#667085] dark:text-[#94A3B8]">
                         Tél : {supplier.phone} · Délai : {supplier.payment_terms_days} jour(s)
                         {supplier.company_name ? ` · ${supplier.company_name}` : ''}
                         {supplier.address ? ` · ${supplier.address}` : ''}
@@ -168,14 +168,14 @@ export function SupplierDetailModal({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                      <div className="text-[#667085]">Total réceptionné</div>
+                      <div className="text-[#667085] dark:text-[#94A3B8]">Total réceptionné</div>
                       <div className="mt-1 font-mono-num text-sm font-bold text-[#16A36A]">
                         {formatFcfa(supplier.total_purchases)}
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                      <div className="text-[#667085]">Solde dû</div>
-                      <div className="mt-1 font-mono-num text-sm font-bold text-[#DC4545]">
+                      <div className="text-[#667085] dark:text-[#94A3B8]">Solde dû</div>
+                      <div className="mt-1 font-mono-num text-sm font-bold text-[#BE123C]">
                         {formatFcfa(supplier.balance_due)}
                       </div>
                     </div>
@@ -186,7 +186,7 @@ export function SupplierDetailModal({
                       Commandes & réceptions ({supOrders.length})
                     </h4>
                     {supOrders.length === 0 ? (
-                      <p className="text-[#667085]">Aucune commande passée à ce fournisseur.</p>
+                      <p className="text-[#667085] dark:text-[#94A3B8]">Aucune commande passée à ce fournisseur.</p>
                     ) : (
                       <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                         {supOrders.map((po) => (
@@ -196,7 +196,7 @@ export function SupplierDetailModal({
                           >
                             <div>
                               <span className="font-mono-num font-semibold">{po.reference}</span>
-                              <span className="ml-2 font-mono-num text-[#667085]">
+                              <span className="ml-2 font-mono-num text-[#667085] dark:text-[#94A3B8]">
                                 {formatDateTime(po.created_at)}
                               </span>
                             </div>
@@ -218,7 +218,7 @@ export function SupplierDetailModal({
                       Dettes & règlements ({supDebts.length})
                     </h4>
                     {supDebts.length === 0 ? (
-                      <p className="text-[#667085]">Aucune dette enregistrée.</p>
+                      <p className="text-[#667085] dark:text-[#94A3B8]">Aucune dette enregistrée.</p>
                     ) : (
                       <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                         {supDebts.map((d) => (
@@ -230,7 +230,7 @@ export function SupplierDetailModal({
                               <span className="font-mono-num font-semibold">
                                 {d.receipt_reference}
                               </span>
-                              <span className="ml-2 text-[#667085]">
+                              <span className="ml-2 text-[#667085] dark:text-[#94A3B8]">
                                 Éch. {formatDate(d.due_date)}
                               </span>
                             </div>

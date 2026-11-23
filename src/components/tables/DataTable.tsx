@@ -16,6 +16,7 @@ import {
   DP_SPRING_SNAPPY,
 } from '../motion/MotionPrimitives.tsx';
 import { cn } from '../../utils/format.ts';
+import { headerScope } from '../../features/quality/utils/operationalSafety.ts';
 
 interface DataTableProps<T> {
   data: T[];
@@ -69,6 +70,9 @@ export function DataTable<T>({
                   return (
                     <th
                       key={header.id}
+                      // `scope="col"` est indispensable : sans lui, les lecteurs
+                      // d'écran n'associent pas les cellules à leur colonne.
+                      scope={headerScope(false)}
                       className="px-4 py-2.5 text-xs font-semibold text-[#667085] dark:text-slate-400 whitespace-nowrap"
                     >
                       {header.isPlaceholder ? null : canSort ? (
@@ -142,7 +146,7 @@ export function DataTable<T>({
               transition={DP_SPRING_SNAPPY}
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 hover:border-[#2563EB]/40 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 hover:border-[#2563EB]/40 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Précédent
@@ -154,7 +158,7 @@ export function DataTable<T>({
               transition={DP_SPRING_SNAPPY}
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 hover:border-[#2563EB]/40 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 hover:border-[#2563EB]/40 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 transition-colors"
             >
               Suivant
               <ChevronRight className="h-3.5 w-3.5" />

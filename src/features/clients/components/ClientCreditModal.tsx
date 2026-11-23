@@ -35,7 +35,7 @@ function ClientCreditFormBody({
       <div className="mt-4 space-y-4">
         <div>
           <label className="block text-xs font-medium">État du crédit</label>
-          <select
+          <select aria-label="État du crédit"
             value={creditPolicy}
             onChange={(e) => setCreditPolicy(e.target.value as CreditPolicy)}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"

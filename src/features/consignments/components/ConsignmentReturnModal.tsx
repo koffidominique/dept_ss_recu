@@ -101,7 +101,7 @@ function ConsignmentReturnFormBody({
           </div>
           <div>
             <label className="block font-medium">État</label>
-            <select
+            <select aria-label="État"
               value={conditionState}
               onChange={(e) => {
                 const st = e.target.value as 'good' | 'damaged';
@@ -128,13 +128,13 @@ function ConsignmentReturnFormBody({
           />
         </div>
         {counterpartExceeded && (
-          <p className="rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 px-2.5 py-1.5 text-[11px] font-medium text-[#DC4545]">
+          <p className="rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 px-2.5 py-1.5 text-[11px] font-medium text-[#BE123C]">
             La somme remboursement + déduction créance ({formatFcfa(refundAmount + creditReduction)}) dépasse la valeur maximale restituable ({formatFcfa(maxCounterpart)}).
           </p>
         )}
         <div>
           <label className="block font-medium">Moyen de remboursement</label>
-          <select
+          <select aria-label="Moyen de remboursement"
             value={methodCode}
             onChange={(e) => setMethodCode(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2"
@@ -184,7 +184,7 @@ function ConsignmentReturnFormBody({
               reason,
             })
           }
-          className="rounded-lg bg-[#16A36A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+          className="rounded-lg bg-[#0D7A4C] px-4 py-2 text-xs font-semibold text-white disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100"
         >
           Confirmer le retour
         </button>

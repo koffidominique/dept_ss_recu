@@ -52,9 +52,9 @@ export function StockBalancesTable({
             <span
               className={`font-mono-num font-semibold ${
                 isOut
-                  ? 'text-[#DC4545]'
+                  ? 'text-[#BE123C]'
                   : isLow
-                    ? 'text-[#D9901A]'
+                    ? 'text-[#8A5A0B] dark:text-[#FBBF24]'
                     : 'text-[#182230] dark:text-slate-100'
               }`}
             >
@@ -79,7 +79,7 @@ export function StockBalancesTable({
           row.original.average_cost_fcfa !== null ? (
             <span className="font-mono-num">{formatFcfa(row.original.average_cost_fcfa)}</span>
           ) : (
-            <span className="text-xs text-[#D9901A]">Coût non renseigné</span>
+            <span className="text-xs text-[#8A5A0B] dark:text-[#FBBF24]">Coût non renseigné</span>
           ),
       },
       {
@@ -91,7 +91,7 @@ export function StockBalancesTable({
               {formatFcfa(row.original.valuation_fcfa)}
             </span>
           ) : (
-            <span className="text-xs text-[#667085]">Non valorisable</span>
+            <span className="text-xs text-[#667085] dark:text-[#94A3B8]">Non valorisable</span>
           ),
       },
       {
@@ -139,7 +139,7 @@ export function StockMovementsTable({ movements }: { movements: StockMovementRow
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.product_name}</div>
-            <div className="font-mono-num text-[11px] text-[#667085]">
+            <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
               {row.original.product_reference}
             </div>
           </div>
@@ -161,7 +161,7 @@ export function StockMovementsTable({ movements }: { movements: StockMovementRow
           const pos = row.original.quantity_milli > 0;
           return (
             <span
-              className={`font-mono-num font-semibold ${pos ? 'text-[#16A36A]' : 'text-[#DC4545]'}`}
+              className={`font-mono-num font-semibold ${pos ? 'text-[#16A36A]' : 'text-[#BE123C]'}`}
             >
               {pos ? '+' : ''}
               {formatQty(row.original.quantity_milli, row.original.base_unit)}
@@ -186,7 +186,7 @@ export function StockMovementsTable({ movements }: { movements: StockMovementRow
           <div className="text-xs">
             <div className="text-[#182230] dark:text-slate-200">{row.original.reason || '—'}</div>
             {row.original.reference_document && (
-              <div className="font-mono-num text-[11px] text-[#2563EB] dark:text-[#60A5FA]">
+              <div className="font-mono-num text-[11px] text-[#1D4ED8] dark:text-[#60A5FA]">
                 {row.original.reference_document}
               </div>
             )}

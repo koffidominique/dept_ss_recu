@@ -91,7 +91,7 @@ export function ConsignmentTypeModal({
           </div>
           <div>
             <label className="block font-medium">Type *</label>
-            <select
+            <select aria-label="Type"
               value={kind}
               onChange={(e) => setKind(e.target.value as 'bottle' | 'crate')}
               className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2"

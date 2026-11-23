@@ -81,7 +81,7 @@ export function PinKeypad({ disabled, onDigit, onClear, onBackspace }: PinKeypad
               hover:shadow-lg hover:shadow-blue-500/20 hover:border-blue-500/30
               active:shadow-none
               transition-all duration-200 ease-out
-              disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
+              disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
             style={{ willChange: 'transform, box-shadow' }}>
             <span className="relative z-10">{digit}</span>
@@ -110,7 +110,7 @@ export function PinKeypad({ disabled, onDigit, onClear, onBackspace }: PinKeypad
             hover:shadow-lg hover:shadow-rose-500/20 hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-400
             active:shadow-none
             transition-all duration-200 ease-out
-            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
+            disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
           style={{ willChange: 'transform, box-shadow' }}>
           <span className="relative z-10">Effacer</span>
@@ -137,7 +137,7 @@ export function PinKeypad({ disabled, onDigit, onClear, onBackspace }: PinKeypad
             hover:shadow-lg hover:shadow-blue-500/20 hover:border-blue-500/30
             active:shadow-none
             transition-all duration-200 ease-out
-            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
+            disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
           style={{ willChange: 'transform, box-shadow' }}>
           <span className="relative z-10">0</span>
@@ -165,7 +165,7 @@ export function PinKeypad({ disabled, onDigit, onClear, onBackspace }: PinKeypad
             hover:shadow-lg hover:shadow-amber-500/20 hover:border-amber-500/30 hover:text-amber-600 dark:hover:text-amber-400
             active:shadow-none
             transition-all duration-200 ease-out
-            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
+            disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-sm
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
           style={{ willChange: 'transform, box-shadow' }}>
           <span className="relative z-10 flex items-center justify-center">

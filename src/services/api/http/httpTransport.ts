@@ -1,5 +1,6 @@
 import { useUiStore } from '../../../stores/uiStore.ts';
 import { ApiError } from '../ApiClient.ts';
+import { redactSecrets } from '../../../features/quality/utils/operationalSafety.ts';
 
 /* ============================================================================
  * Transport HTTP commun (JSON, CSV, binaires PDF/backups, query string)
@@ -18,9 +19,35 @@ function buildHeaders(init: RequestInit): Headers {
   return headers;
 }
 
+export function normalizeFetchError(err: unknown): ApiError {
+  if (err instanceof ApiError) {
+    return err;
+  }
+  if (
+    err instanceof Error &&
+    (err.name === 'AbortError' || /aborted|timeout/i.test(err.message))
+  ) {
+    return new ApiError(
+      'TIMEOUT_ERROR',
+      'Délai de réponse dépassé : l’opération n’a pas pu être confirmée. Vérifiez l’état avant de relancer.',
+      0
+    );
+  }
+  return new ApiError(
+    'NETWORK_ERROR',
+    'Connexion au serveur local indisponible (ou mode hors ligne) : aucune écriture n’a été validée. Vos saisies sont conservées.',
+    0
+  );
+}
+
 export async function httpRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = buildHeaders(init);
-  const res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  } catch (err) {
+    throw normalizeFetchError(err);
+  }
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
     useUiStore.getState().setToken(null);
   }
@@ -28,7 +55,14 @@ export async function httpRequest<T>(path: string, init: RequestInit = {}): Prom
   if (!res.ok) {
     if (contentType.includes('application/json')) {
       const err = (await res.json()) as { code?: string; message?: string };
-      throw new ApiError(err.code || 'API_ERROR', err.message || 'Erreur lors de la requête.', res.status);
+      // Le message serveur est masqué avant de devenir une exception : un jeton
+      // ou une phrase secrète renvoyés par une couche basse ne doivent jamais
+      // atteindre l'écran ni un log de console.
+      throw new ApiError(
+        err.code || 'API_ERROR',
+        redactSecrets(err.message || '') || 'Erreur lors de la requête.',
+        res.status
+      );
     }
     throw new ApiError('HTTP_ERROR', `Erreur HTTP ${res.status}`, res.status);
   }
@@ -40,7 +74,12 @@ export async function httpRequest<T>(path: string, init: RequestInit = {}): Prom
 
 export async function httpRequestBytes(path: string, init: RequestInit = {}): Promise<Uint8Array> {
   const headers = buildHeaders(init);
-  const res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  } catch (err) {
+    throw normalizeFetchError(err);
+  }
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
     useUiStore.getState().setToken(null);
   }
@@ -48,7 +87,11 @@ export async function httpRequestBytes(path: string, init: RequestInit = {}): Pr
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const err = (await res.json()) as { code?: string; message?: string };
-      throw new ApiError(err.code || 'API_ERROR', err.message || 'Erreur lors de la requête.', res.status);
+      throw new ApiError(
+        err.code || 'API_ERROR',
+        redactSecrets(err.message || '') || 'Erreur lors de la requête.',
+        res.status
+      );
     }
     throw new ApiError('HTTP_ERROR', `Erreur HTTP ${res.status}`, res.status);
   }

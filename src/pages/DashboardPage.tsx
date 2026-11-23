@@ -4,6 +4,13 @@ import { PackagePlus, Plus } from 'lucide-react';
 import { FormTipsButton } from '../components/common/FormTipsButton.tsx';
 import { ErrorState, LoadingState } from '../components/common/States.tsx';
 import { useDashboardData } from '../features/reports/hooks/useDashboardData.ts';
+import { useWorkQueue } from '../features/dashboard/hooks/useWorkQueue.ts';
+import { useConnectionState } from '../features/dashboard/hooks/useConnectionState.ts';
+import {
+  KpiScopeNote,
+  OfflineWorkBanner,
+  WorkQueuePanel,
+} from '../features/dashboard/components/WorkQueuePanel.tsx';
 import {
   OnboardingBanner,
   OnboardingModal,
@@ -29,6 +36,9 @@ export function DashboardPage() {
     monthlyDailyRows,
     onboardingMutation,
   } = useDashboardData();
+
+  const { items, summary, degradedSources, isLoading, isFetching, refetchAll } = useWorkQueue();
+  const { isOnline, offlineSince, serverState } = useConnectionState();
 
   if (dashboardQuery.isLoading) return <LoadingState rows={6} />;
   if (dashboardQuery.error || !dashboardQuery.data) {
@@ -100,7 +110,7 @@ export function DashboardPage() {
             to="/purchases"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] dp-surface-interactive px-4 py-2 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap shrink-0"
           >
-            <PackagePlus className="h-4 w-4 text-[#2563EB]" />
+            <PackagePlus className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
             Nouvel approvisionnement
           </Link>
           <Link
@@ -113,7 +123,26 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <OfflineWorkBanner
+        isOnline={isOnline}
+        offlineSince={offlineSince}
+        serverState={serverState}
+      />
+
+      <WorkQueuePanel
+        items={items}
+        summary={summary}
+        degradedSources={degradedSources}
+        isLoading={isLoading}
+        isFetching={isFetching}
+        onRefresh={() => {
+          void refetchAll();
+        }}
+      />
+
       <DashboardOverdueAlerts kpis={kpis} />
+
+      <KpiScopeNote />
 
       <DashboardKpiGrid kpis={kpis} />
 

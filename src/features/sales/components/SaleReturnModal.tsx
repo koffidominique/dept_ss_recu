@@ -96,7 +96,7 @@ function SaleReturnBody({
             <div key={l.id} className="flex items-center justify-between gap-3 text-xs">
               <div>
                 <div className="font-medium">{l.product_name}</div>
-                <div className="text-[#667085]">
+                <div className="text-[#667085] dark:text-[#94A3B8]">
                   {remMilli > 0
                     ? `Max retournable : ${formatQty(remMilli, l.base_unit)}`
                     : 'Déjà intégralement retournée'}
@@ -114,7 +114,7 @@ function SaleReturnBody({
                   }
                 }}
                 placeholder="0"
-                className="w-24 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 font-mono-num text-right disabled:opacity-50"
+                className="w-24 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 font-mono-num text-right disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
               />
             </div>
           );
@@ -170,7 +170,7 @@ function SaleReturnBody({
           type="button"
           disabled={!returnReason.trim() || isPending}
           onClick={handleSubmit}
-          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+          className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           Générer l&apos;avoir
         </button>

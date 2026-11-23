@@ -46,7 +46,7 @@ function CreateSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.name && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.name.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.name.message}</p>
           )}
         </div>
         <div>
@@ -65,7 +65,7 @@ function CreateSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.phone && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.phone.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.phone.message}</p>
           )}
         </div>
         <div>
@@ -84,7 +84,7 @@ function CreateSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.email && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.email.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.email.message}</p>
           )}
         </div>
         <div>

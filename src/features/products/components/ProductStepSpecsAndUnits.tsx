@@ -78,7 +78,7 @@ export function ProductStepSpecs({ form, containerTypes }: ProductStepSpecsProps
           control={form.control}
           name="container_type_id"
           render={({ field }) => (
-            <select
+            <select aria-label="Type de contenant"
               value={field.value ?? ''}
               onChange={(e) => {
                 const id = e.target.value ? Number(e.target.value) : null;
@@ -101,7 +101,7 @@ export function ProductStepSpecs({ form, containerTypes }: ProductStepSpecsProps
 
       <div>
         <label className="block text-xs font-medium">Matière contenant</label>
-        <select
+        <select aria-label="Matière contenant"
           value={form.watch('container_material')}
           onChange={(e) => {
             const mat = e.target.value;
@@ -140,8 +140,8 @@ export function ProductStepSpecs({ form, containerTypes }: ProductStepSpecsProps
               onClick={() => form.setValue('volume_ml', p.ml)}
               className={`rounded-md border px-2 py-1 text-xs font-medium ${
                 form.watch('volume_ml') === p.ml
-                  ? 'border-[#2563EB] bg-blue-50 text-[#2563EB] dark:bg-blue-950/40'
-                  : 'border-slate-200 dark:border-slate-700 text-[#667085]'
+                  ? 'border-[#2563EB] bg-blue-50 text-[#1D4ED8] dark:text-[#60A5FA] dark:bg-blue-950/40'
+                  : 'border-slate-200 dark:border-slate-700 text-[#667085] dark:text-[#94A3B8]'
               }`}
             >
               {p.label}

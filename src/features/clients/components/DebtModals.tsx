@@ -38,7 +38,7 @@ function DebtPayBody({
           <button
             type="button"
             onClick={() => setParts((p) => [...p, { method_code: 'wave', amount: 0 }])}
-            className="inline-flex items-center gap-1 text-xs font-medium text-[#2563EB]"
+            className="inline-flex items-center gap-1 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]"
           >
             <Plus className="h-3 w-3" />
             Ajouter moyen
@@ -47,6 +47,7 @@ function DebtPayBody({
         {parts.map((part, idx) => (
           <div key={idx} className="flex items-center gap-2">
             <select
+              aria-label="Moyen de paiement de l’échéancier"
               value={part.method_code}
               onChange={(e) =>
                 setParts((prev) =>
@@ -74,7 +75,7 @@ function DebtPayBody({
               <button
                 type="button"
                 onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
-                className="text-slate-400 hover:text-[#DC4545]"
+                className="text-slate-400 hover:text-[#BE123C]"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -105,7 +106,7 @@ function DebtPayBody({
           type="button"
           disabled={isPending}
           onClick={() => onSubmit({ receivableId: receivable.id, note, parts })}
-          className="rounded-lg bg-[#16A36A] px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+          className="rounded-lg bg-[#0D7A4C] px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
         >
           Valider l&apos;encaissement
         </button>
@@ -184,9 +185,9 @@ export function DebtHistoryModal({
     >
       <div className="mt-4 space-y-2 text-xs">
         {!historySale ? (
-          <p className="text-[#667085]">Chargement de l&apos;historique...</p>
+          <p className="text-[#667085] dark:text-[#94A3B8]">Chargement de l&apos;historique...</p>
         ) : historySale.payments.length === 0 ? (
-          <p className="text-[#667085]">Aucun versement encore enregistré sur cette facture.</p>
+          <p className="text-[#667085] dark:text-[#94A3B8]">Aucun versement encore enregistré sur cette facture.</p>
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
             {historySale.payments.map((p, idx) => (
@@ -196,7 +197,7 @@ export function DebtHistoryModal({
                     <span className="font-mono-num font-semibold">{p.reference}</span> ·{' '}
                     {p.method_label}
                   </div>
-                  <div className="font-mono-num text-[11px] text-[#667085]">
+                  <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
                     {formatDateTime(p.created_at)}
                   </div>
                 </div>

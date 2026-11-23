@@ -56,7 +56,7 @@ export function QuantityInput({
             }
           }}
           className={cn(
-            'w-full rounded-lg border bg-white dark:bg-slate-900 px-3 py-2 font-mono-num text-sm text-[#182230] dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] disabled:opacity-50',
+            'w-full rounded-lg border bg-white dark:bg-slate-900 px-3 py-2 font-mono-num text-sm text-[#182230] dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 focus:border-[#2563EB] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100',
             unit ? 'pr-20' : '',
             error ? 'border-[#DC4545]' : 'border-slate-300 dark:border-slate-700'
           )}
@@ -67,7 +67,7 @@ export function QuantityInput({
           </span>
         )}
       </div>
-      {error && <p className="text-xs text-[#DC4545]">{error}</p>}
+      {error && <p className="text-xs text-[#BE123C]">{error}</p>}
     </div>
   );
 }

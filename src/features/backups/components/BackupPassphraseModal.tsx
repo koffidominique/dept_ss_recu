@@ -54,9 +54,9 @@ export function BackupPassphraseModal({
             type="button"
             disabled={isBusy || passphrase.trim().length < 8}
             onClick={onSubmit}
-            className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
+            className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 ${
               action?.mode === 'restore'
-                ? 'bg-[#DC4545] hover:bg-rose-700'
+                ? 'bg-[#BE123C] hover:bg-rose-700'
                 : 'bg-[#2563EB] hover:bg-blue-700'
             }`}
           >

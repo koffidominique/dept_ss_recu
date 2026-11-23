@@ -38,7 +38,7 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
       </MotionStaggerGrid>
 
       {(data.profitability.unknownCostLines > 0 || data.stock.unknown_cost_products > 0) && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-xs text-[#D9901A]">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-xs text-[#8A5A0B] dark:text-[#FBBF24]">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Transparence des coûts historiques</div>
@@ -58,7 +58,7 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
           </h3>
           <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
             <div className="flex justify-between py-2.5">
-              <span className="text-[#667085]">
+              <span className="text-[#667085] dark:text-[#94A3B8]">
                 Chiffre d&apos;affaires marchandises à coût connu
               </span>
               <span className="font-mono-num font-semibold">
@@ -66,10 +66,10 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
               </span>
             </div>
             <div className="flex justify-between py-2.5">
-              <span className="text-[#667085]">
+              <span className="text-[#667085] dark:text-[#94A3B8]">
                 Coût d&apos;achat des marchandises vendues (COGS)
               </span>
-              <span className="font-mono-num text-[#DC4545]">
+              <span className="font-mono-num text-[#BE123C]">
                 - {formatFcfa(data.profitability.knownCostTotal)}
               </span>
             </div>
@@ -80,8 +80,8 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
               </span>
             </div>
             <div className="flex justify-between py-2.5">
-              <span className="text-[#667085]">Dépenses d&apos;exploitation cumulées</span>
-              <span className="font-mono-num text-[#DC4545]">
+              <span className="text-[#667085] dark:text-[#94A3B8]">Dépenses d&apos;exploitation cumulées</span>
+              <span className="font-mono-num text-[#BE123C]">
                 - {formatFcfa(data.profitability.expensesTotal)}
               </span>
             </div>
@@ -89,7 +89,7 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
               <span className="font-semibold">Résultat net connu</span>
               <span
                 className={`font-mono-num font-bold ${
-                  data.profitability.netKnownResult >= 0 ? 'text-[#16A36A]' : 'text-[#DC4545]'
+                  data.profitability.netKnownResult >= 0 ? 'text-[#16A36A]' : 'text-[#BE123C]'
                 }`}
               >
                 {formatFcfa(data.profitability.netKnownResult)}
@@ -105,11 +105,11 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-[#667085]">
-                  <th className="py-2">Moyen</th>
-                  <th className="py-2 text-right">Entrées</th>
-                  <th className="py-2 text-right">Sorties</th>
-                  <th className="py-2 text-right">Solde net</th>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-[#667085] dark:text-[#94A3B8]">
+                  <th scope="col" className="py-2">Moyen</th>
+                  <th scope="col" className="py-2 text-right">Entrées</th>
+                  <th scope="col" className="py-2 text-right">Sorties</th>
+                  <th scope="col" className="py-2 text-right">Solde net</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -117,14 +117,14 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
                   <tr key={pm.code}>
                     <td className="py-2.5 font-medium">
                       {pm.label}{' '}
-                      <span className="text-[11px] text-[#667085]">
+                      <span className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                         ({pm.is_cash === 1 ? 'Espèces' : 'Digital'})
                       </span>
                     </td>
                     <td className="py-2.5 text-right font-mono-num text-[#16A36A]">
                       {formatFcfa(pm.total_in)}
                     </td>
-                    <td className="py-2.5 text-right font-mono-num text-[#DC4545]">
+                    <td className="py-2.5 text-right font-mono-num text-[#BE123C]">
                       {formatFcfa(pm.total_out)}
                     </td>
                     <td className="py-2.5 text-right font-mono-num font-semibold">
@@ -146,12 +146,12 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-[#667085]">
-                  <th className="py-2">Journée</th>
-                  <th className="py-2 text-right">Ventes</th>
-                  <th className="py-2 text-right">CA Marchandises</th>
-                  <th className="py-2 text-right">Consignes emballages</th>
-                  <th className="py-2 text-right">Encaissé</th>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-[#667085] dark:text-[#94A3B8]">
+                  <th scope="col" className="py-2">Journée</th>
+                  <th scope="col" className="py-2 text-right">Ventes</th>
+                  <th scope="col" className="py-2 text-right">CA Marchandises</th>
+                  <th scope="col" className="py-2 text-right">Consignes emballages</th>
+                  <th scope="col" className="py-2 text-right">Encaissé</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -162,7 +162,7 @@ export function CommercialReportTab({ data, periodLabel }: CommercialReportTabPr
                     <td className="py-2 text-right font-mono-num font-semibold">
                       {formatFcfa(d.revenue)}
                     </td>
-                    <td className="py-2 text-right font-mono-num text-[#D9901A]">
+                    <td className="py-2 text-right font-mono-num text-[#8A5A0B] dark:text-[#FBBF24]">
                       {formatFcfa(d.deposit)}
                     </td>
                     <td className="py-2 text-right font-mono-num text-[#16A36A]">

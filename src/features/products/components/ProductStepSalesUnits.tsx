@@ -81,7 +81,7 @@ export function ProductStepSalesUnits({
                   ),
                 )
               }
-              className="inline-flex items-center gap-1 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-medium text-[#2563EB]"
+              className="inline-flex items-center gap-1 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]"
             >
               <Sparkles className="h-3.5 w-3.5" />
               Générer unités standard
@@ -99,7 +99,7 @@ export function ProductStepSalesUnits({
       </div>
 
       {units.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-4 text-center text-xs text-[#667085]">
+        <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-4 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
           {isEditing
             ? 'Aucune unité commerciale spécifique enregistrée.'
             : 'Aucune unité personnalisée ajoutée : le conditionnement principal sera utilisé automatiquement, ou cliquez sur « Générer unités standard ».'}
@@ -123,6 +123,7 @@ export function ProductStepSalesUnits({
               </div>
               <div className="sm:col-span-3">
                 <select
+                  aria-label="Type d’unité de vente"
                   disabled={isEditing}
                   value={u.unit_type}
                   onChange={(e) =>
@@ -180,14 +181,14 @@ export function ProductStepSalesUnits({
                         units.filter((_, i) => i !== idx),
                       )
                     }
-                    className="rounded p-1 text-[#DC4545] hover:bg-red-50 dark:hover:bg-red-950/30"
+                    className="rounded p-1 text-[#BE123C] hover:bg-red-50 dark:hover:bg-red-950/30"
                     title="Supprimer l'unité"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
-              <div className="sm:col-span-12 flex flex-wrap gap-4 text-[11px] text-[#667085]">
+              <div className="sm:col-span-12 flex flex-wrap gap-4 text-[11px] text-[#667085] dark:text-[#94A3B8]">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"

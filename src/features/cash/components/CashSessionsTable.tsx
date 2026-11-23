@@ -26,7 +26,7 @@ export function CashSessionsTable({ history, onPrintSession }: CashSessionsTable
         accessorKey: 'opened_at',
         header: 'Période',
         cell: ({ row }) => (
-          <div className="font-mono-num text-xs text-[#667085]">
+          <div className="font-mono-num text-xs text-[#667085] dark:text-[#94A3B8]">
             {formatDateTime(row.original.opened_at)} → {formatDateTime(row.original.closed_at)}
           </div>
         ),
@@ -62,7 +62,7 @@ export function CashSessionsTable({ history, onPrintSession }: CashSessionsTable
           return (
             <span
               className={`font-mono-num font-semibold ${
-                d === 0 ? 'text-[#16A36A]' : 'text-[#D9901A]'
+                d === 0 ? 'text-[#16A36A]' : 'text-[#8A5A0B] dark:text-[#FBBF24]'
               }`}
             >
               {d > 0 ? '+' : ''}
@@ -142,7 +142,7 @@ export function CashSessionsTable({ history, onPrintSession }: CashSessionsTable
           type="button"
           disabled={history.length === 0}
           onClick={() => exportCashSessionsCsv(history)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <Download className="h-3.5 w-3.5" />
           CSV Sessions

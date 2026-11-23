@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
-import { formatFcfa, newRequestKey } from '../../../utils/format.ts';
+import { formatFcfa } from '../../../utils/format.ts';
+import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
 import { toNonNegativeIntFcfaBigInt } from '../../sales/utils/saleCalculations.ts';
 import type { OpenIssue } from '../types.ts';
 
@@ -57,6 +58,9 @@ export function useConsignmentsMutations({
     onError: (err) => onError(err instanceof Error ? err.message : 'Erreur création emballage.'),
   });
 
+  const adjustKeyRef = useRef(createIdempotentRequestTracker('ret-adj'));
+  const returnKeyRef = useRef(createIdempotentRequestTracker('ret-cli'));
+
   const adjustMut = useMutation({
     mutationFn: (payload: {
       packaging_id: number;
@@ -66,9 +70,12 @@ export function useConsignmentsMutations({
     }) =>
       apiClient.adjustReturnableStock({
         ...payload,
-        request_key: newRequestKey('ret-adj'),
+        request_key: adjustKeyRef.current.resolveKey(
+          `${payload.packaging_id}:${payload.movement_type}:${payload.quantity}:${payload.reason.trim()}`
+        ),
       }),
     onSuccess: () => {
+      adjustKeyRef.current.reset();
       qc.invalidateQueries({ queryKey: ['consignments'] });
       qc.invalidateQueries({ queryKey: ['packaging-assets'] });
       qc.invalidateQueries({ queryKey: ['packaging-stock'] });
@@ -116,10 +123,21 @@ export function useConsignmentsMutations({
         credit_reduction: input.credit_reduction,
         method_code: input.method_code,
         reason: input.reason,
-        request_key: newRequestKey('ret-cli'),
+        request_key: returnKeyRef.current.resolveKey(
+          JSON.stringify({
+            issue_id: input.target.id,
+            pieces: input.pieces,
+            condition_state: input.condition_state,
+            refund_amount: input.refund_amount,
+            credit_reduction: input.credit_reduction,
+            method_code: input.method_code,
+            reason: input.reason.trim(),
+          })
+        ),
       });
     },
     onSuccess: () => {
+      returnKeyRef.current.reset();
       qc.invalidateQueries({ queryKey: ['consignments'] });
       qc.invalidateQueries({ queryKey: ['packaging-obligations'] });
       qc.invalidateQueries({ queryKey: ['packaging-dashboard'] });

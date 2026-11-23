@@ -84,7 +84,7 @@ export function DashboardBottomPanels({
           </h3>
           <Link
             to="/stock"
-            className="text-xs font-medium text-[#2563EB] dark:text-[#60A5FA] hover:underline"
+            className="text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:underline"
           >
             Voir tout le stock
           </Link>
@@ -111,8 +111,8 @@ export function DashboardBottomPanels({
                 <span
                   className={`font-mono-num text-xs font-semibold shrink-0 ${
                     p.stock_milli <= 0
-                      ? 'text-[#DC4545] dark:text-rose-400'
-                      : 'text-[#D9901A] dark:text-amber-400'
+                      ? 'text-[#BE123C] dark:text-rose-400'
+                      : 'text-[#8A5A0B] dark:text-amber-300'
                   }`}
                 >
                   {formatQty(p.stock_milli, p.base_unit)}

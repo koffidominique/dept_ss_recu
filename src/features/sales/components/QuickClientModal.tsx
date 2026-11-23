@@ -55,7 +55,7 @@ export function QuickClientModal({
             type="button"
             disabled={!name.trim() || isPending}
             onClick={() => onSubmit({ name, client_type: clientType, phone })}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             Créer &amp; sélectionner
           </button>
@@ -75,7 +75,7 @@ export function QuickClientModal({
         </div>
         <div>
           <label className="block font-medium">Type</label>
-          <select
+          <select aria-label="Type"
             value={clientType}
             onChange={(e) =>
               setClientType(e.target.value === 'professionnel' ? 'professionnel' : 'particulier')

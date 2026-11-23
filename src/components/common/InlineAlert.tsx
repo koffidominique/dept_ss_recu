@@ -18,8 +18,8 @@ export function InlineAlert({
     variant === 'success'
       ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/30 text-[#16A36A] dark:text-emerald-400'
       : variant === 'warning'
-        ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 text-[#D9901A] dark:text-amber-400'
-        : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 text-[#DC4545]';
+        ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 text-[#8A5A0B] dark:text-amber-300'
+        : 'border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 text-[#BE123C]';
 
   const Icon =
     variant === 'success'

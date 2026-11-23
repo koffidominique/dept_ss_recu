@@ -1,6 +1,7 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
-import { newRequestKey } from '../../../utils/format.ts';
+import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
 
 export function useDebtsQueries(historySaleId: number | null) {
   const receivablesQuery = useQuery({
@@ -26,19 +27,25 @@ export function usePayReceivableMutation(options: {
   onError: (msg: string) => void;
 }) {
   const qc = useQueryClient();
+  const keyTrackerRef = useRef(createIdempotentRequestTracker('recpay'));
 
   return useMutation({
     mutationFn: (args: {
       receivableId: number;
       note: string;
       parts: Array<{ method_code: string; amount: number }>;
-    }) =>
-      apiClient.payReceivable(args.receivableId, {
-        request_key: newRequestKey('recpay'),
+    }) => {
+      const cleanParts = args.parts.filter((p) => p.amount > 0);
+      return apiClient.payReceivable(args.receivableId, {
+        request_key: keyTrackerRef.current.resolveKey(
+          JSON.stringify({ id: args.receivableId, note: args.note.trim(), parts: cleanParts })
+        ),
         note: args.note,
-        parts: args.parts.filter((p) => p.amount > 0),
-      }),
+        parts: cleanParts,
+      });
+    },
     onSuccess: () => {
+      keyTrackerRef.current.reset();
       qc.invalidateQueries({ queryKey: ['receivables'] });
       qc.invalidateQueries({ queryKey: ['sale'] });
       qc.invalidateQueries({ queryKey: ['clients'] });

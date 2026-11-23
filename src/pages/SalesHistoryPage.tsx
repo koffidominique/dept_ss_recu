@@ -161,7 +161,7 @@ export function SalesHistoryPage() {
                   setToDate('');
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[11px] font-medium text-[#667085] hover:text-[#182230] dark:hover:text-slate-200"
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[11px] font-medium text-[#667085] dark:text-[#94A3B8] hover:text-[#182230] dark:hover:text-slate-200"
               >
                 Réinitialiser
               </button>
@@ -172,7 +172,7 @@ export function SalesHistoryPage() {
           type="button"
           disabled={exportingCsv}
           onClick={handleExportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
         >
           <Download className="h-3.5 w-3.5" />
           {exportingCsv ? 'Export en cours...' : 'Exporter CSV'}

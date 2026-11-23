@@ -61,7 +61,7 @@ export function CataloguePriceEditModal({
             type="button"
             disabled={isPending}
             onClick={onConfirm}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:bg-blue-300 disabled:text-blue-950 disabled:opacity-100"
           >
             {isPending ? '…' : 'Appliquer'}
           </button>
@@ -94,10 +94,10 @@ export function CataloguePriceHistoryModal({
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-slate-500">
-                <th className="py-1">Nouveau prix</th>
-                <th className="py-1">Par</th>
-                <th className="py-1">Motif</th>
-                <th className="py-1">Date</th>
+                <th scope="col" className="py-1">Nouveau prix</th>
+                <th scope="col" className="py-1">Par</th>
+                <th scope="col" className="py-1">Motif</th>
+                <th scope="col" className="py-1">Date</th>
               </tr>
             </thead>
             <tbody>

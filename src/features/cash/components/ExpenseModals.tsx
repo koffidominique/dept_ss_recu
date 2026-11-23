@@ -75,7 +75,7 @@ function ExpenseCreateBody({
             ))}
             {categories.length === 0 && <option value="Frais généraux">Frais généraux</option>}
           </select>
-          {errors.category && <p className="mt-1 text-[#DC4545]">{errors.category.message}</p>}
+          {errors.category && <p className="mt-1 text-[#BE123C]">{errors.category.message}</p>}
         </div>
 
         <div>
@@ -90,7 +90,7 @@ function ExpenseCreateBody({
               />
             )}
           />
-          {errors.amount && <p className="mt-1 text-[#DC4545]">{errors.amount.message}</p>}
+          {errors.amount && <p className="mt-1 text-[#BE123C]">{errors.amount.message}</p>}
         </div>
 
         <div>
@@ -108,7 +108,7 @@ function ExpenseCreateBody({
             {activeMethods.length === 0 && <option value="cash">Espèces</option>}
           </select>
           {errors.method_code && (
-            <p className="mt-1 text-[#DC4545]">{errors.method_code.message}</p>
+            <p className="mt-1 text-[#BE123C]">{errors.method_code.message}</p>
           )}
         </div>
 
@@ -143,7 +143,7 @@ function ExpenseCreateBody({
                   className="h-12 w-12 rounded-lg border border-slate-200 dark:border-slate-700 bg-white object-cover shrink-0"
                 />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-[#667085] shrink-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-[#667085] dark:text-[#94A3B8] shrink-0">
                   <ImageIcon className="h-4 w-4" />
                 </div>
               )}
@@ -171,7 +171,7 @@ function ExpenseCreateBody({
                 <button
                   type="button"
                   onClick={() => setValue('receipt_path', null)}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[#DC4545] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[#BE123C] hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 >
                   <Trash2 className="h-3 w-3" />
                   Retirer
@@ -193,7 +193,7 @@ function ExpenseCreateBody({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             Valider la dépense
           </button>

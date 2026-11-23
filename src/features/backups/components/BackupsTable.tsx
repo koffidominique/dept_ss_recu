@@ -87,7 +87,7 @@ export function BackupsTable({
               <button
                 type="button"
                 onClick={() => onRestore(row.original.name, isEnc)}
-                className="inline-flex items-center gap-1 rounded-md border border-rose-200 dark:border-rose-900/60 px-2.5 py-1 text-xs font-medium text-[#DC4545] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                className="inline-flex items-center gap-1 rounded-md border border-rose-200 dark:border-rose-900/60 px-2.5 py-1 text-xs font-medium text-[#BE123C] hover:bg-rose-50 dark:hover:bg-rose-950/30"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Restaurer

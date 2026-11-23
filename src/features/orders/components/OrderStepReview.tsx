@@ -63,13 +63,13 @@ export function OrderStepReview({
     <div className="space-y-4">
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
         <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 dark:bg-slate-900 text-[#667085]">
+          <thead className="bg-slate-50 dark:bg-slate-900 text-[#667085] dark:text-[#94A3B8]">
             <tr>
-              <th className="px-3 py-2 font-medium">Ligne</th>
-              <th className="px-3 py-2 font-medium">Contenu</th>
-              <th className="px-3 py-2 font-medium text-right">Quantité en unités</th>
-              <th className="px-3 py-2 font-medium text-right">PU (FCFA)</th>
-              <th className="px-3 py-2 font-medium text-right">Total (FCFA)</th>
+              <th scope="col" className="px-3 py-2 font-medium">Ligne</th>
+              <th scope="col" className="px-3 py-2 font-medium">Contenu</th>
+              <th scope="col" className="px-3 py-2 font-medium text-right">Quantité en unités</th>
+              <th scope="col" className="px-3 py-2 font-medium text-right">PU (FCFA)</th>
+              <th scope="col" className="px-3 py-2 font-medium text-right">Total (FCFA)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -92,7 +92,7 @@ export function OrderStepReview({
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-2 text-xs">
           <div className="font-semibold">Emballages alloués</div>
           {preview.allocations.length === 0 ? (
-            <p className="text-[#667085]">Aucun emballage physique alloué.</p>
+            <p className="text-[#667085] dark:text-[#94A3B8]">Aucun emballage physique alloué.</p>
           ) : (
             preview.allocations.map((a, i) => (
               <div key={i} className="flex justify-between">
@@ -109,26 +109,26 @@ export function OrderStepReview({
 
         <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-3 space-y-1.5 text-xs">
           <div className="flex justify-between">
-            <span className="text-[#667085]">Total liquides (CA hors consigne)</span>
+            <span className="text-[#667085] dark:text-[#94A3B8]">Total liquides (CA hors consigne)</span>
             <span className="font-mono-num font-semibold">
               {formatFcfa(preview.totals.total_xof)}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[#667085]">Total consignes (dépôt récupérable)</span>
+            <span className="text-[#667085] dark:text-[#94A3B8]">Total consignes (dépôt récupérable)</span>
             <span className="font-mono-num font-semibold text-amber-700 dark:text-amber-300">
               {formatFcfa(preview.totals.deposit_due_xof)}
             </span>
           </div>
           {effectiveDeliveryFee > 0 && (
             <div className="flex justify-between">
-              <span className="text-[#667085]">Frais de livraison</span>
+              <span className="text-[#667085] dark:text-[#94A3B8]">Frais de livraison</span>
               <span className="font-mono-num font-semibold">{formatFcfa(effectiveDeliveryFee)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-1.5 text-sm font-bold">
             <span>Net à percevoir</span>
-            <span className="font-mono-num text-[#2563EB]">
+            <span className="font-mono-num text-[#1D4ED8] dark:text-[#60A5FA]">
               {formatFcfa(preview.totals.total_to_collect_xof)}
             </span>
           </div>
@@ -138,7 +138,7 @@ export function OrderStepReview({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium">Mode de paiement</label>
-          <select
+          <select aria-label="Mode de paiement"
             value={paymentMethod}
             onChange={(e) => {
               const next = e.target.value as 'cash' | 'mobile_money' | 'credit' | 'mixed';
@@ -155,19 +155,19 @@ export function OrderStepReview({
             <option value="mixed">Paiement mixte</option>
           </select>
           {creditForbidden && (
-            <p className="mt-1 text-[11px] text-[#DC4545]">
+            <p className="mt-1 text-[11px] text-[#BE123C]">
               Ce client n&apos;est pas autorisé à commander à crédit.
             </p>
           )}
           {creditExceeded && (
-            <p className="mt-1 text-[11px] text-[#DC4545]">
+            <p className="mt-1 text-[11px] text-[#BE123C]">
               Plafond crédit dépassé ({formatFcfa(client?.credit_limit ?? 0)} max).
             </p>
           )}
         </div>
         <div>
           <label className="block text-xs font-medium">Canal de règlement prévu (Reçu)</label>
-          <select
+          <select aria-label="Canal de règlement prévu (Reçu)"
             value={plannedPaymentChannel}
             onChange={(e) => onChangePlannedPaymentChannel(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"

@@ -109,7 +109,7 @@ export function ReportsPage() {
       <div className="no-print flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-xs font-medium text-[#667085]">Du</label>
+            <label className="block text-xs font-medium text-[#667085] dark:text-[#94A3B8]">Du</label>
             <input
               type="date"
               value={fromDate}
@@ -118,7 +118,7 @@ export function ReportsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#667085]">Au</label>
+            <label className="block text-xs font-medium text-[#667085] dark:text-[#94A3B8]">Au</label>
             <input
               type="date"
               value={toDate}
@@ -147,7 +147,7 @@ export function ReportsPage() {
               type="button"
               disabled={exportingCsv}
               onClick={handleExportTabCsv}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3.5 py-2 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
             >
               <Download className="h-3.5 w-3.5" />
               {activeTab === 'stock'

@@ -39,7 +39,7 @@ export function BusinessTipsContent({
       {/* Règle d'or métier */}
       <div className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/60 dark:bg-blue-950/25 p-4">
         <div className="flex items-start gap-2.5">
-          <HelpCircle className="h-4 w-4 text-[#2563EB] dark:text-[#60A5FA] shrink-0 mt-0.5" />
+          <HelpCircle className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA] shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="text-xs font-semibold text-[#182230] dark:text-slate-100">
               Logique métier essentielle
@@ -87,7 +87,7 @@ export function BusinessTipsContent({
         {(activeTab === 'all' || activeTab === 'fields') && (
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#182230] dark:text-slate-100">
-              <CheckSquare className="h-4 w-4 text-[#2563EB] dark:text-[#60A5FA]" />
+              <CheckSquare className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
               <h3>Champs de formulaires & impacts de calcul</h3>
             </div>
             <div className="divide-y divide-slate-200 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -109,7 +109,7 @@ export function BusinessTipsContent({
                     {item.rule}
                   </p>
                   {item.example && (
-                    <p className="font-mono-num text-[11px] text-[#2563EB] dark:text-[#60A5FA] pt-0.5">
+                    <p className="font-mono-num text-[11px] text-[#1D4ED8] dark:text-[#60A5FA] pt-0.5">
                       Exemple : {item.example}
                     </p>
                   )}
@@ -145,13 +145,13 @@ export function BusinessTipsContent({
         {(activeTab === 'all' || activeTab === 'pitfalls') && (
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#182230] dark:text-slate-100">
-              <AlertCircle className="h-4 w-4 text-[#D9901A] dark:text-amber-400" />
+              <AlertCircle className="h-4 w-4 text-[#8A5A0B] dark:text-amber-300" />
               <h3>Points d’attention & erreurs évitées</h3>
             </div>
             <ul className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-xs text-[#182230] dark:text-slate-200">
               {activeTopic.pitfalls.map((tip, idx) => (
                 <li key={idx} className="flex items-start gap-2.5">
-                  <span className="font-mono-num text-[11px] font-semibold text-[#D9901A] dark:text-amber-400 mt-0.5">
+                  <span className="font-mono-num text-[11px] font-semibold text-[#8A5A0B] dark:text-amber-300 mt-0.5">
                     0{idx + 1}
                   </span>
                   <span className="leading-relaxed">{tip}</span>

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
-import { newRequestKey } from '../../../utils/format.ts';
 
 export function useCashQuery() {
   return useQuery({
@@ -25,10 +24,10 @@ export function useCashMutations({
   const qc = useQueryClient();
 
   const openMut = useMutation({
-    mutationFn: (openingCash: number) =>
+    mutationFn: (input: { opening_cash: number; request_key: string }) =>
       apiClient.openCashSession({
-        opening_cash: openingCash,
-        request_key: newRequestKey('open'),
+        opening_cash: input.opening_cash,
+        request_key: input.request_key,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cash'] });
@@ -40,18 +39,23 @@ export function useCashMutations({
   });
 
   const closeMut = useMutation({
-    mutationFn: (input: { physical_cash: number; closing_notes: string }) => {
+    mutationFn: (input: {
+      physical_cash: number;
+      closing_notes: string;
+      request_key: string;
+    }) => {
       if (!activeSessionId) throw new Error('Aucune session ouverte');
       return apiClient.closeCashSession({
         session_id: activeSessionId,
         physical_cash: input.physical_cash,
         closing_notes: input.closing_notes.trim(),
-        request_key: newRequestKey('close'),
+        request_key: input.request_key,
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cash'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       onClosed();
     },
     onError: (err) =>

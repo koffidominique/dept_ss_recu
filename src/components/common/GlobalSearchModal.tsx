@@ -149,15 +149,15 @@ export function GlobalSearchModal({
   const renderIcon = (group: SearchDestination['group']) => {
     switch (group) {
       case 'Produits':
-        return <Package className="h-4 w-4 text-[#2563EB]" />;
+        return <Package className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />;
       case 'Clients':
         return <Users className="h-4 w-4 text-[#16A36A]" />;
       case 'Fournisseurs':
-        return <Truck className="h-4 w-4 text-[#D9901A]" />;
+        return <Truck className="h-4 w-4 text-[#8A5A0B] dark:text-[#FBBF24]" />;
       case 'Ventes':
         return <ReceiptText className="h-4 w-4 text-[#7C3AED]" />;
       default:
-        return <Compass className="h-4 w-4 text-[#667085]" />;
+        return <Compass className="h-4 w-4 text-[#667085] dark:text-[#94A3B8]" />;
     }
   };
 
@@ -177,7 +177,7 @@ export function GlobalSearchModal({
         >
           <Dialog.Title className="sr-only">Recherche globale DEPOTPRO</Dialog.Title>
           <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
-            <Search className="h-4 w-4 text-[#667085] shrink-0" />
+            <Search className="h-4 w-4 text-[#667085] dark:text-[#94A3B8] shrink-0" />
             <input
               type="text"
               autoFocus
@@ -191,7 +191,7 @@ export function GlobalSearchModal({
               }}
               placeholder="Rechercher un écran, produit, client, fournisseur ou n° vente..."
               aria-label="Recherche globale"
-              className="flex-1 bg-transparent text-sm text-[#182230] dark:text-slate-100 placeholder:text-[#667085] focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-[#182230] dark:text-slate-100 placeholder:text-[#667085] dark:text-[#94A3B8] focus:outline-none"
             />
             <Dialog.Close
               aria-label="Fermer la recherche"
@@ -203,7 +203,7 @@ export function GlobalSearchModal({
 
           <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/70">
             {results.length === 0 ? (
-              <div className="px-4 py-8 text-center text-xs text-[#667085]">
+              <div className="px-4 py-8 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
                 Aucun résultat pour « {trimmed} ».
               </div>
             ) : (

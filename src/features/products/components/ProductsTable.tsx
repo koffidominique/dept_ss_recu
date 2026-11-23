@@ -93,9 +93,9 @@ export function ProductsTable({
             <span
               className={`font-semibold ${
                 row.original.stock_milli <= 0
-                  ? 'text-[#DC4545]'
+                  ? 'text-[#BE123C]'
                   : low
-                    ? 'text-[#D9901A]'
+                    ? 'text-[#8A5A0B] dark:text-[#FBBF24]'
                     : 'text-[#16A36A] dark:text-emerald-400'
               }`}
             >
@@ -122,18 +122,18 @@ export function ProductsTable({
               className={`flex items-center gap-2 rounded px-1 -mx-1 py-0.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
                 pk.is_active
                   ? 'text-[#182230] dark:text-slate-300'
-                  : 'opacity-50 line-through text-[#667085]'
+                  : 'opacity-50 line-through text-[#667085] dark:text-[#94A3B8]'
               }`}
             >
               <span className="font-medium capitalize">{pk.name}</span>
               <span className="rounded bg-blue-50 px-1.5 py-0.5 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 tabular-nums">
                 {packagingContentsLabel(pk.name, row.original.base_unit, pk.coefficient_milli)}
               </span>
-              <span className="font-mono-num text-[#2563EB] dark:text-[#60A5FA]">
+              <span className="font-mono-num text-[#1D4ED8] dark:text-[#60A5FA]">
                 {formatFcfa(pk.retail_price)}
               </span>
               {pk.deposit_mode === 'deposit' && (
-                <span className="text-[11px] text-[#D9901A] dark:text-amber-400">
+                <span className="text-[11px] text-[#8A5A0B] dark:text-amber-300">
                   Consigné
                   {((pk.bottle_deposit_amount ?? 0) > 0 || (pk.package_deposit_amount ?? 0) > 0)
                     ? ` (${formatFcfa((pk.bottle_deposit_amount ?? 0) + (pk.package_deposit_amount ?? 0))})`
@@ -198,7 +198,7 @@ export function ProductsTable({
               onClick={() => onDelete(row.original)}
               title="Supprimer définitivement (Owner)"
               aria-label={`Supprimer ${row.original.name}`}
-              className="rounded-md border border-rose-200 dark:border-rose-900/60 p-1.5 text-[#DC4545] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              className="rounded-md border border-rose-200 dark:border-rose-900/60 p-1.5 text-[#BE123C] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

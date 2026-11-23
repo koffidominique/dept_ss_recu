@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { Supplier } from '../../../types/erp.ts';
-import { newRequestKey } from '../../../utils/format.ts';
+import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
 import type { CreateSupplierValues, EditSupplierValues } from '../utils/supplierSchemas.ts';
 
 export function useSuppliersQueries(search: string, detailOpen: boolean) {
@@ -75,14 +76,19 @@ export function useSuppliersMutations(options: {
       options.onError(err instanceof Error ? err.message : 'Erreur mise à jour fournisseur.'),
   });
 
+  const payKeyRef = useRef(createIdempotentRequestTracker('suppay'));
+
   const payMutation = useMutation({
     mutationFn: (args: { debtId: number; method_code: string; amount: number }) =>
       apiClient.paySupplierDebt(args.debtId, {
         method_code: args.method_code,
         amount: args.amount,
-        request_key: newRequestKey('suppay'),
+        request_key: payKeyRef.current.resolveKey(
+          `${args.debtId}:${args.method_code}:${args.amount}`
+        ),
       }),
     onSuccess: () => {
+      payKeyRef.current.reset();
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.invalidateQueries({ queryKey: ['supplier-debts'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
