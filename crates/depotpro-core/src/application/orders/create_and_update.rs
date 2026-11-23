@@ -107,8 +107,7 @@ pub async fn create_order(db: &DepotDb, input: CreateOrderInput) -> CoreResult<O
             .courier_name
             .as_deref()
             .is_some_and(|s| !s.trim().is_empty());
-    let delivery_mode =
-        normalize_delivery_mode(input.delivery_mode.as_deref(), has_delivery_hints);
+    let delivery_mode = normalize_delivery_mode(input.delivery_mode.as_deref(), has_delivery_hints);
     let clean_opt = |opt: &Option<String>| -> Option<String> {
         opt.as_deref()
             .map(str::trim)
@@ -235,13 +234,8 @@ pub async fn update_order(
         let allocs =
             resolve_allocations_tx(&mut tx, &lines, &native_caps, input.allocations.as_deref())
                 .await?;
-        let totals = compute_order_totals_with_delivery(
-            &lines,
-            &allocs,
-            next_discount,
-            next_tax,
-            next_fee,
-        );
+        let totals =
+            compute_order_totals_with_delivery(&lines, &allocs, next_discount, next_tax, next_fee);
         write_lines_and_allocations_tx(
             &mut tx,
             id,
@@ -294,7 +288,10 @@ pub async fn update_order(
             .await?;
     }
     if input.payment_method.is_some() || input.planned_payment_channel.is_some() {
-        let planned_inner = input.planned_payment_channel.as_ref().and_then(|o| o.as_deref());
+        let planned_inner = input
+            .planned_payment_channel
+            .as_ref()
+            .and_then(|o| o.as_deref());
         let (norm_pm, channel) =
             normalize_order_payment_channel(input.payment_method.as_deref(), planned_inner);
         sqlx::query(
@@ -317,8 +314,10 @@ pub async fn update_order(
         .await?;
     }
     if let Some(ref val) = input.courier_name {
-        sqlx::query("UPDATE orders SET courier_name = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(val.as_deref().map(str::trim).filter(|s| !s.is_empty()))
+        sqlx::query(
+            "UPDATE orders SET courier_name = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(val.as_deref().map(str::trim).filter(|s| !s.is_empty()))
             .bind(id)
             .execute(&mut *tx)
             .await?;

@@ -948,18 +948,20 @@ pub async fn get_document_detail(
             .await?;
             packaging_lines = exchanges
                 .into_iter()
-                .map(|(name, code, kind, pieces)| CommercialDocumentPackagingLine {
-                    label: format!("{name} ({code})"),
-                    kind,
-                    expected_quantity: pieces,
-                    issued_quantity: Some(pieces),
-                    returned_quantity: None,
-                    status_label:
-                        "Remis physiquement au fournisseur — échange sans ligne financière"
-                            .to_string(),
-                    detail: None,
-                    amount: None,
-                })
+                .map(
+                    |(name, code, kind, pieces)| CommercialDocumentPackagingLine {
+                        label: format!("{name} ({code})"),
+                        kind,
+                        expected_quantity: pieces,
+                        issued_quantity: Some(pieces),
+                        returned_quantity: None,
+                        status_label:
+                            "Remis physiquement au fournisseur — échange sans ligne financière"
+                                .to_string(),
+                        detail: None,
+                        amount: None,
+                    },
+                )
                 .collect();
             let snap_rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
                 "SELECT version, document_number, issued_at, issued_by_name, issued_by_role, snapshot_json
