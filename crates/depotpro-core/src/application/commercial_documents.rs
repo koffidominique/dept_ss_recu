@@ -183,7 +183,11 @@ fn format_milli_quantity(value: i64) -> String {
     }
 }
 
-fn packaging_contents_description(packaging: &str, base_unit: &str, coefficient_milli: i64) -> String {
+fn packaging_contents_description(
+    packaging: &str,
+    base_unit: &str,
+    coefficient_milli: i64,
+) -> String {
     let unit = base_unit.to_lowercase();
     let package = packaging.to_lowercase();
     let contents = if unit.contains("canette") || unit.contains("can") {
@@ -289,8 +293,8 @@ async fn document_snapshot(
                 .bind(document_id)
                 .fetch_optional(&mut **tx)
                 .await?;
-            let (number, party, subtotal, discount, total, notes, status) = header
-                .ok_or_else(|| CoreError::NotFound("Commande client introuvable.".into()))?;
+            let (number, party, subtotal, discount, total, notes, status) =
+                header.ok_or_else(|| CoreError::NotFound("Commande client introuvable.".into()))?;
             let lines: Vec<(String, String, i64, i64, i64)> = sqlx::query_as(
                 "SELECT p.name, v.name, ol.base_quantity, ol.unit_price_xof, ol.line_total_xof
                  FROM order_lines ol JOIN products p ON p.id = ol.product_id
@@ -318,8 +322,8 @@ async fn document_snapshot(
             .bind(document_id)
             .fetch_optional(&mut **tx)
             .await?;
-            let (number, party, total, notes, status) = header
-                .ok_or_else(|| CoreError::NotFound("Bon fournisseur introuvable.".into()))?;
+            let (number, party, total, notes, status) =
+                header.ok_or_else(|| CoreError::NotFound("Bon fournisseur introuvable.".into()))?;
             let lines: Vec<(String, String, i64, i64, i64)> = sqlx::query_as(
                 "SELECT product_name, packaging_name, ordered_quantity_milli, unit_price, line_total
                  FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id",
@@ -666,7 +670,10 @@ pub async fn get_document_detail(
                             issued_quantity: Some(0),
                             returned_quantity: Some(expected),
                             status_label: "Retour reçu · hors total commande".to_string(),
-                            detail: Some("Réintégré au stock d'emballages vides du sous-dépôt".to_string()),
+                            detail: Some(
+                                "Réintégré au stock d'emballages vides du sous-dépôt"
+                                    .to_string(),
+                            ),
                             amount: Some(amount),
                         }
                     } else {

@@ -331,7 +331,11 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
                 label: "Solde restant après règlement".to_string(),
                 value: format_fcfa_space(after_val),
                 bold: true,
-                tone: if after_val > 0 { Some("danger".to_string()) } else { Some("success".to_string()) },
+                tone: if after_val > 0 {
+                    Some("danger".to_string())
+                } else {
+                    Some("success".to_string())
+                },
             },
         ],
         payments: Some(pdf_payments),
@@ -377,8 +381,9 @@ pub(crate) async fn persist_payment_receipt_snapshot_tx(
         "balanceAfterXof": after_val,
         "pdfDocument": pdf_document,
     });
-    let snapshot_json = serde_json::to_string(&snapshot)
-        .map_err(|e| CoreError::Internal(format!("Sérialisation reçu de paiement impossible : {e}")))?;
+    let snapshot_json = serde_json::to_string(&snapshot).map_err(|e| {
+        CoreError::Internal(format!("Sérialisation reçu de paiement impossible : {e}"))
+    })?;
 
     sqlx::query(
         "INSERT OR IGNORE INTO payment_receipt_snapshots
