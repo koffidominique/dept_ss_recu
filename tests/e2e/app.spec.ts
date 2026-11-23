@@ -341,19 +341,14 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Valider la livraison' }).click();
     await expect(page.getByText(/\(DELIVERED\)/)).toBeVisible();
 
-    // Ordre metier impose par le noyau : livre -> facture -> encaisse.
-    // pay_order ne passe le statut a 'paid' que si la commande etait 'invoiced'.
-    await page.getByRole('button', { name: 'Facturer', exact: true }).click();
-    // Diagnostic : capture du bandeau d'etat reel et d'un eventuel message d'erreur.
-    await page.waitForTimeout(1500);
-    const stateText = await page
-      .locator('text=/Commande #ORD-/')
-      .first()
-      .textContent()
-      .catch(() => null);
-    expect(stateText, 'statut affiche apres facturation').toContain('(INVOICED)');
-
+    // Ordre metier impose par le noyau : encaisser le solde AVANT de facturer.
+    // Encaisser apres facturation ferait echouer invoice_order cote serveur
+    // (politique credit du client = forbidden pour le solde restant), et
+    // facturer une commande deja soldee la fait passer directement a 'paid'.
     await page.getByRole('button', { name: /Encaisser solde/i }).click();
+    await expect(page.getByRole('button', { name: /Encaisser solde/i })).toBeHidden();
+
+    await page.getByRole('button', { name: 'Facturer', exact: true }).click();
     await expect(page.getByText(/\(PAID\)/)).toBeVisible();
 
     await page.getByRole('button', { name: /Retourner 1 Casier 24 × 33cl verre/i }).click();
