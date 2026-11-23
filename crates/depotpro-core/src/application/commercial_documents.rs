@@ -489,9 +489,11 @@ pub async fn get_document_detail(
     let mut packaging_lines = Vec::new();
     let mut payments = Vec::new();
     let mut snapshots = Vec::new();
-    // Affecte dans chaque branche du match ci-dessous : toute initialisation
-    // ici serait ecrasee avant lecture (inutile, et signalee en -D warnings).
-    let notes;
+    // Affecte dans chaque branche du match ci-dessous (et reinsigne dans la
+    // branche sales_receipt pour y joindre les emballages). Initialiser a None
+    // serait ecrase avant lecture : signale en -D warnings. Le type doit etre
+    // explicite, sinon l'inference echoue en aval sur query_scalar.
+    let mut notes: Option<String>;
 
     match document_type {
         "customer_order" => {
