@@ -131,6 +131,9 @@ async fn open_session(db: &DepotDb) {
 
 #[tokio::test]
 async fn a_draft_run_still_cancels() {
+    // Trace de progression : si ce test bloque, le log de CI affiche
+    // cette ligne comme dernier signe de vie et nomme le coupable.
+    eprintln!("[lot21] debut a_draft_run_still_cancels");
     let (db, run_id) = seed("draft").await;
     let cancelled = auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None))
         .await
@@ -140,6 +143,9 @@ async fn a_draft_run_still_cancels() {
 
 #[tokio::test]
 async fn a_loaded_run_still_cancels_when_no_money_was_declared() {
+    // Trace de progression : si ce test bloque, le log de CI affiche
+    // cette ligne comme dernier signe de vie et nomme le coupable.
+    eprintln!("[lot21] debut a_loaded_run_still_cancels_when_no_money_was_declared");
     let (db, run_id) = seed("loaded").await;
 
     auth::with_actor(owner(), delivery_runs::load_run(&db, run_id))
@@ -155,6 +161,9 @@ async fn a_loaded_run_still_cancels_when_no_money_was_declared() {
 
 #[tokio::test]
 async fn an_in_progress_run_still_cancels_while_the_sack_is_empty() {
+    // Trace de progression : si ce test bloque, le log de CI affiche
+    // cette ligne comme dernier signe de vie et nomme le coupable.
+    eprintln!("[lot21] debut an_in_progress_run_still_cancels_while_the_sack_is_empty");
     let (db, run_id) = seed("started-empty").await;
 
     auth::with_actor(owner(), delivery_runs::load_run(&db, run_id))
@@ -180,6 +189,9 @@ async fn an_in_progress_run_still_cancels_while_the_sack_is_empty() {
 /// rattrapé ; celui-ci le fige ici, à côté de la règle qui l'avait cassé.
 #[tokio::test]
 async fn a_returned_run_never_cancels_even_without_any_declaration() {
+    // Trace de progression : si ce test bloque, le log de CI affiche
+    // cette ligne comme dernier signe de vie et nomme le coupable.
+    eprintln!("[lot21] debut a_returned_run_never_cancels_even_without_any_declaration");
     let (db, run_id) = seed("returned").await;
 
     sqlx::query("UPDATE delivery_runs SET status = 'returned' WHERE id = ?")
@@ -210,6 +222,9 @@ async fn a_returned_run_never_cancels_even_without_any_declaration() {
 /// écrans sans sortir des tables.
 #[tokio::test]
 async fn money_already_declared_cannot_be_cancelled_away() {
+    // Trace de progression : si ce test bloque, le log de CI affiche
+    // cette ligne comme dernier signe de vie et nomme le coupable.
+    eprintln!("[lot21] debut money_already_declared_cannot_be_cancelled_away");
     let (db, run_id) = seed("hide").await;
     open_session(&db).await;
 

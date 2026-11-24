@@ -136,6 +136,34 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # `lot21_cancel_guard` est lance SEUL, avec une limite courte.
+      #
+      # Il arrive qu'un test de ce fichier bloque. Lance dans la suite
+      # complete, le blocage fige tout le job sans qu'aucun nom de test
+      # n'apparaisse : le job meurt au timeout et le log ne dit rien. Isole
+      # avec `timeout 300`, il est tue en cinq minutes et son log - le dernier
+      # test affiche - nomme le coupable.
+      - name: Tests ciblés lot21 (isolés, limités à 5 min)
+        timeout-minutes: 8
+        run: |
+          set +e
+          CARGO_TERM_COLOR=never timeout 300 cargo test -p depotpro-core \
+            --test lot21_cancel_guard -- --test-threads=1 \
+            2>&1 | tee /tmp/lot21_test.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 124 ]; then
+            MSG=$(grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking) ' \
+              /tmp/lot21_test.log | tail -n 40 | sed 's/%/%25/g; s/\r//g' \
+              | tr '\n' '\a' | sed 's/\a/%0A/g')
+            echo "::error title=lot21-bloque::timeout 300s — dernier test affiché dans le log%0A$MSG"
+            exit 1
+          fi
+          if [ "$rc" -ne 0 ]; then
+            MSG=$(tail -n 40 /tmp/lot21_test.log | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
+            echo "::error title=lot21-en-echec::$MSG"
+            exit "$rc"
+          fi
+
       - name: Tests depotpro-core
         run: |
           set +e
