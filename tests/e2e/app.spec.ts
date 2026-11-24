@@ -83,10 +83,17 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
 
     await page.goto('/cash');
     await expect(page.getByRole('heading', { name: 'Session de caisse', level: 1 })).toBeVisible();
-    await page.getByRole('button', { name: /Ouvrir une session de caisse/i }).click();
-    const cashDialog = page.getByRole('dialog');
-    await cashDialog.locator('input').first().fill('50000');
-    await cashDialog.getByRole('button', { name: "Confirmer l'ouverture" }).click();
+
+    // Une session peut déjà être ouverte : le Scénario 6 en ouvre une, et
+    // Playwright ne garantit pas l'ordre des fichiers. On n'ouvre donc que si
+    // le bouton est là, mais l'état final attendu, lui, ne change pas.
+    const openButton = page.getByRole('button', { name: /Ouvrir une session de caisse/i });
+    if (await openButton.isVisible()) {
+      await openButton.click();
+      const cashDialog = page.getByRole('dialog');
+      await cashDialog.locator('input').first().fill('50000');
+      await cashDialog.getByRole('button', { name: "Confirmer l'ouverture" }).click();
+    }
     await expect(page.getByRole('heading', { name: /Session active/i })).toBeVisible();
 
     await page.goto('/products');

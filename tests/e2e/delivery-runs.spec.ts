@@ -83,16 +83,21 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     const { token } = (await loginRes.json()) as { token: string };
     const auth = { Authorization: `Bearer ${token}` };
 
-    // Session de caisse ouverte : la réconciliation l'exige (« tout franc qui
-    // entre passe par une session ouverte »). Idempotent si le Scénario 2 en a
-    // déjà ouvert une.
-    const openRes = await page.request.post('/api/cash/open', {
-      headers: auth,
-      data: { opening_cash: 1000, request_key: 'e2e-scenario8-open' },
-    });
-    if (!openRes.ok()) {
-      expect((await openRes.json()).code).toBe('SESSION_ALREADY_OPEN');
-    }
+    // Pas d'ouverture de session ici. La réconciliation en exige une, mais le
+    // Scénario 2 de `app.spec.ts` compte précisément sur une caisse FERMÉE pour
+    // vérifier le bouton « Ouvrir une session de caisse ». L'ouvrir d'ici l'a
+    // fait échouer. On se contente donc de constater l'état, et on s'arrête
+    // avec un message explicite s'il manque quelque chose : un échec de
+    // précondition ne doit pas ressembler à un échec de scénario.
+    const statusRes = await page.request.get('/api/cash', { headers: auth });
+    expect(statusRes.ok()).toBeTruthy();
+    const cashStatus = (await statusRes.json()) as {
+      activeSession: { id: number } | null;
+    };
+    expect(
+      cashStatus.activeSession,
+      'la réconciliation exige une session de caisse ouverte (Scénario 2)'
+    ).not.toBeNull();
 
     // --- Un livreur, via l'écran Paramètres (le vrai chemin) -----------------
     await page.goto('/settings');
@@ -177,7 +182,12 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
       },
     });
     expect(orderRes.ok(), `création commande : ${await orderRes.text()}`).toBeTruthy();
-    const order = (await orderRes.json()) as { id: number; total_to_collect_xof: number };
+    // `POST /api/orders` renvoie un OrderDetailDto : la commande est sous
+    // `order`, pas à la racine.
+    const detail = (await orderRes.json()) as {
+      order: { id: number; total_to_collect_xof: number };
+    };
+    const order = detail.order;
     expect(order.total_to_collect_xof).toBeGreaterThan(0);
 
     // --- L'écran des tournées est joignable --------------------------------
