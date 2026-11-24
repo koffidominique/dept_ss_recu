@@ -297,7 +297,10 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
 
     // Étape 1 : création rapide client
     await page.getByRole('button', { name: 'Nouveau client rapide' }).click();
-    await page.getByPlaceholder('Nom client *').fill('Maquis E2E Plateau');
+    // La refonte du recu (PR #3) a remplace le placeholder « Nom client * »
+    // par un libelle « Nom du client * », sans association htmlFor/id : on
+    // cible donc le champ par son attribut autocomplete, stable et unique.
+    await page.locator('input[autocomplete="organization"]').fill('Maquis E2E Plateau');
     await page.getByRole('button', { name: 'Créer', exact: true }).click();
     // Le panneau emballages confirme le client actif (libelle reel de
     // OrderStepClient ; l ancien attendu « Solde consigne en cours » n a jamais
