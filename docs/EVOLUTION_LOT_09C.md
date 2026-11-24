@@ -160,11 +160,23 @@ L'ordre **facturer puis livrer** est imposé par le code actuel
 | `deposit_issues.sale_id` reste NOT NULL | Moyenne | Bloque la correction du point 1 sans migration supplémentaire |
 | Politique à 15 j imposée par migration | Faible | Le réglage `app_settings` du Lot 9b la rendra administrable |
 
-**Le premier point est le plus important.** Ce lot rend la consigne *possible* ;
-il ne la rend pas *certaine*. Tant que `deliver_order` exige `existing_sale_id`,
-un dépôt qui livre avant de facturer — ce qui est le flux réel d'une tournée —
-perdra la consigne. C'est exactement le prochain chantier, et il converge avec le
-Lot 13 (tournées) où la livraison est le point de départ, pas la conclusion.
+**Correction de ce que j'avais annoncé.** J'ai d'abord écrit que « livrer avant
+facturer perd la consigne définitivement ». C'est **faux** : `invoice_order`
+(lifecycle_settlement.rs:190) crée les consignes dès lors que la commande a été
+livrée. Les deux fonctions sont **complémentaires**, et ensemble elles couvrent
+les deux ordres possibles :
+
+| Ordre | Qui crée la consigne |
+| --- | --- |
+| Facturer puis livrer | `deliver_order` (via `existing_sale_id`) |
+| Livrer puis facturer | `invoice_order` (via `was_delivered > 0`) |
+
+Le vrai défaut n'est donc pas l'ordre des opérations, mais qu'**aucune des deux
+fonctions ne déduplique** : elles se fient à leur garde de statut. Correct tant
+que l'état est cohérent, fragile si une reprise ou un correctif manuel laisse la
+commande dans un état intermédiaire.
+
+Voir `docs/EVOLUTION_LOT_09D.md` pour la mesure et les correctifs.
 
 ---
 
