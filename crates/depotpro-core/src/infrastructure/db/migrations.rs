@@ -189,7 +189,10 @@ impl DepotDb {
         let mut skipped_legacy_columns_for = Vec::new();
 
         for migration in pending {
-            let needs_fk_off = matches!(migration.version, 14 | 25);
+            // 27 reconstruit `users` pour y ajouter le role 'driver' : SQLite ne sait
+            // pas modifier une contrainte CHECK, et 12 cles etrangeres pointent vers
+            // cette table. Sans FK OFF, la reconstruction echoue en production.
+            let needs_fk_off = matches!(migration.version, 14 | 25 | 27);
             let mut conn = pool.acquire().await?;
             if needs_fk_off {
                 sqlx::query("PRAGMA foreign_keys = OFF")

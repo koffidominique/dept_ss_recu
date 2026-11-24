@@ -56,6 +56,8 @@ pub const V3_MIGRATION_0025_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0025_deposit_issues_sale_line_id_nullable.sql");
 pub const V3_MIGRATION_0026_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0026_link_packaging_assets_to_returnables.sql");
+pub const V3_MIGRATION_0027_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0027_delivery_runs.sql");
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {
@@ -195,10 +197,15 @@ pub const MIGRATIONS: &[MigrationDef] = &[
         name: "0026_link_packaging_assets_to_returnables",
         sql: V3_MIGRATION_0026_SQL,
     },
+    MigrationDef {
+        version: 27,
+        name: "0027_delivery_runs",
+        sql: V3_MIGRATION_0027_SQL,
+    },
 ];
 
 pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = 1;
-pub const CURRENT_SCHEMA_VERSION: i64 = 26;
+pub const CURRENT_SCHEMA_VERSION: i64 = 27;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationRunReport {
