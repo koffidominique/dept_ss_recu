@@ -305,9 +305,19 @@ test.describe("DEPOTPRO — Tournées de livraison, parcours complet", () => {
       collectDialog.getByRole("heading", { name: /Encaissement ·/ }),
     ).toBeVisible();
     await collectDialog.getByRole("button", { name: "Déclarer" }).click();
+    await expect(collectDialog).toBeHidden();
+
+    // Le bouton « Encaissement » reste affiché, et c'est volontaire : un arrêt
+    // peut être réglé en plusieurs fois — une partie en espèces, une partie en
+    // Wave. `UNIQUE (stop_id, method_code)` l'organise, et `register_collection`
+    // met à jour la ligne du moyen au lieu d'en créer une seconde.
+    //
+    // La version précédente de ce test affirmait l'inverse, en se fondant sur
+    // mon intuition, pas sur le schéma. La déclaration est donc vérifiée là où
+    // elle est écrite : sur le serveur.
     await expect(
       page.getByRole("button", { name: "Encaissement" }),
-    ).toBeHidden();
+    ).toBeVisible();
 
     // Le bouton d'annulation doit avoir disparu : la tournée porte désormais de
     // l'argent déclaré, et le cœur refuse de l'annuler (Lot 21). Proposer le
@@ -363,6 +373,21 @@ test.describe("DEPOTPRO — Tournées de livraison, parcours complet", () => {
     const ourRun = runs.find((r) => r.reference.startsWith("TRN-"));
     expect(ourRun, "la tournée doit être listée").toBeTruthy();
     expect(ourRun!.status).toBe("reconciled");
+
+    // La déclaration est bien enregistrée, et sur le bon arrêt.
+    const detailRes = await page.request.get(
+      `/api/delivery-runs/${ourRun!.id}`,
+      { headers: auth },
+    );
+    expect(detailRes.ok()).toBeTruthy();
+    const runDetail = (await detailRes.json()) as {
+      stops: Array<{ declared_amount: number }>;
+    };
+    const declaredOnStops = runDetail.stops.reduce(
+      (sum, st) => sum + st.declared_amount,
+      0,
+    );
+    expect(declaredOnStops).toBeGreaterThan(0);
 
     // Et l'écart constaté est nul : le compté saisi était le déclaré.
     const recRes = await page.request.get(
