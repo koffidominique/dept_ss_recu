@@ -1,5 +1,13 @@
 # CHANGELOG — DEPOTPRO PREMIUM V3
 
+## [3.1.0] - 2026-11-23 — Architecture Rust unique & CI verte
+
+- **Suppression du serveur Node/Express** (`server.ts`, `server/**`, `node:sqlite`) : `crates/depotpro-server` (Axum) devient l'**unique** serveur métier, en Web comme en Desktop. Le cœur `crates/depotpro-core` est la seule implémentation des règles. Détail du chantier : `docs/LOT_01_RUST_ONLY.md`.
+- **CI verte de bout en bout** (12 contrôles sur 12) : lockfile multi-plateformes pour `npm ci` sur Windows/macOS, correctifs des tests Rust Core et Axum, Playwright E2E réactivé (7 scénarios), Clippy `-D warnings` et `cargo fmt --check` assainis sur l'ensemble du dépôt.
+- **Lots d'évolution 1 → 8** livrés : accessibilité et contraste WCAG AA, ergonomie du parcours de vente, états de chargement/erreur/vide, recherche et filtres, cohérence des libellés, palette validée, permissions d'interface et écran `/catalogue-admin` (comptes rendus dans `docs/EVOLUTION_LOT_02.md` → `_08.md`).
+- **Documentation réalignée** sur l'architecture réelle : `README.md`, `docs/ARCHITECTURE_V3.md` et `docs/INSTALLATION_WEB.md` ne décrivent plus Express/`node:sqlite`.
+- **Suppression de code mort** : handler `generate_payment_receipt_pdf` sans route associée (le reçu de paiement passe par `GET /api/payments/:id/receipt`).
+
 ## [3.0.0] - 2026-11-19 — LOT 10 : Validation finale & préparation production
 - Validation complète du parcours métier (28 étapes de la section 10.1) via les 22 scénarios canoniques paritaires (`lot9_parity.rs` + suite Node `tests/lot9_parity.test.mjs`, 117/117 PASS).
 - Benchmarks charge validés (`npm run benchmark`, base 10k produits / 10k clients / 100k lignes) : recherche p50 37 ms (< 300 ms), détail vente p95 1.03 ms (< 150 ms), validation vente atomique p95 2.60 ms (< 500 ms).
