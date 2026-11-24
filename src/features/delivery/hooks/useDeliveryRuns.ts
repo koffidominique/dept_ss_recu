@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
+import { isReconcilableForReading } from '../utils/deliveryRuns.ts';
 import type {
   AddDeliveryStopInput,
   CreateDeliveryRunInput,
@@ -43,9 +44,12 @@ export function useDeliveryRunsQueries(selectedId: number | null) {
   const reconciliationQuery = useQuery({
     queryKey: KEYS.reconciliation(selectedId ?? -1),
     queryFn: () => apiClient.getDeliveryReconciliation(selectedId as number),
-    // Lue seulement quand la tournée est réconciliée : avant, il n'y a rien à
-    // lire et le cœur refuserait.
-    enabled: selectedId !== null && detailQuery.data?.run.status === 'reconciled',
+    // Lue dès `returned` : c'est là qu'on ouvre la modale de réconciliation, et
+    // elle a besoin des montants attendu/déclaré pour calculer les écarts.
+    // Restreindre à `reconciled` laissait la modale s'ouvrir sur un résumé nul,
+    // donc vide, au moment précis où le gérant en a besoin. `get_reconciliation`
+    // ne fait que lire et accepte n'importe quel statut.
+    enabled: selectedId !== null && isReconcilableForReading(detailQuery.data?.run.status),
   });
 
   const settingsQuery = useQuery({

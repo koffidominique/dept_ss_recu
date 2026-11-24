@@ -4,6 +4,7 @@ import {
   allocationBlocker,
   buildCreateRunInput,
   isDriverAccount,
+  isReconcilableForReading,
   isTerminal,
   reconciliationBlocker,
   reconciliationGaps,
@@ -238,4 +239,33 @@ test('seuls les rôles qui portent delivery_runs:execute sont proposés comme li
 
 test('un compte désactivé n’est jamais proposé, quel que soit son rôle', () => {
   assert.equal(isDriverAccount({ active: false, role: 'driver' }), false);
+});
+
+/* --- Lisibilité de la réconciliation ------------------------------------- */
+
+test('la réconciliation est lisible dès le retour, pas seulement après', () => {
+  // Défaut réel : la requête était conditionnée à `reconciled`. La modale
+  // s'ouvrait donc sur un résumé `null` — vide — au moment exact où le gérant
+  // devait saisir le montant compté.
+  assert.equal(isReconcilableForReading('returned'), true);
+  assert.equal(isReconcilableForReading('reconciled'), true, 'consultation après coup');
+});
+
+test('rien à lire avant le retour : le livreur est encore sur la route', () => {
+  assert.equal(isReconcilableForReading('draft'), false);
+  assert.equal(isReconcilableForReading('loaded'), false);
+  assert.equal(isReconcilableForReading('in_progress'), false);
+  assert.equal(isReconcilableForReading('cancelled'), false);
+  assert.equal(isReconcilableForReading(undefined), false, 'aucune tournée sélectionnée');
+});
+
+test('chaque statut où l’on peut réconcilier est aussi un statut lisible', () => {
+  // Le invariant qui manquait : proposer le bouton sans pouvoir charger le
+  // résumé. Il doit rester vrai si la matrice des actions change.
+  const statuses = ['draft', 'loaded', 'in_progress', 'returned', 'reconciled', 'cancelled'] as const;
+  for (const st of statuses) {
+    if (runActions(st, 3).canReconcile) {
+      assert.equal(isReconcilableForReading(st), true, `réconciliable mais illisible : ${st}`);
+    }
+  }
 });

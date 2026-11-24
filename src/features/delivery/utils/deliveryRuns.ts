@@ -71,6 +71,18 @@ export function runActions(status: DeliveryRunStatus, stopCount: number): RunAct
   };
 }
 
+/**
+ * Quand la réconciliation est-elle **lisible** ?
+ *
+ * Dès le retour, pas seulement une fois réconciliée : la modale qui décide du
+ * montant à encaisser a besoin de l'attendu et du déclaré pour calculer les
+ * écarts. La restreindre à `reconciled` ouvrait une modale vide au moment
+ * précis où le gérant en a besoin.
+ */
+export function isReconcilableForReading(status: DeliveryRunStatus | undefined): boolean {
+  return status === 'returned' || status === 'reconciled';
+}
+
 /** Une tournée close ne se modifie plus : `reconciled` et `cancelled` sont terminaux. */
 export function isTerminal(status: DeliveryRunStatus): boolean {
   return status === "reconciled" || status === "cancelled";
