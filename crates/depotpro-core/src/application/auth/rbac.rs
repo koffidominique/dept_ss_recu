@@ -270,6 +270,10 @@ impl Permission {
             Permission::BackupsRestore => "backups:restore",
             Permission::SecurityManageUsers => "security:manage_users",
             Permission::SecurityChangeOwnerPin => "security:change_owner_pin",
+            Permission::DeliveryRunsRead => "delivery_runs:read",
+            Permission::DeliveryRunsManage => "delivery_runs:manage",
+            Permission::DeliveryRunsExecute => "delivery_runs:execute",
+            Permission::DeliveryRunsReconcile => "delivery_runs:reconcile",
         }
     }
 }
