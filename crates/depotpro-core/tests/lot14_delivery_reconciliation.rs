@@ -58,10 +58,11 @@ async fn seed(db: &DepotDb) -> (i64, i64, i64, i64) {
         .execute(&mut *tx)
         .await
         .unwrap();
-        let driver_id: i64 = sqlx::query_scalar("SELECT id FROM users WHERE username = 'chauffeur'")
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
+        let driver_id: i64 =
+            sqlx::query_scalar("SELECT id FROM users WHERE username = 'chauffeur'")
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
 
         sqlx::query(
             "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
@@ -116,13 +117,39 @@ async fn make_order(db: &DepotDb, client_id: i64, number: &str, to_collect: i64,
 }
 
 /// Ajoute une consigne ouverte pour un client.
+///
+/// `deposit_issues.sale_id` est NOT NULL : une consigne nait toujours d'une
+/// vente. On cree donc une vente d'appui par consigne, comme le ferait le vrai
+/// flux de facturation.
 async fn make_issue(db: &DepotDb, client_id: i64, returnable_id: i64, pieces: i64) -> i64 {
     let (_g, mut tx) = db.begin_write().await.unwrap();
+    let tag = uuid::Uuid::new_v4().to_string().replace('-', "");
+    sqlx::query(
+        "INSERT INTO sales (reference, request_key, client_id, sale_type,
+            subtotal_merchandise, total_merchandise, total_deposit, total_amount)
+         VALUES (?, ?, ?, 'cash', ?, ?, ?, ?)",
+    )
+    .bind(format!("VTE-{}", &tag[..10]))
+    .bind(format!("rk-{}", &tag[..10]))
+    .bind(client_id)
+    .bind(pieces * 1000)
+    .bind(pieces * 1000)
+    .bind(pieces * 1000)
+    .bind(pieces * 2000)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let sale_id: i64 = sqlx::query_scalar("SELECT MAX(id) FROM sales")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+
     sqlx::query(
         "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id,
             pieces, unit_value, amount, status)
-         VALUES (NULL, NULL, ?, ?, ?, 1000, ?, 'pending')",
+         VALUES (?, NULL, ?, ?, ?, 1000, ?, 'pending')",
     )
+    .bind(sale_id)
     .bind(client_id)
     .bind(returnable_id)
     .bind(pieces)
@@ -530,7 +557,10 @@ async fn reconciliation_is_idempotent_and_terminal() {
             .fetch_one(&db.pool)
             .await
             .unwrap();
-    assert_eq!(movements, 1, "rejouer la réconciliation ne double pas la caisse");
+    assert_eq!(
+        movements, 1,
+        "rejouer la réconciliation ne double pas la caisse"
+    );
 
     // Terminal : plus aucun constat possible.
     let err = auth::with_actor(
@@ -767,15 +797,15 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
     let returned_a: i64 =
         sqlx::query_scalar("SELECT returned_pieces FROM deposit_issues WHERE id = ?")
             .bind(issue_a)
-        .fetch_one(&db.pool)
-        .await
-        .unwrap();
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
     let returned_b: i64 =
         sqlx::query_scalar("SELECT returned_pieces FROM deposit_issues WHERE id = ?")
             .bind(issue_b)
-        .fetch_one(&db.pool)
-        .await
-        .unwrap();
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
 
     assert_eq!(returned_a, 2, "les casiers repris chez A soldent la consigne de A");
     assert_eq!(status_a, "settled");

@@ -265,7 +265,11 @@ async fn apply_customer_empty_return_tx(
         .await?;
 
         crate::application::packaging_returns::settle_deposit_issues_tx(
-            tx, customer_id, rid, order_id, quantity,
+            tx,
+            customer_id,
+            rid,
+            order_id,
+            quantity,
         )
         .await?;
 

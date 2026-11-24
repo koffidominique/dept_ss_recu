@@ -182,8 +182,7 @@ pub async fn register_collection(
             .await?;
     if matches!(stop_status.as_str(), "failed" | "skipped") {
         return Err(CoreError::Validation(
-            "Cet arrêt n'a pas été livré : aucun encaissement ne peut y être déclaré."
-                .to_string(),
+            "Cet arrêt n'a pas été livré : aucun encaissement ne peut y être déclaré.".to_string(),
         ));
     }
 
@@ -245,14 +244,12 @@ pub async fn record_stop_outcome(
     }
     ensure_stop_in_run_tx(&mut tx, run_id, input.stop_id).await?;
 
-    sqlx::query(
-        "UPDATE delivery_run_stops SET status = ?, failure_reason = ? WHERE id = ?",
-    )
-    .bind(&input.status)
-    .bind(&input.failure_reason)
-    .bind(input.stop_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("UPDATE delivery_run_stops SET status = ?, failure_reason = ? WHERE id = ?")
+        .bind(&input.status)
+        .bind(&input.failure_reason)
+        .bind(input.stop_id)
+        .execute(&mut *tx)
+        .await?;
 
     // Un arrêt déclaré non livré ne peut plus porter d'encaissement.
     if matches!(input.status.as_str(), "failed" | "skipped") {
@@ -638,13 +635,12 @@ async fn ensure_stop_in_run_tx(
     run_id: i64,
     stop_id: i64,
 ) -> CoreResult<()> {
-    let belongs: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM delivery_run_stops WHERE id = ? AND run_id = ?",
-    )
-    .bind(stop_id)
-    .bind(run_id)
-    .fetch_one(&mut **tx)
-    .await?;
+    let belongs: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM delivery_run_stops WHERE id = ? AND run_id = ?")
+            .bind(stop_id)
+            .bind(run_id)
+            .fetch_one(&mut **tx)
+            .await?;
     if belongs == 0 {
         return Err(CoreError::Validation(
             "Cet arrêt n'appartient pas à cette tournée.".to_string(),
