@@ -238,6 +238,20 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
         .await?;
 
         if is_consigned == 1 {
+            // Une consigne sans consignable rattache ne peut pas naitre : sans
+            // returnable_id, aucune ligne deposit_issues n'est creee et la dette
+            // du client disparaitrait silencieusement de la comptabilite.
+            // La migration 0026 relie les actifs seedes ; cette garde couvre les
+            // actifs crees a la main apres coup.
+            if returnable_id_opt.is_none() {
+                return Err(CoreError::Validation(
+                    "L'emballage consigne de cette commande n'est rattache a aucun consignable \
+                     (packaging_assets.returnable_id est vide). Renseignez le rattachement dans \
+                     le catalogue des emballages avant de livrer, sinon la consigne ne sera pas \
+                     tracee."
+                        .to_string(),
+                ));
+            }
             sqlx::query(
                 "INSERT INTO customer_deposit_balances (
                     customer_id, packaging_asset_id, quantity_held,

@@ -430,6 +430,25 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     let deps_draft = orders::get_customer_deposits(&db, client.id).await.unwrap();
     assert!(deps_draft.is_empty());
 
+    // Le catalogue d'emballages seedé par la migration 0019 ne renseigne pas
+    // returnable_id ; sans rattachement, deliver_order ne peut créer aucune
+    // consigne. La migration 0026 relie les actifs existants aux consignables.
+    // Ce test reproduit le cas d'un actif créé après coup : on vérifie que
+    // l'absence de rattachement est refusée explicitement (et non silencieuse).
+    let asset_id_for_link = created.allocations[0].packaging_asset_id;
+    sqlx::query(
+        "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
+         VALUES ('EMB-TEST-CAS24-33', 'Casier test 24x33', 'TEST', 'crate', 1000)",
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let test_returnable_id: i64 =
+        sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-TEST-CAS24-33'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+
     // Confirm : décrémente le stock en unités de base (200 -> 188), sans créer d'achat fournisseur.
     let confirmed = auth::with_actor(
         approver.clone(),
@@ -453,6 +472,26 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         .unwrap();
     assert_eq!(bock_stock, 188_000);
 
+    // Sans rattachement au consignable, la livraison doit être REFUSÉE :
+    // sinon la dette d'emballages du client n'existerait nulle part.
+    let refused = auth::with_actor(
+        approver.clone(),
+        orders::deliver_order(&db, created.order.id),
+    )
+    .await;
+    assert!(
+        refused.is_err(),
+        "livrer une consigne non rattachée à un consignable doit échouer"
+    );
+
+    // Avec le rattachement, la livraison crée la consigne dans deposit_issues.
+    sqlx::query("UPDATE packaging_assets SET returnable_id = ? WHERE id = ?")
+        .bind(test_returnable_id)
+        .bind(asset_id_for_link)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
     // Deliver : crée mouvement LIVRAISON_CLIENT & incrémente customer_deposit_balances
     let delivered = auth::with_actor(
         approver.clone(),
@@ -464,6 +503,8 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert_eq!(delivered.customer_deposits.len(), 1);
     assert_eq!(delivered.customer_deposits[0].quantity_held, 1);
     assert_eq!(delivered.customer_deposits[0].amount_held_xof, 1000);
+
+
 
     // Retour d'1 casier vide -> décrémente solde consigné & incrémente stock_empty
     let asset_id = created.allocations[0].packaging_asset_id;
@@ -665,4 +706,181 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert!(receipt_pdf_text.contains("Maquis Abidjan"));
     assert!(!receipt_pdf_text.contains("PRODUIT FORGE"));
     assert!(!receipt_pdf_text.contains("CLIENT FORGE"));
+}
+
+// ============================================================================
+// Lot 9c : la consigne d'une commande nait dans deposit_issues
+//
+// Le catalogue d'emballages seede par la migration 0019 ne renseigne pas
+// packaging_assets.returnable_id, donc deliver_order ne peut creer aucune
+// consigne. La migration 0026 relie les actifs existants aux consignables, et
+// deliver_order refuse desormais explicitement un actif non rattache.
+//
+// Ce test couvre l'ordre correct du parcours : la consigne n'est ecrite que si
+// la commande est deja facturee (existing_sale_id), il faut donc facturer
+// AVANT de livrer pour que la dette d'emballages soit tracee.
+// ============================================================================
+#[tokio::test]
+async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delivered() {
+    let db = DepotDb::connect(&temp_db_path("lot9c_deposit_issues"))
+        .await
+        .unwrap();
+    let approver = SessionIdentity::from_role(
+        "lot9c-owner",
+        "lot9c",
+        "Propriétaire Lot 9c",
+        Role::Owner,
+    );
+
+    // Un consignable et un actif rattache : c'est l'etat attendu apres 0026.
+    sqlx::query(
+        "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
+         VALUES ('EMB-LOT9C-CAS24', 'Casier 24x33 Lot 9c', 'TEST', 'crate', 1000)",
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let returnable_id: i64 = sqlx::query_scalar(
+        "SELECT id FROM returnable_packaging_types WHERE code = 'EMB-LOT9C-CAS24'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    let asset_id: i64 = sqlx::query_scalar(
+        "SELECT id FROM packaging_assets WHERE code = 'PA-CASIER-24X33'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE packaging_assets SET returnable_id = ?, stock_empty = 10 WHERE id = ?")
+        .bind(returnable_id)
+        .bind(asset_id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+    let cat = products::create_category(&db, "Bières Lot 9c", None)
+        .await
+        .unwrap();
+    let cat_id = cat.id;
+    let (bock_var, _) = make_beverage_variant(
+        &db,
+        cat_id,
+        "Bock Lot 9c",
+        "SKU-LOT9C",
+        330,
+        "glass_returnable",
+        400,
+        "200",
+    )
+    .await;
+
+    let client = sales::create_client(
+        &db,
+        sales::CreateClientInput {
+            name: "Client Lot 9c".to_string(),
+            client_type: "professionnel".to_string(),
+            phone: None,
+            address: None,
+            city: Some("Abidjan".to_string()),
+            email: None,
+            contact_person: None,
+            credit_policy: "limited".to_string(),
+            credit_limit: Some(500_000),
+            payment_terms_days: Some(15),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    let created = orders::create_order(
+        &db,
+        orders::CreateOrderInput {
+            customer_id: client.id,
+            order_type: Some("mixte".into()),
+            payment_method: Some("cash".into()),
+            lines: vec![orders::OrderLineInput {
+                variant_id: bock_var,
+                requested_unit: "crate".into(),
+                requested_quantity: 1,
+                unit_price_xof: Some(400),
+                discount_xof: None,
+                notes: None,
+            }],
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(created.allocations.len(), 1, "un casier doit être alloué");
+
+    auth::with_actor(
+        approver.clone(),
+        orders::confirm_order(&db, created.order.id),
+    )
+    .await
+    .unwrap();
+
+    // Facturer AVANT livrer : sinon deliver_order ne trouve aucune vente et
+    // la consigne ne serait pas ecrite.
+    sqlx::query("UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?")
+        .bind(created.order.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    auth::with_actor(
+        approver.clone(),
+        orders::invoice_order(&db, created.order.id),
+    )
+    .await
+    .unwrap();
+
+    auth::with_actor(approver.clone(), orders::deliver_order(&db, created.order.id))
+        .await
+        .unwrap();
+
+    // La consigne existe dans deposit_issues : c'est elle qui porte les
+    // echeances, conversions et pertes. Avant le correctif, elle n'existait pas.
+    let row: (i64, i64, i64, i64, String) = sqlx::query_as(
+        "SELECT pieces, returned_pieces, unit_value, amount, status
+         FROM deposit_issues WHERE client_id = ? AND returnable_id = ?",
+    )
+    .bind(client.id)
+    .bind(returnable_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("deliver_order doit créer une consigne dans deposit_issues");
+    assert_eq!(row.0, 1, "1 casier consigné");
+    assert_eq!(row.1, 0, "aucun retour à la livraison");
+    assert_eq!(row.2, 1000, "valeur unitaire figée");
+    assert_eq!(row.3, 1000, "montant consigné");
+    assert_eq!(row.4, "pending");
+
+    // Une echeance exploitable est posee : sans elle, aucune conversion ni
+    // signalement de retard n'est possible.
+    let due: Option<String> = sqlx::query_scalar(
+        "SELECT due_date FROM deposit_issues WHERE client_id = ? AND returnable_id = ?",
+    )
+    .bind(client.id)
+    .bind(returnable_id)
+    .fetch_optional(&db.pool)
+    .await
+    .unwrap()
+    .flatten();
+    assert!(due.is_some(), "une échéance doit être posée");
+    assert!(!due.unwrap().is_empty());
+
+    // La politique appliquee est celle du depot, pas une retombee en dur.
+    let policy_delay: i64 = sqlx::query_scalar(
+        "SELECT return_delay_days FROM packaging_policies
+         WHERE returnable_id IS NULL AND client_id IS NULL",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        policy_delay, 15,
+        "la politique globale doit être alignée à 15 jours (migration 0026)"
+    );
 }
