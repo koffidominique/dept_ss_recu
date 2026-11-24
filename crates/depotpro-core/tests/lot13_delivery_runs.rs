@@ -160,22 +160,27 @@ async fn stop_cannot_target_another_clients_order() {
     let db = fresh_db("stop_owner").await;
     let (client_a, client_b, d1, _d2) = seed(&db).await;
 
+    let order_b: i64;
     // Une commande de client B.
-    let (_g, mut tx) = db.begin_write().await.unwrap();
-    sqlx::query(
-        "INSERT INTO orders (order_number, customer_id, order_type, status,
-            subtotal_xof, discount_xof, total_xof, total_to_collect_xof, paid_xof)
-         VALUES ('ORD-B-1', ?, 'mixte', 'confirmed', 1000, 0, 1000, 1000, 0)",
-    )
-    .bind(client_b)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    let order_b: i64 = sqlx::query_scalar("SELECT id FROM orders WHERE order_number = 'ORD-B-1'")
-        .fetch_one(&mut *tx)
+    // Portee fermee : le garde d'ecriture doit tomber AVANT tout appel
+    // au coeur, sinon `create_run` attend un verrou que ce test detient.
+    {
+        let (_g, mut tx) = db.begin_write().await.unwrap();
+        sqlx::query(
+            "INSERT INTO orders (order_number, customer_id, order_type, status,
+                subtotal_xof, discount_xof, total_xof, total_to_collect_xof, paid_xof)
+             VALUES ('ORD-B-1', ?, 'mixte', 'confirmed', 1000, 0, 1000, 1000, 0)",
+        )
+        .bind(client_b)
+        .execute(&mut *tx)
         .await
         .unwrap();
-    tx.commit().await.unwrap();
+        order_b = sqlx::query_scalar("SELECT id FROM orders WHERE order_number = 'ORD-B-1'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
 
     let run = auth::with_actor(
         owner(),
@@ -218,22 +223,27 @@ async fn load_freezes_expected_amounts_and_status_flow_is_guarded() {
     let db = fresh_db("freeze").await;
     let (client_a, _b, d1, _d2) = seed(&db).await;
 
+    let order_a: i64;
     // Une commande de 10 600 F dont 6 000 deja payes -> attendu 4 600.
-    let (_g, mut tx) = db.begin_write().await.unwrap();
-    sqlx::query(
-        "INSERT INTO orders (order_number, customer_id, order_type, status,
-            subtotal_xof, discount_xof, total_xof, total_to_collect_xof, paid_xof)
-         VALUES ('ORD-A-1', ?, 'mixte', 'confirmed', 9600, 0, 9600, 10600, 6000)",
-    )
-    .bind(client_a)
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    let order_a: i64 = sqlx::query_scalar("SELECT id FROM orders WHERE order_number = 'ORD-A-1'")
-        .fetch_one(&mut *tx)
+    // Portee fermee : le garde d'ecriture doit tomber AVANT tout appel
+    // au coeur, sinon `create_run` attend un verrou que ce test detient.
+    {
+        let (_g, mut tx) = db.begin_write().await.unwrap();
+        sqlx::query(
+            "INSERT INTO orders (order_number, customer_id, order_type, status,
+                subtotal_xof, discount_xof, total_xof, total_to_collect_xof, paid_xof)
+             VALUES ('ORD-A-1', ?, 'mixte', 'confirmed', 9600, 0, 9600, 10600, 6000)",
+        )
+        .bind(client_a)
+        .execute(&mut *tx)
         .await
         .unwrap();
-    tx.commit().await.unwrap();
+        order_a = sqlx::query_scalar("SELECT id FROM orders WHERE order_number = 'ORD-A-1'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
 
     let run = auth::with_actor(
         owner(),
@@ -402,47 +412,52 @@ async fn expected_empty_pieces_follow_open_deposit_issues() {
     let (client_a, _b, d1, _d2) = seed(&db).await;
 
     // Deux consignes ouvertes de 3 et 2 casiers -> 5 vides attendus.
-    let (_g, mut tx) = db.begin_write().await.unwrap();
-    sqlx::query(
-        "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
-         VALUES ('EMB-L13', 'Casier L13', 'SOLIBRA', 'crate', 1000)",
-    )
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    let rid: i64 =
-        sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-L13'")
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-    sqlx::query(
-        "INSERT INTO sales (reference, request_key, sale_type, subtotal_merchandise,
-            total_merchandise, total_amount) VALUES ('VTE-L13','rk-l13','cash',12000,12000,12000)",
-    )
-    .execute(&mut *tx)
-    .await
-    .unwrap();
-    let sale_id: i64 = sqlx::query_scalar("SELECT id FROM sales WHERE reference = 'VTE-L13'")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
-    for (pieces, status) in [(3, "pending"), (2, "partially_returned")] {
+    // Portee fermee : le garde d'ecriture doit tomber AVANT tout appel
+    // au coeur, sinon `create_run` attend un verrou que ce test detient.
+    {
+        let (_g, mut tx) = db.begin_write().await.unwrap();
         sqlx::query(
-            "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id,
-                pieces, unit_value, amount, status)
-             VALUES (?, NULL, ?, ?, ?, 1000, ?, ?)",
+            "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
+             VALUES ('EMB-L13', 'Casier L13', 'SOLIBRA', 'crate', 1000)",
         )
-        .bind(sale_id)
-        .bind(client_a)
-        .bind(rid)
-        .bind(pieces)
-        .bind(pieces * 1000)
-        .bind(status)
         .execute(&mut *tx)
         .await
         .unwrap();
+        let rid: i64 =
+            sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-L13'")
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        sqlx::query(
+            "INSERT INTO sales (reference, request_key, sale_type, subtotal_merchandise,
+                total_merchandise, total_amount)
+             VALUES ('VTE-L13','rk-l13','cash',12000,12000,12000)",
+        )
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        let sale_id: i64 = sqlx::query_scalar("SELECT id FROM sales WHERE reference = 'VTE-L13'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        for (pieces, status) in [(3, "pending"), (2, "partially_returned")] {
+            sqlx::query(
+                "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id,
+                    pieces, unit_value, amount, status)
+                 VALUES (?, NULL, ?, ?, ?, 1000, ?, ?)",
+            )
+            .bind(sale_id)
+            .bind(client_a)
+            .bind(rid)
+            .bind(pieces)
+            .bind(pieces * 1000)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+        tx.commit().await.unwrap();
     }
-    tx.commit().await.unwrap();
 
     let run = auth::with_actor(
         owner(),
