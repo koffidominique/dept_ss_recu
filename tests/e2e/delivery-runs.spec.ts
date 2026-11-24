@@ -149,7 +149,9 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     await page.getByRole('button', { name: 'Arrêt', exact: true }).click();
     const stopDialog = page.getByRole('dialog');
     await stopDialog.getByLabel('Client *').selectOption(String(client.id));
-    await stopDialog.getByRole('button', { name: "Ajouter l'arrêt" }).click();
+    // L'apostrophe de l'interface est typographique (’) : une expression
+    // régulière évite de dépendre du caractère exact.
+    await stopDialog.getByRole('button', { name: /Ajouter l.arrêt/ }).click();
     // La modale se ferme : c'est la preuve que l'arrêt est enregistré.
     await expect(stopDialog).toBeHidden();
     await expect(page.getByRole('cell', { name: 'Maquis Tournée E2E' })).toBeVisible();

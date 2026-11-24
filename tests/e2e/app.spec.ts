@@ -44,12 +44,16 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     //
     // Le montage de bout en bout (deux saisies, deux écrans) reste vérifié
     // quand l'écran de création s'affiche réellement.
-    const ownerPinConfigured = await page
-      .getByRole('button', { name: 'Déverrouiller' })
-      .isVisible();
+    // Attendre que l'écran ait décidé : `isVisible()` seul ne patiente pas et
+    // peut répondre « faux » sur un rendu encore en cours, ce qui a fait
+    // tomber le test juste après.
+    const pinConfiguredScreen = page.getByRole('button', { name: 'Déverrouiller' });
+    const setupScreen = page.getByText('Créer votre PIN propriétaire');
+    await expect(pinConfiguredScreen.or(setupScreen)).toBeVisible();
+    const ownerPinConfigured = await pinConfiguredScreen.isVisible();
 
     if (!ownerPinConfigured) {
-      await expect(page.getByText('Créer votre PIN propriétaire')).toBeVisible();
+      await expect(setupScreen).toBeVisible();
       await enterPinDigits(page, '123456');
       await page.getByRole('button', { name: 'Continuer' }).click();
 
