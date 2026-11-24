@@ -85,32 +85,35 @@ pub async fn get_cash_status(db: &DepotDb) -> CoreResult<CashStatusDto> {
     // Toujours calculé, même sans session ouverte : une tournée peut être sur
     // la route avant que le tiroir ne le soit.
     let runs_in_transit = sqlx::query_as::<_, RunInTransitDto>(
-        // Les alias sont en camelCase parce que `RunInTransitDto` derive
-        // `serde(rename_all = "camelCase")` : `FromRow` lit les colonnes par
-        // leur nom RUST (runId, declaredAmount…), pas par leur nom SQL. Un
-        // alias snake_case ferait echouer l'extraction a l'execution, pas a la
-        // compilation.
-        "SELECT dr.id AS runId,
+        // ATTENTION, verifie a la duree : `FromRow` lit le nom **SQL** de la
+        // colonne, pas le nom Rust. Avec `rename_all = "camelCase"`, le nom
+        // Rust est `run_id`, donc l'alias SQL doit rester `run_id` ; mettre
+        // `AS run_id` echoue a l'execution avec « no column found for name:
+        // run_id », et pas a la compilation.
+        //
+        // Le `rename_all` ne concerne QUE la serialisation JSON envoyee au
+        // front, ou les champs sortent bien en camelCase.
+        "SELECT dr.id AS run_id,
                 dr.reference AS reference,
-                dr.run_date AS runDate,
-                u.display_name AS driverName,
+                dr.run_date AS run_date,
+                u.display_name AS driver_name,
                 dr.status AS status,
                 COALESCE((SELECT SUM(c.amount)
                           FROM delivery_run_collections c
                           JOIN delivery_run_stops s ON s.id = c.stop_id
                           WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
-                    AS declaredAmount,
+                    AS declared_amount,
                 COALESCE((SELECT SUM(s.expected_amount)
                           FROM delivery_run_stops s
                           WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
-                    AS expectedAmount,
+                    AS expected_amount,
                 COALESCE((SELECT COUNT(DISTINCT s.id)
                           FROM delivery_run_collections c
                           JOIN delivery_run_stops s ON s.id = c.stop_id
                           WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
-                    AS declaredStops,
+                    AS declared_stops,
                 (SELECT COUNT(*) FROM delivery_run_stops s WHERE s.run_id = dr.id)
-                    AS plannedStops
+                    AS planned_stops
          FROM delivery_runs dr
          JOIN users u ON u.id = dr.driver_user_id
          WHERE dr.status = 'in_progress'

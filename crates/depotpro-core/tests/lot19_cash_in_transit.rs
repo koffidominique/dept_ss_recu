@@ -25,7 +25,8 @@ fn driver() -> SessionIdentity {
 }
 
 async fn fresh_db(tag: &str) -> DepotDb {
-    let path = std::env::temp_dir().join(format!("depotpro_lot19_{tag}_{}.db", uuid::Uuid::new_v4()));
+    let path =
+        std::env::temp_dir().join(format!("depotpro_lot19_{tag}_{}.db", uuid::Uuid::new_v4()));
     DepotDb::connect(&path).await.expect("connect")
 }
 
@@ -84,7 +85,13 @@ async fn make_order(db: &DepotDb, client_id: i64, number: &str, to_collect: i64)
 }
 
 /// Tournée chargée et partie, avec un arrêt. Renvoie (run_id, stop_id).
-async fn started_run(db: &DepotDb, client_id: i64, driver_id: i64, to_collect: i64, tag: &str) -> (i64, i64) {
+async fn started_run(
+    db: &DepotDb,
+    client_id: i64,
+    driver_id: i64,
+    to_collect: i64,
+    tag: &str,
+) -> (i64, i64) {
     let order_id = make_order(db, client_id, &format!("ORD-T-{tag}"), to_collect).await;
     let run = auth::with_actor(
         owner(),
@@ -157,7 +164,11 @@ async fn declared_money_shows_up_in_transit() {
     let status = auth::with_actor(owner(), cash::get_cash_status(&db))
         .await
         .unwrap();
-    assert_eq!(status.runs_in_transit.len(), 1, "une tournée est sur la route");
+    assert_eq!(
+        status.runs_in_transit.len(),
+        1,
+        "une tournée est sur la route"
+    );
     let line = &status.runs_in_transit[0];
     assert_eq!(line.run_id, run_id);
     assert_eq!(line.declared_amount, 4_600);
@@ -246,36 +257,52 @@ async fn a_returned_run_leaves_the_transit_list() {
 async fn a_failed_stop_counts_in_neither_expected_nor_declared() {
     let db = fresh_db("echec").await;
     let (client_id, driver_id) = seed(&db).await;
-    let (run_id, stop_a) = started_run(&db, client_id, driver_id, 4_600, "echec").await;
 
-    // Deuxième arrêt sur la même tournée, qui échouera.
-    let order_b = make_order(&db, client_id, "ORD-T-ECHEC", 2_400).await;
-    auth::with_actor(
+    // Le deuxième arrêt doit être ajouté AVANT le départ : `add_stop` refuse
+    // une tournée `in_progress` (« ses arrêts ne peuvent plus être modifiés »).
+    // Une tournée se prépare, puis part — on ne la modifie pas en route.
+    let order_a = make_order(&db, client_id, "ORD-T-ECHEC-A", 4_600).await;
+    let order_b = make_order(&db, client_id, "ORD-T-ECHEC-B", 2_400).await;
+    let run = auth::with_actor(
         owner(),
-        delivery_runs::add_stop(
+        delivery_runs::create_run(
             &db,
-            run_id,
-            AddStopInput {
-                client_id,
-                order_id: Some(order_b),
-                sequence: None,
+            CreateRunInput {
+                run_date: "2026-11-24".into(),
+                driver_user_id: driver_id,
+                vehicle_label: None,
+                request_key: Some("k19-echec".into()),
+                notes: None,
             },
         ),
     )
     .await
     .unwrap();
-    // `load_run` refige l'attendu de TOUS les arrêts, y compris le nouveau.
-    // On relit ensuite depuis la base : le DTO renvoyé par `add_stop` est un
-    // instantané pris avant le rechargement, et l'arrêt B y vaut encore 0.
-    let detail = auth::with_actor(owner(), delivery_runs::load_run(&db, run_id))
+    for order_id in [order_a, order_b] {
+        auth::with_actor(
+            owner(),
+            delivery_runs::add_stop(
+                &db,
+                run.id,
+                AddStopInput {
+                    client_id,
+                    order_id: Some(order_id),
+                    sequence: None,
+                },
+            ),
+        )
         .await
         .unwrap();
-    let stop_b = detail
-        .stops
-        .iter()
-        .find(|s| s.id != stop_a)
-        .map(|s| s.id)
-        .expect("le deuxième arrêt doit exister après rechargement");
+    }
+    let detail = auth::with_actor(owner(), delivery_runs::load_run(&db, run.id))
+        .await
+        .unwrap();
+    let run_id = run.id;
+    let stop_a = detail.stops[0].id;
+    let stop_b = detail.stops[1].id;
+    auth::with_actor(owner(), delivery_runs::start_run(&db, run_id))
+        .await
+        .unwrap();
 
     declare(&db, run_id, stop_a, 4_600).await;
     auth::with_actor(
@@ -297,10 +324,16 @@ async fn a_failed_stop_counts_in_neither_expected_nor_declared() {
         .await
         .unwrap();
     let line = &status.runs_in_transit[0];
-    assert_eq!(line.expected_amount, 4_600, "l'arrêt en échec n'attend rien");
+    assert_eq!(
+        line.expected_amount, 4_600,
+        "l'arrêt en échec n'attend rien"
+    );
     assert_eq!(line.declared_amount, 4_600);
     assert_eq!(line.declared_stops, 1);
-    assert_eq!(line.planned_stops, 2, "mais il reste un arrêt prévu sur deux");
+    assert_eq!(
+        line.planned_stops, 2,
+        "mais il reste un arrêt prévu sur deux"
+    );
 }
 
 #[tokio::test]
