@@ -83,12 +83,20 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     const { token } = (await loginRes.json()) as { token: string };
     const auth = { Authorization: `Bearer ${token}` };
 
-    // Pas d'ouverture de session ici. La réconciliation en exige une, mais le
-    // Scénario 2 de `app.spec.ts` compte précisément sur une caisse FERMÉE pour
-    // vérifier le bouton « Ouvrir une session de caisse ». L'ouvrir d'ici l'a
-    // fait échouer. On se contente donc de constater l'état, et on s'arrête
-    // avec un message explicite s'il manque quelque chose : un échec de
-    // précondition ne doit pas ressembler à un échec de scénario.
+    // Session de caisse ouverte : la réconciliation l'exige. L'appel est
+    // idempotent — si une session existe déjà, le serveur répond
+    // SESSION_ALREADY_OPEN et la précondition est remplie.
+    //
+    // Le Scénario 2 de `app.spec.ts` vérifiait autrefois le bouton d'ouverture
+    // en supposant la caisse fermée ; il tolère désormais les deux états, donc
+    // ce scénario peut amorcer sans le casser.
+    const openRes = await page.request.post('/api/cash/open', {
+      headers: auth,
+      data: { opening_cash: 1000, request_key: 'e2e-scenario8-open' },
+    });
+    if (!openRes.ok()) {
+      expect((await openRes.json()).code).toBe('SESSION_ALREADY_OPEN');
+    }
     const statusRes = await page.request.get('/api/cash', { headers: auth });
     expect(statusRes.ok()).toBeTruthy();
     const cashStatus = (await statusRes.json()) as {
@@ -96,7 +104,7 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     };
     expect(
       cashStatus.activeSession,
-      'la réconciliation exige une session de caisse ouverte (Scénario 2)'
+      'la réconciliation exige une session de caisse ouverte'
     ).not.toBeNull();
 
     // --- Un livreur, via l'écran Paramètres (le vrai chemin) -----------------
