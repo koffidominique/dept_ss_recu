@@ -20,10 +20,8 @@ fn cashier() -> SessionIdentity {
 }
 
 async fn fresh_db(tag: &str) -> DepotDb {
-    let path = std::env::temp_dir().join(format!(
-        "depotpro_lot13_{tag}_{}.db",
-        uuid::Uuid::new_v4()
-    ));
+    let path =
+        std::env::temp_dir().join(format!("depotpro_lot13_{tag}_{}.db", uuid::Uuid::new_v4()));
     DepotDb::connect(&path).await.expect("connect")
 }
 
@@ -55,8 +53,8 @@ async fn seed(db: &DepotDb) -> (i64, i64, i64, i64) {
         .bind(username)
         .bind(role)
         .execute(&mut *tx)
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     }
     // Un caissier, pour verifier qu'il ne peut PAS etre livreur.
     sqlx::query(
@@ -146,7 +144,10 @@ async fn create_run_is_idempotent_on_request_key() {
         .await
         .unwrap();
 
-    assert_eq!(first.id, second.id, "rejouer la requête ne crée pas de doublon");
+    assert_eq!(
+        first.id, second.id,
+        "rejouer la requête ne crée pas de doublon"
+    );
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM delivery_runs")
         .fetch_one(&db.pool)
         .await
@@ -438,8 +439,8 @@ async fn expected_empty_pieces_follow_open_deposit_issues() {
         .bind(pieces * 1000)
         .bind(status)
         .execute(&mut *tx)
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     }
     tx.commit().await.unwrap();
 
