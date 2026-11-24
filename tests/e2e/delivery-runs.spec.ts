@@ -46,6 +46,32 @@ async function loginAs(page: Page, pin: string, username?: string) {
 test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
   test.describe.configure({ mode: 'serial' });
 
+  /**
+   * Ne pas dépendre de l'ordre des fichiers.
+   *
+   * Le PIN propriétaire est configuré par le Scénario 1 de `app.spec.ts` —
+   * mais rien ne garantit qu'il s'exécute avant ce fichier : Playwright
+   * ordonne les fichiers comme il l'entend, et la CI a déjà fait échouer ce
+   * scénario à la connexion, sur un écran « Créer votre PIN propriétaire ».
+   *
+   * On l'amorce donc ici. L'appel est idempotent par nature : si le PIN existe
+   * déjà, le serveur répond « déjà configuré » et on continue.
+   */
+  test.beforeAll(async ({ playwright }) => {
+    const ctx = await playwright.request.newContext({
+      baseURL: 'http://127.0.0.1:3100',
+    });
+    const res = await ctx.post('/api/auth/setup', { data: { pin: '123456' } });
+    if (!res.ok()) {
+      const body = (await res.json()) as { code?: string; message?: string };
+      // Seul « déjà configuré » est acceptable : tout le reste indiquerait que
+      // l'amorçage lui-même est cassé, et le test qui suit échouerait pour une
+      // raison trompeuse.
+      expect(body.message ?? '').toMatch(/déjà configuré/i);
+    }
+    await ctx.dispose();
+  });
+
   test('Scénario 8 — Parcours complet d’une tournée', async ({ page }) => {
     const errors = trackRuntimeErrors(page);
 
