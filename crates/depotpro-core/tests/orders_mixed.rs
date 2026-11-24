@@ -480,8 +480,6 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert_eq!(delivered.customer_deposits[0].quantity_held, 1);
     assert_eq!(delivered.customer_deposits[0].amount_held_xof, 1000);
 
-
-
     // Retour d'1 casier vide -> décrémente solde consigné & incrémente stock_empty
     let asset_id = created.allocations[0].packaging_asset_id;
     let after_ret = orders::return_order_packaging(
@@ -701,12 +699,8 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
     let db = DepotDb::connect(&temp_db_path("lot9c_deposit_issues"))
         .await
         .unwrap();
-    let approver = SessionIdentity::from_role(
-        "lot9c-owner",
-        "lot9c",
-        "Propriétaire Lot 9c",
-        Role::Owner,
-    );
+    let approver =
+        SessionIdentity::from_role("lot9c-owner", "lot9c", "Propriétaire Lot 9c", Role::Owner);
 
     // Base neuve : aucun consignable, l'actif 24x33 n'est pas rattache.
     let asset_id: i64 =
@@ -720,7 +714,10 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
             .fetch_one(&db.pool)
             .await
             .unwrap();
-    assert!(linked_before.is_none(), "aucun consignable sur une base neuve");
+    assert!(
+        linked_before.is_none(),
+        "aucun consignable sur une base neuve"
+    );
     // stock_empty suffisant pour allouer un casier
     sqlx::query("UPDATE packaging_assets SET stock_empty = 10 WHERE id = ?")
         .bind(asset_id)
@@ -793,11 +790,13 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
 
     // Facturer AVANT livrer : sinon deliver_order ne trouve aucune vente et
     // la consigne ne serait pas ecrite.
-    sqlx::query("UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?")
-        .bind(created.order.id)
-        .execute(&db.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?",
+    )
+    .bind(created.order.id)
+    .execute(&db.pool)
+    .await
+    .unwrap();
     auth::with_actor(
         approver.clone(),
         orders::invoice_order(&db, created.order.id),
@@ -805,9 +804,12 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
     .await
     .unwrap();
 
-    auth::with_actor(approver.clone(), orders::deliver_order(&db, created.order.id))
-        .await
-        .unwrap();
+    auth::with_actor(
+        approver.clone(),
+        orders::deliver_order(&db, created.order.id),
+    )
+    .await
+    .unwrap();
 
     // deliver_order a cree le consignable manquant ET rattache l'actif
     let returnable_id: i64 =
@@ -817,14 +819,12 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
             .await
             .expect("deliver_order doit rattacher l'actif à un consignable");
     assert!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT code FROM returnable_packaging_types WHERE id = ?"
-        )
-        .bind(returnable_id)
-        .fetch_one(&db.pool)
-        .await
-        .unwrap()
-        .starts_with("EMB-AUTO-"),
+        sqlx::query_scalar::<_, String>("SELECT code FROM returnable_packaging_types WHERE id = ?")
+            .bind(returnable_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap()
+            .starts_with("EMB-AUTO-"),
         "le consignable doit être déduit de l'actif"
     );
 
