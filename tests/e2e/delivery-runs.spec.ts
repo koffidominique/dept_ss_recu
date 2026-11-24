@@ -270,6 +270,11 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     await collectDialog.getByRole('button', { name: 'Déclarer' }).click();
     await expect(page.getByRole('button', { name: 'Encaissement' })).toBeHidden();
 
+    // Le bouton d'annulation doit avoir disparu : la tournée porte désormais de
+    // l'argent déclaré, et le cœur refuse de l'annuler (Lot 21). Proposer le
+    // bouton reviendrait à promettre une action impossible.
+    await expect(page.getByRole('button', { name: 'Annuler', exact: true })).toBeHidden();
+
     // --- Retour de tournée --------------------------------------------------
     await page.getByRole('button', { name: 'Tournée rentrée' }).click();
     await expect(page.getByText('Rentrée').first()).toBeVisible();

@@ -49,6 +49,14 @@ pub struct DeliveryRunStopDto {
     pub expected_empty_pieces: i64,
     pub status: String,
     pub failure_reason: Option<String>,
+    /// Somme declaree par le livreur sur cet arret (tous moyens confondus).
+    ///
+    /// L'ecran en a besoin pour une seule decision : une tournee qui porte de
+    /// l'argent ne s'annule plus (`cancel_run`), et le bouton ne doit donc
+    /// plus etre propose. Sans cette valeur, il faudrait soit l'afficher
+    /// quand meme et laisser echouer, soit lire le detail de chaque tournee
+    /// separement.
+    pub declared_amount: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -357,10 +365,44 @@ pub async fn cancel_run(
         tx.commit().await?;
         return Ok(dto);
     }
-    if !matches!(status.as_str(), "draft" | "loaded" | "in_progress") {
-        return Err(CoreError::Validation(format!(
-            "Une tournee au statut {status} ne peut pas etre annulee : elle porte deja des constats."
-        )));
+    if status != "draft" {
+        // Une tournée chargée ou partie peut encore être annulée — mais pas si
+        // le livreur a déjà déclaré de l'argent.
+        //
+        // Le besoin est réel et antérieur : si le véhicule ne part pas, ou si
+        // « Départ » a été cliqué par erreur, l'annulation est la seule sortie.
+        // L'écran l'affiche donc toujours.
+        //
+        // Ce qui est inacceptable, c'est de l'annuler APRÈS une déclaration.
+        // Les encaissements d'un livreur ne sont visibles que par deux chemins
+        // très étroits : l'état de caisse (tournées en cours) et la
+        // réconciliation (à partir de « rentrée »). Annuler les ferait sortir
+        // des deux : l'argent resterait en base, mais plus aucun écran ne
+        // pourrait le montrer, et `reconcile_run` refuse tout statut autre que
+        // `returned`. Il disparaîtrait de la comptabilité en restant dans les
+        // tables.
+        //
+        // Trois autres statuts sont déjà refusés plus haut (`returned`,
+        // `reconciled`, `cancelled`) : ils ont des constats et une sortie
+        // propre.
+        let declared: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)
+             FROM delivery_run_collections c
+             JOIN delivery_run_stops s ON s.id = c.stop_id
+             WHERE s.run_id = ?",
+        )
+        .bind(run_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if declared > 0 {
+            return Err(CoreError::Validation(
+                "Impossible d'annuler : le livreur a déjà déclaré des encaissements. \
+                 Les annuler ferait disparaître cet argent de la caisse. \
+                 Constatez chaque arrêt, déclarez le retour, puis réconciliez."
+                    .to_string(),
+            ));
+        }
     }
     let key = closed_key
         .filter(|k| !k.trim().is_empty())
@@ -482,9 +524,16 @@ async fn load_run_detail_tx(
     run_id: i64,
 ) -> CoreResult<DeliveryRunDetailDto> {
     let run = load_run_tx(tx, run_id).await?;
+    // `declared_amount` : somme des declarations du livreur sur cet arret.
+    // La sous-requete est correlee par `s.id`, et l'alias `s` est indispensable
+    // (meme piege que dans `load_run` : sans lui, `id` se resout dans la
+    // sous-requete elle-meme).
     let rows = sqlx::query(
         "SELECT s.id, s.run_id, s.client_id, c.name AS client_name, s.order_id, s.sequence,
-                s.expected_amount, s.expected_empty_pieces, s.status, s.failure_reason
+                s.expected_amount, s.expected_empty_pieces, s.status, s.failure_reason,
+                COALESCE((SELECT SUM(col.amount)
+                          FROM delivery_run_collections col
+                          WHERE col.stop_id = s.id), 0) AS declared_amount
          FROM delivery_run_stops s
          JOIN clients c ON c.id = s.client_id
          WHERE s.run_id = ?
@@ -506,6 +555,7 @@ async fn load_run_detail_tx(
             expected_empty_pieces: row.try_get("expected_empty_pieces")?,
             status: row.try_get("status")?,
             failure_reason: row.try_get("failure_reason")?,
+            declared_amount: row.try_get("declared_amount")?,
         });
     }
     Ok(DeliveryRunDetailDto { run, stops })

@@ -52,7 +52,11 @@ export interface RunActions {
   canReconcile: boolean;
 }
 
-export function runActions(status: DeliveryRunStatus, stopCount: number): RunActions {
+export function runActions(
+  status: DeliveryRunStatus,
+  stopCount: number,
+  declaredTotal = 0
+): RunActions {
   const editable = status === "draft" || status === "loaded";
   return {
     canAddStop: editable,
@@ -60,12 +64,19 @@ export function runActions(status: DeliveryRunStatus, stopCount: number): RunAct
     // geste, on ne le laisse pas échouer.
     canLoad: editable && stopCount > 0,
     canStart: status === "loaded",
-    // Le cœur accepte d'annuler une tournée qui roule déjà (`cancel_run` :
-    // draft, loaded, in_progress) : elle porte alors des constats, mais
-    // l'annulation reste la seule sortie si le véhicule ne part pas. Mon
-    // premier filtre l'interdisait, donc le gérant ne pouvait plus annuler une
-    // tournée partie par erreur.
-    canCancel: status === "draft" || status === "loaded" || status === "in_progress",
+    // Annuler une tournée partie par erreur doit rester possible : si le
+    // véhicule ne part pas, c'est la seule sortie. Mon premier filtre
+    // l'interdisait, et le gérant se retrouvait coincé.
+    //
+    // Mais le cœur refuse désormais l'annulation dès qu'une déclaration
+    // d'encaissement existe (`cancel_run`). Ce n'est pas une tracasserie :
+    // les déclarations d'un livreur ne sont visibles que dans l'état de caisse
+    // (tournées en cours) et dans la réconciliation (à partir de « rentrée »).
+    // Annuler les ferait disparaître des deux. On ne propose donc pas un
+    // bouton qui échouerait.
+    canCancel:
+      (status === "draft" || status === "loaded" || status === "in_progress") &&
+      declaredTotal === 0,
     // Les constats d'arrêt se posent pendant la tournée et au retour : le
     // gérant peut encore corriger un statut resté « prévu » après coup.
     canRecordOutcome: status === "in_progress" || status === "returned",

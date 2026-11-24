@@ -53,6 +53,7 @@ function stop(over: Partial<DeliveryRunStop> = {}): DeliveryRunStop {
     expected_empty_pieces: 0,
     status: 'planned',
     failure_reason: null,
+    declared_amount: 0,
     ...over,
   };
 }
@@ -291,15 +292,44 @@ test('un arrêt en échec ou ignoré n’encaisse rien', () => {
 
 /* --- Alignement écran / cœur --------------------------------------------- */
 
-test('annuler reste possible sur une tournée qui roule', () => {
-  // `cancel_run` accepte draft, loaded et in_progress. Mon premier filtre
-  // s'arrêtait à loaded : le gérant ne pouvait plus annuler une tournée partie
-  // par erreur, alors que c'est précisément le cas où on en a besoin.
+test('annuler reste possible tant que rien n\'est encaissé', () => {
+  // Le gérant doit pouvoir annuler une tournée partie par erreur : si le
+  // véhicule ne part pas, c'est la seule sortie.
   assert.equal(runActions('draft', 2).canCancel, true);
   assert.equal(runActions('loaded', 2).canCancel, true);
   assert.equal(runActions('in_progress', 2).canCancel, true);
   assert.equal(runActions('returned', 2).canCancel, false, 'rentrée = constats posés');
   assert.equal(runActions('reconciled', 2).canCancel, false);
+});
+
+test('annuler disparaît dès que le livreur a déclaré de l\'argent', () => {
+  // Ce test remplace une croyance. La version précédente affirmait que
+  // l'annulation restait possible « sur une tournée qui roule », en se fondant
+  // sur ce que `cancel_run` acceptait. C'était vrai, et c'était le défaut :
+  // les déclarations du livreur ne sont visibles que dans l'état de caisse
+  // (tournées en cours) et dans la réconciliation (à partir de « rentrée »).
+  // Annuler les faisait sortir des deux — l'argent quittait la comptabilité
+  // en restant dans les tables.
+  assert.equal(
+    runActions('in_progress', 2, 4600).canCancel,
+    false,
+    'argent déclaré = plus d\'annulation'
+  );
+  assert.equal(
+    runActions('loaded', 2, 4600).canCancel,
+    false,
+    'une déclaration peut précéder le départ : le cas est couvert aussi'
+  );
+  assert.equal(
+    runActions('draft', 2, 4600).canCancel,
+    false,
+    'règle unique, sans exception de statut'
+  );
+  assert.equal(
+    runActions('in_progress', 2, 0).canCancel,
+    true,
+    'sac vide = annulation toujours possible'
+  );
 });
 
 test('le départ exige Manage, pas Execute', () => {

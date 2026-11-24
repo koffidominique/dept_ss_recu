@@ -45,6 +45,15 @@ export interface DeliveryRunStop {
   expected_empty_pieces: number;
   status: DeliveryRunStopStatus;
   failure_reason: string | null;
+  /**
+   * Somme déclarée par le livreur sur cet arrêt, tous moyens confondus.
+   *
+   * Sert à une décision : une tournée qui porte de l'argent ne s'annule plus
+   * (le jour de l'annulation, ses encaissements sortiraient de tous les
+   * écrans). Le bouton « Annuler » disparaît donc dès qu'un arrêt déclare
+   * quelque chose.
+   */
+  declared_amount: number;
 }
 
 export interface DeliveryRunDetail {

@@ -400,7 +400,10 @@ function RunDetail({
   }
 
   const { run, stops } = detailQuery.data;
-  const actions = runActions(run.status, stops.length);
+  // L'annulation dépend de l'argent déjà déclaré : une tournée qui en porte
+  // ne s'annule plus côté cœur, donc on ne propose pas le bouton.
+  const declaredTotal = stops.reduce((sum, st) => sum + (st.declared_amount ?? 0), 0);
+  const actions = runActions(run.status, stops.length, declaredTotal);
 
   return (
     <>
