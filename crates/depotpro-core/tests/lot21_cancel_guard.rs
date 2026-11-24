@@ -200,10 +200,7 @@ async fn a_returned_run_never_cancels_even_without_any_declaration() {
         .await
         .unwrap();
 
-    let refused = step!(
-        "cancel_run (doit être refusé)",
-        auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None))
-    );
+    let refused = auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None)).await;
     assert!(
         refused.is_err(),
         "une tournée revenue porte des constats : elle ne s'annule pas"
