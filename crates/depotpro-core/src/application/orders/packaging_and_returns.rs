@@ -19,7 +19,8 @@ pub(crate) async fn load_customer_deposits(
     customer_id: i64,
 ) -> CoreResult<Vec<CustomerDepositBalanceDto>> {
     let rows: Vec<CustomerDepositBalanceDto> = sqlx::query_as(
-        "SELECT cdb.id, cdb.customer_id, cdb.packaging_asset_id, pa.name AS packaging_name,
+        "SELECT cdb.id, cdb.customer_id, cdb.packaging_asset_id, pa.returnable_id,
+                pa.name AS packaging_name,
                 pa.compatibility_class, pa.deposit_value, cdb.quantity_held, cdb.amount_held_xof,
                 cdb.last_movement_at
          FROM customer_deposit_balances cdb
@@ -174,7 +175,7 @@ pub(crate) async fn sync_customer_deposit_asset_delta_tx(
     Ok(())
 }
 
-async fn apply_customer_empty_return_tx(
+pub(super) async fn apply_customer_empty_return_tx(
     tx: &mut Transaction<'_, Sqlite>,
     customer_id: i64,
     order_id: Option<i64>,

@@ -65,6 +65,11 @@ export interface CreateCustomerOrderInput {
   allow_price_override?: boolean;
   lines: OrderLineInput[];
   allocations?: OrderAllocationOverrideInput[] | null;
+  /**
+   * Vides rapportés au comptoir pendant la commande. Appliqués dans la même
+   * transaction : la commande échoue si un retour est invalide.
+   */
+  returned_empties?: Array<{ packaging_asset_id: number; quantity: number }> | null;
 }
 
 export interface OrderTotals {
@@ -187,12 +192,40 @@ export interface CustomerDepositBalance {
   id: number;
   customer_id: number;
   packaging_asset_id: number;
+  /** Consignable lié (nullable) : clé du rapprochement avec les consignes dues. */
+  returnable_id: number | null;
   packaging_name: string;
   compatibility_class: string;
   deposit_value: number;
   quantity_held: number;
   amount_held_xof: number;
   last_movement_at: string | null;
+}
+
+/**
+ * Consigne ouverte, telle que `list_obligations` la renvoie.
+ *
+ * Une consigne est rattachée à une VENTE et à un CONSIGNABLE. Pour décider ce
+ * qu'un retour physique solde, c'est l'agrégat par consignable qui compte : le
+ * client raisonne en casiers, pas en ventes.
+ */
+export interface PackagingObligationRef {
+  id: number;
+  sale_id: number;
+  sale_reference: string | null;
+  client_id: number | null;
+  returnable_id: number;
+  pieces: number;
+  returned_pieces: number;
+  lost_pieces: number;
+  destroyed_pieces: number;
+  converted_pieces: number;
+  pending_pieces: number;
+  unit_value: number;
+  total_reference_value: number;
+  due_date: string | null;
+  overdue: boolean;
+  status: string;
 }
 
 export interface PackagingMovementRecord {
