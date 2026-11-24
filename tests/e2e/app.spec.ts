@@ -36,13 +36,30 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     const errors = trackRuntimeErrors(page);
 
     await page.goto('/login');
-    await expect(page.getByText('Créer votre PIN propriétaire')).toBeVisible();
-    await enterPinDigits(page, '123456');
-    await page.getByRole('button', { name: 'Continuer' }).click();
 
-    await expect(page.getByText('Confirmer le code PIN')).toBeVisible();
-    await enterPinDigits(page, '123456');
-    await page.getByRole('button', { name: 'Enregistrer et accéder' }).click();
+    // Ce scénario était le seul à configurer le PIN propriétaire, et supposait
+    // donc implicitement être le premier fichier exécuté. Playwright ordonne
+    // les fichiers comme il l'entend : `delivery-runs.spec.ts` est déjà passé
+    // avant lui et a amorcé le PIN. On accepte les deux états de départ.
+    //
+    // Le montage de bout en bout (deux saisies, deux écrans) reste vérifié
+    // quand l'écran de création s'affiche réellement.
+    const ownerPinConfigured = await page
+      .getByRole('button', { name: 'Déverrouiller' })
+      .isVisible();
+
+    if (!ownerPinConfigured) {
+      await expect(page.getByText('Créer votre PIN propriétaire')).toBeVisible();
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Continuer' }).click();
+
+      await expect(page.getByText('Confirmer le code PIN')).toBeVisible();
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Enregistrer et accéder' }).click();
+    } else {
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Déverrouiller' }).click();
+    }
 
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();

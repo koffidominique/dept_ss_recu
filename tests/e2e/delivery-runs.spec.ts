@@ -63,11 +63,10 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     });
     const res = await ctx.post('/api/auth/setup', { data: { pin: '123456' } });
     if (!res.ok()) {
-      const body = (await res.json()) as { code?: string; message?: string };
-      // Seul « déjà configuré » est acceptable : tout le reste indiquerait que
-      // l'amorçage lui-même est cassé, et le test qui suit échouerait pour une
-      // raison trompeuse.
-      expect(body.message ?? '').toMatch(/déjà configuré/i);
+      const body = (await res.json()) as { message?: string };
+      if (!/déjà configuré/i.test(body.message ?? '')) {
+        throw new Error(`Amorçage du PIN impossible : ${JSON.stringify(body)}`);
+      }
     }
     await ctx.dispose();
   });
@@ -115,7 +114,13 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     //     par le Scénario 6, on ne la refait pas ici) -------------------------
     const clientRes = await page.request.post('/api/clients', {
       headers: auth,
-      data: { name: 'Maquis Tournée E2E', client_type: 'professionnel' },
+      data: {
+        name: 'Maquis Tournée E2E',
+        client_type: 'professionnel',
+        // `credit_policy` n'a pas de défaut côté cœur : « Politique de crédit
+        // explicite requise ». Un maquis de tournée paie comptant.
+        credit_policy: 'forbidden',
+      },
     });
     expect(clientRes.ok(), `création client : ${await clientRes.text()}`).toBeTruthy();
     const client = (await clientRes.json()) as { id: number; name: string };
