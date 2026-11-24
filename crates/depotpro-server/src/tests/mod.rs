@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+mod delivery_http_tests;
 mod lot9_parity_tests;
 mod orders_http_tests;
 mod security_tests;

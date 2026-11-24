@@ -148,7 +148,18 @@ impl Role {
             // Il n'a NI CashOperate, NI SalesWrite, NI quoi que ce soit qui
             // touche a la caisse : c'est la garantie structurelle que son sac
             // reste separe de la caisse du depot (cf. DECISIONS_TOURNEES §2).
-            Role::Driver => &[Permission::DeliveryRunsExecute],
+            // Read est indispensable : sans lui le livreur peut demarrer une
+            // tournee (Execute) mais ne peut pas en lire les arrets, donc il ne
+            // sait pas ou aller. Execute seul etait une impasse.
+            //
+            // Limite connue : Read n'est pas filtre par ligne. Un livreur voit
+            // donc toutes les tournees, pas seulement les siennes. Acceptable a
+            // l'echelle d'un depot (quelques livreurs) ; a filtrer par
+            // driver_user_id le jour ou ca ne l'est plus.
+            Role::Driver => &[
+                Permission::DeliveryRunsRead,
+                Permission::DeliveryRunsExecute,
+            ],
             Role::Accountant => &[
                 Permission::CatalogRead,
                 Permission::SalesRead,
