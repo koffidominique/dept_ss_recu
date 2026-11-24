@@ -277,9 +277,12 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     ).toBeVisible();
     await expect(recDialog.getByLabel('Montant compté dans le sac *')).toBeVisible();
 
-    // Déclarer un montant compté égal au déclaré : pas d'écart, donc pas de
-    // motif à saisir.
-    await recDialog.getByLabel('Montant compté dans le sac *').fill('0');
+    // Le champ est pré-rempli avec le déclaré par le livreur (4 800) : on ne
+    // le touche pas, et on vérifie que la modale l'a bien repris. C'est ce qui
+    // garantit « aucun écart, donc aucun motif à saisir » — mettre 0 aurait
+    // créé un manquant de 4 800 et exigé un motif, que ce scénario ne saisit
+    // pas.
+    await expect(recDialog.getByLabel('Montant compté dans le sac *')).toHaveValue('4800');
     await recDialog.getByRole('button', { name: 'Réconcilier et encaisser' }).click();
     await expect(page.getByText('Réconciliée').first()).toBeVisible();
 
