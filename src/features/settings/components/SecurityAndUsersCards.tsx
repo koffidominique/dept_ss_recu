@@ -204,6 +204,7 @@ export function UsersRbacCard({
           <option value="stock_manager">Magasinier</option>
           <option value="manager">Gérant</option>
           <option value="accountant">Comptable</option>
+          <option value="driver">Livreur</option>
           <option value="admin">Administrateur</option>
         </select>
         <input

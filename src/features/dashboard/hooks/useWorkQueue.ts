@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useUiStore } from '../../../stores/uiStore.ts';
+import {
+  hasPermission,
+  PERMISSIONS,
+  type PermissionName,
+} from '../../quality/utils/permissions.ts';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { CustomerOrderSummary } from '../../../types/erp.ts';
 import type { InventoryRecord } from '../../inventory/types.ts';
@@ -14,41 +20,56 @@ import {
  * Charge les sources nécessaires à la file de travail du tableau de bord.
  *
  * Choix assumé : chaque source est une requête indépendante avec sa propre
- * erreur. Une seule source indisponible (ex. `/backups` refusé) ne doit pas
- * faire disparaître la file entière — on dégrade par élément manquant et on
- * l'annonce explicitement dans l'interface.
+ * erreur. Une seule source indisponible ne doit pas faire disparaître la file
+ * entière — on dégrade par élément manquant et on l'annonce explicitement dans
+ * l'interface.
+ *
+ * Ce que ce commentaire disait sans que le code le fasse : une source à
+ * laquelle l'utilisateur n'a pas droit partait quand même, encaissait un 403,
+ * et salissait la console. Le tableau de bord est la page d'arrivée après
+ * connexion : un livreur y déclenchait sept requêtes interdites d'un coup.
+ * Chaque requête est donc liée à la permission qui la rend lisible.
  */
 export function useWorkQueue() {
   const now = new Date();
+  const currentUser = useUiStore((s) => s.currentUser);
+
+  const can = (p: PermissionName) => hasPermission(currentUser, p);
 
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => apiClient.getDashboard(),
+    enabled: can(PERMISSIONS.reportsRead),
   });
 
   const cashQuery = useQuery({
     queryKey: ['cash'],
     queryFn: () => apiClient.getCashStatus(),
+    enabled: can(PERMISSIONS.cashRead),
   });
 
   const ordersQuery = useQuery({
     queryKey: ['customer-orders'],
     queryFn: () => apiClient.listCustomerOrders(),
+    enabled: can(PERMISSIONS.salesRead),
   });
 
   const inventoriesQuery = useQuery({
     queryKey: ['inventories'],
     queryFn: () => apiClient.listInventories(),
+    enabled: can(PERMISSIONS.stockRead),
   });
 
   const consignmentsQuery = useQuery({
     queryKey: ['consignments'],
     queryFn: () => apiClient.getConsignmentsOverview(),
+    enabled: can(PERMISSIONS.consignmentsRead),
   });
 
   const localDbQuery = useQuery({
     queryKey: ['local-db-status'],
     queryFn: () => apiClient.getLocalDbStatus(),
+    enabled: can(PERMISSIONS.settingsRead),
   });
 
   const items = useMemo<WorkQueueItem[]>(() => {

@@ -28,7 +28,8 @@ export type UserRole =
   | "manager"
   | "cashier"
   | "stock_manager"
-  | "accountant";
+  | "accountant"
+  | "driver";
 
 export interface SessionUser {
   userId: string;

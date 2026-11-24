@@ -4,6 +4,8 @@
 
 use crate::application::auth::{current_actor, require_current_actor_permission, Permission};
 use crate::application::sales::audit_log_tx;
+
+use super::packaging_and_returns::apply_customer_empty_return_tx;
 use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
 
@@ -157,6 +159,41 @@ pub async fn create_order(db: &DepotDb, input: CreateOrderInput) -> CoreResult<O
         input.allocations.as_deref(),
     )
     .await?;
+    // Vides rapportes au comptoir : appliques DANS la transaction de la
+    // commande. Si un retour est invalide, la commande entiere est annulee —
+    // c'est voulu : une commande enregistree avec des consignes non deduites
+    // laisserait le client avec une dette qu'il vient justement de payer.
+    if let Some(retours) = input.returned_empties.as_deref() {
+        if !retours.is_empty() {
+            let acteur = current_actor();
+            if acteur
+                .as_ref()
+                .map(|a| !a.has_permission(Permission::ConsignmentsWrite))
+                .unwrap_or(true)
+            {
+                return Err(CoreError::Validation(
+                    "Le retour d'emballages vides exige la permission consignments:write."
+                        .to_string(),
+                ));
+            }
+            for retour in retours {
+                if retour.quantity <= 0 {
+                    continue;
+                }
+                apply_customer_empty_return_tx(
+                    &mut tx,
+                    input.customer_id,
+                    None,
+                    None,
+                    retour.packaging_asset_id,
+                    retour.quantity,
+                    Some("Retour saisi à la commande"),
+                )
+                .await?;
+            }
+        }
+    }
+
     audit_log_tx(
         &mut tx,
         "create_order",

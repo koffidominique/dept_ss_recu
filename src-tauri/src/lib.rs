@@ -274,6 +274,19 @@ pub fn run() {
             commands::orders::get_customer_deposits_v4,
             commands::orders::get_customer_deposit_history_v4,
             commands::orders::return_customer_deposits_v4,
+            commands::delivery::list_delivery_runs,
+            commands::delivery::get_delivery_run,
+            commands::delivery::create_delivery_run,
+            commands::delivery::add_delivery_stop,
+            commands::delivery::load_delivery_run,
+            commands::delivery::start_delivery_run,
+            commands::delivery::cancel_delivery_run,
+            commands::delivery::declare_delivery_collection,
+            commands::delivery::record_delivery_stop_outcome,
+            commands::delivery::record_delivery_run_return,
+            commands::delivery::return_delivery_run,
+            commands::delivery::reconcile_delivery_run,
+            commands::delivery::get_delivery_reconciliation,
         ])
         .build(tauri::generate_context!())
         .expect("Erreur fatale au démarrage de DEPOTPRO Desktop");

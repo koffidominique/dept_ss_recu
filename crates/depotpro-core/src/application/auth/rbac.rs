@@ -14,6 +14,7 @@ pub enum Role {
     Cashier,
     StockManager,
     Accountant,
+    Driver,
 }
 
 impl Role {
@@ -25,6 +26,7 @@ impl Role {
             Role::Cashier => "cashier",
             Role::StockManager => "stock_manager",
             Role::Accountant => "accountant",
+            Role::Driver => "driver",
         }
     }
 
@@ -36,6 +38,7 @@ impl Role {
             Role::Cashier => "Caissier",
             Role::StockManager => "Gestionnaire de stock",
             Role::Accountant => "Comptable",
+            Role::Driver => "Livreur",
         }
     }
 
@@ -47,6 +50,7 @@ impl Role {
             "cashier" => Ok(Role::Cashier),
             "stock_manager" => Ok(Role::StockManager),
             "accountant" => Ok(Role::Accountant),
+            "driver" => Ok(Role::Driver),
             other => Err(CoreError::Validation(format!("Rôle inconnu : {other}"))),
         }
     }
@@ -80,6 +84,9 @@ impl Role {
                 Permission::BackupsCreate,
                 Permission::BackupsRestore,
                 Permission::SecurityManageUsers,
+                Permission::DeliveryRunsRead,
+                Permission::DeliveryRunsManage,
+                Permission::DeliveryRunsReconcile,
             ],
             Role::Manager => &[
                 Permission::CatalogRead,
@@ -104,6 +111,9 @@ impl Role {
                 Permission::SettingsRead,
                 Permission::BackupsRead,
                 Permission::BackupsCreate,
+                Permission::DeliveryRunsRead,
+                Permission::DeliveryRunsManage,
+                Permission::DeliveryRunsReconcile,
             ],
             Role::Cashier => &[
                 Permission::CatalogRead,
@@ -118,6 +128,8 @@ impl Role {
                 Permission::CashOperate,
                 Permission::ExpensesWrite,
                 Permission::SettingsRead,
+                Permission::DeliveryRunsRead,
+                Permission::DeliveryRunsReconcile,
             ],
             Role::StockManager => &[
                 Permission::CatalogRead,
@@ -130,6 +142,23 @@ impl Role {
                 Permission::ConsignmentsRead,
                 Permission::ConsignmentsWrite,
                 Permission::SettingsRead,
+                Permission::DeliveryRunsRead,
+            ],
+            // Un livreur ne voit que ses tournees et declare ses encaissements.
+            // Il n'a NI CashOperate, NI SalesWrite, NI quoi que ce soit qui
+            // touche a la caisse : c'est la garantie structurelle que son sac
+            // reste separe de la caisse du depot (cf. DECISIONS_TOURNEES §2).
+            // Read est indispensable : sans lui le livreur peut demarrer une
+            // tournee (Execute) mais ne peut pas en lire les arrets, donc il ne
+            // sait pas ou aller. Execute seul etait une impasse.
+            //
+            // Limite connue : Read n'est pas filtre par ligne. Un livreur voit
+            // donc toutes les tournees, pas seulement les siennes. Acceptable a
+            // l'echelle d'un depot (quelques livreurs) ; a filtrer par
+            // driver_user_id le jour ou ca ne l'est plus.
+            Role::Driver => &[
+                Permission::DeliveryRunsRead,
+                Permission::DeliveryRunsExecute,
             ],
             Role::Accountant => &[
                 Permission::CatalogRead,
@@ -142,6 +171,7 @@ impl Role {
                 Permission::ReportsRead,
                 Permission::SettingsRead,
                 Permission::BackupsRead,
+                Permission::DeliveryRunsRead,
             ],
         }
     }
@@ -181,6 +211,10 @@ pub enum Permission {
     BackupsRestore,
     SecurityManageUsers,
     SecurityChangeOwnerPin,
+    DeliveryRunsRead,
+    DeliveryRunsManage,
+    DeliveryRunsExecute,
+    DeliveryRunsReconcile,
 }
 
 impl Permission {
@@ -212,6 +246,10 @@ impl Permission {
         Permission::BackupsRestore,
         Permission::SecurityManageUsers,
         Permission::SecurityChangeOwnerPin,
+        Permission::DeliveryRunsRead,
+        Permission::DeliveryRunsManage,
+        Permission::DeliveryRunsExecute,
+        Permission::DeliveryRunsReconcile,
     ];
 
     pub fn code(self) -> &'static str {
@@ -243,6 +281,10 @@ impl Permission {
             Permission::BackupsRestore => "backups:restore",
             Permission::SecurityManageUsers => "security:manage_users",
             Permission::SecurityChangeOwnerPin => "security:change_owner_pin",
+            Permission::DeliveryRunsRead => "delivery_runs:read",
+            Permission::DeliveryRunsManage => "delivery_runs:manage",
+            Permission::DeliveryRunsExecute => "delivery_runs:execute",
+            Permission::DeliveryRunsReconcile => "delivery_runs:reconcile",
         }
     }
 }

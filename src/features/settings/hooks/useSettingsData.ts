@@ -1,11 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
+import { useUiStore } from '../../../stores/uiStore.ts';
+import { hasPermission, PERMISSIONS } from '../../quality/utils/permissions.ts';
 import type { AppSettings, UserAccount, UserRole } from '../../../types/erp.ts';
 
+/**
+ * Réglages de l'entreprise et comptes opérateurs.
+ *
+ * Ce hook est monté par `AppLayout`, donc sur TOUTES les pages : c'est lui qui
+ * fournit l'en-tête (logo, nom) et la durée d'inactivité. Les deux lectures
+ * exigeaient pourtant des droits que peu de rôles possèdent — `SettingsRead`
+ * pour les réglages, `SecurityManageUsers` pour les comptes. Un livreur, dont
+ * le rôle ne porte que la livraison, déclenchait donc deux 403 à chaque
+ * changement d'écran.
+ *
+ * Elles ne partent plus que si l'utilisateur peut les lire. L'en-tête retombe
+ * alors sur le nom par défaut, ce qui est le comportement voulu pour un compte
+ * qui n'a pas accès aux réglages.
+ */
 export function useSettingsQueries() {
+  const currentUser = useUiStore((s) => s.currentUser);
+  const canReadSettings = hasPermission(currentUser, PERMISSIONS.settingsRead);
+  const canManageUsers = hasPermission(currentUser, PERMISSIONS.securityManageUsers);
+
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: () => apiClient.getSettings(),
+    enabled: canReadSettings,
   });
 
   const usersQuery = useQuery<UserAccount[]>({
@@ -18,6 +39,7 @@ export function useSettingsQueries() {
         return [];
       }
     },
+    enabled: canManageUsers,
   });
 
   return { settingsQuery, usersQuery };

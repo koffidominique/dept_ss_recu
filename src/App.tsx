@@ -25,6 +25,9 @@ const InventoryPage = lazy(() => import('./pages/InventoryPage.tsx').then((m) =>
 const ConsignmentsPage = lazy(() =>
   import('./pages/ConsignmentsPage.tsx').then((m) => ({ default: m.ConsignmentsPage }))
 );
+const DeliveryRunsPage = lazy(() =>
+  import('./pages/DeliveryRunsPage.tsx').then((m) => ({ default: m.DeliveryRunsPage }))
+);
 const SuppliersPage = lazy(() => import('./pages/SuppliersPage.tsx').then((m) => ({ default: m.SuppliersPage })));
 const PurchasesPage = lazy(() => import('./pages/PurchasesPage.tsx').then((m) => ({ default: m.PurchasesPage })));
 const CashPage = lazy(() => import('./pages/CashPage.tsx').then((m) => ({ default: m.CashPage })));
@@ -133,6 +136,7 @@ export default function App() {
                   <Route path="/stock" element={<StockPage />} />
                   <Route path="/inventories" element={<InventoryPage />} />
                   <Route path="/consignments" element={<ConsignmentsPage />} />
+                  <Route path="/delivery-runs" element={<DeliveryRunsPage />} />
                   <Route path="/suppliers" element={<SuppliersPage />} />
                   <Route path="/purchases" element={<PurchasesPage />} />
                   <Route path="/cash" element={<CashPage />} />

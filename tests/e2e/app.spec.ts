@@ -36,13 +36,34 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     const errors = trackRuntimeErrors(page);
 
     await page.goto('/login');
-    await expect(page.getByText('Créer votre PIN propriétaire')).toBeVisible();
-    await enterPinDigits(page, '123456');
-    await page.getByRole('button', { name: 'Continuer' }).click();
 
-    await expect(page.getByText('Confirmer le code PIN')).toBeVisible();
-    await enterPinDigits(page, '123456');
-    await page.getByRole('button', { name: 'Enregistrer et accéder' }).click();
+    // Ce scénario était le seul à configurer le PIN propriétaire, et supposait
+    // donc implicitement être le premier fichier exécuté. Playwright ordonne
+    // les fichiers comme il l'entend : `delivery-runs.spec.ts` est déjà passé
+    // avant lui et a amorcé le PIN. On accepte les deux états de départ.
+    //
+    // Le montage de bout en bout (deux saisies, deux écrans) reste vérifié
+    // quand l'écran de création s'affiche réellement.
+    // Attendre que l'écran ait décidé : `isVisible()` seul ne patiente pas et
+    // peut répondre « faux » sur un rendu encore en cours, ce qui a fait
+    // tomber le test juste après.
+    const pinConfiguredScreen = page.getByRole('button', { name: 'Déverrouiller' });
+    const setupScreen = page.getByText('Créer votre PIN propriétaire');
+    await expect(pinConfiguredScreen.or(setupScreen)).toBeVisible();
+    const ownerPinConfigured = await pinConfiguredScreen.isVisible();
+
+    if (!ownerPinConfigured) {
+      await expect(setupScreen).toBeVisible();
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Continuer' }).click();
+
+      await expect(page.getByText('Confirmer le code PIN')).toBeVisible();
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Enregistrer et accéder' }).click();
+    } else {
+      await enterPinDigits(page, '123456');
+      await page.getByRole('button', { name: 'Déverrouiller' }).click();
+    }
 
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
@@ -62,10 +83,17 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
 
     await page.goto('/cash');
     await expect(page.getByRole('heading', { name: 'Session de caisse', level: 1 })).toBeVisible();
-    await page.getByRole('button', { name: /Ouvrir une session de caisse/i }).click();
-    const cashDialog = page.getByRole('dialog');
-    await cashDialog.locator('input').first().fill('50000');
-    await cashDialog.getByRole('button', { name: "Confirmer l'ouverture" }).click();
+
+    // Une session peut déjà être ouverte : le Scénario 6 en ouvre une, et
+    // Playwright ne garantit pas l'ordre des fichiers. On n'ouvre donc que si
+    // le bouton est là, mais l'état final attendu, lui, ne change pas.
+    const openButton = page.getByRole('button', { name: /Ouvrir une session de caisse/i });
+    if (await openButton.isVisible()) {
+      await openButton.click();
+      const cashDialog = page.getByRole('dialog');
+      await cashDialog.locator('input').first().fill('50000');
+      await cashDialog.getByRole('button', { name: "Confirmer l'ouverture" }).click();
+    }
     await expect(page.getByRole('heading', { name: /Session active/i })).toBeVisible();
 
     await page.goto('/products');
@@ -289,6 +317,11 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
 
     const bockVarId = await makeProd('Bock 33cl E2E', 'BOCK-E2E');
     const drogbaVarId = await makeProd('Drogba 33cl E2E', 'DROGBA-E2E');
+
+    // Lot 9c : la livraison trace désormais la consigne dans deposit_issues.
+    // L'actif d'emballage seedé n'ayant pas de consignable sur une base neuve,
+    // c'est deliver_order qui crée et rattache le consignable à la volée
+    // (comme `apply_catalog_presets`). Aucun préalable côté test.
 
     await page.goto('/orders');
     await expect(

@@ -28,6 +28,7 @@ export const EMPTY_ORDER_DRAFT: OrderDraftState = {
   notes: '',
   lines: [],
   custom_allocations: null,
+  returned_empties: [],
 };
 
 export function useOrdersWizard() {
@@ -61,6 +62,11 @@ export function useOrdersWizard() {
     queryKey: ['customer-deposits', draft.customer_id],
     enabled: Boolean(draft.customer_id),
     queryFn: () => apiClient.getCustomerDeposits(draft.customer_id!),
+  });
+  const obligationsQuery = useQuery({
+    queryKey: ['packaging-obligations', draft.customer_id],
+    enabled: Boolean(draft.customer_id),
+    queryFn: () => apiClient.listPackagingObligations(draft.customer_id!),
   });
   const depositHistoryQuery = useQuery({
     queryKey: ['customer-deposit-history', draft.customer_id],
@@ -196,6 +202,12 @@ export function useOrdersWizard() {
                 deposit_amount_xof: a.deposit_amount_xof,
               }))
             : null,
+          returned_empties: draft.returned_empties.length
+            ? draft.returned_empties.map((r) => ({
+                packaging_asset_id: r.packaging_asset_id,
+                quantity: r.pieces,
+              }))
+            : null,
         };
         return await (editingOrderId
           ? apiClient.updateCustomerOrder(editingOrderId, payload)
@@ -258,6 +270,9 @@ export function useOrdersWizard() {
         unit_price_xof: l.unit_price_xof,
       })),
       custom_allocations: null,
+      // On repart d'un brouillon propre : un retour saisi sur une commande
+      // precedente ne doit pas etre reapplique silencieusement a celle-ci.
+      returned_empties: [],
     });
     setStep(2);
   };
@@ -275,6 +290,7 @@ export function useOrdersWizard() {
     setError,
     clients: clientsQuery.data ?? [],
     deposits: depositsQuery.data ?? [],
+    customerObligations: obligationsQuery.data ?? [],
     depositHistory: depositHistoryQuery.data ?? [],
     orders: ordersQuery.data ?? [],
     variantOptions,

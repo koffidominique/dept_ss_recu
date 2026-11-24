@@ -64,12 +64,36 @@ pub struct CashSummaryDto {
     pub movements: Vec<CashMovementDto>,
 }
 
+/// Une tournée dont l'argent est encore dans le sac du livreur.
+///
+/// Cet argent n'est PAS en caisse : il est en transit. L'afficher dans l'état
+/// de caisse sans le compter dans le théorique est le seul moyen de répondre à
+/// « où est passé l'argent ? » sans rendre le tiroir faux.
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct RunInTransitDto {
+    pub run_id: i64,
+    pub reference: String,
+    pub run_date: String,
+    pub driver_name: String,
+    pub status: String,
+    /// Somme des encaissements déclarés par le livreur sur les arrêts livrés.
+    pub declared_amount: i64,
+    /// Somme des attendus des arrêts livrés (figée au chargement).
+    pub expected_amount: i64,
+    pub declared_stops: i64,
+    pub planned_stops: i64,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CashStatusDto {
     pub active_session: Option<CashSessionDto>,
     pub summary: Option<CashSummaryDto>,
     pub history: Vec<CashSessionDto>,
+    /// Argent en transit, hors caisse. Toujours présent, même sans session
+    /// ouverte : le livreur peut être sur la route avant l'ouverture du tiroir.
+    pub runs_in_transit: Vec<RunInTransitDto>,
 }
 
 #[derive(Debug, Serialize, FromRow)]

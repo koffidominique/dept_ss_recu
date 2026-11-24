@@ -11,6 +11,7 @@ import type { CustomerOrderReceiptSnapshot, PreviewAllocation } from '../types/e
 import { OrderStepClient } from '../features/orders/components/OrderStepClient.tsx';
 import { OrderStepLines } from '../features/orders/components/OrderStepLines.tsx';
 import { OrderStepPackaging } from '../features/orders/components/OrderStepPackaging.tsx';
+import { ReturnedEmptiesPanel } from '../features/orders/components/ReturnedEmptiesPanel.tsx';
 import { OrderStepReview } from '../features/orders/components/OrderStepReview.tsx';
 import { OrderStepConfirm } from '../features/orders/components/OrderStepConfirm.tsx';
 import { OrdersListTable } from '../features/orders/components/OrdersListTable.tsx';
@@ -51,6 +52,7 @@ export function OrdersPage() {
     setError,
     clients,
     deposits,
+    customerObligations,
     depositHistory,
     orders,
     variantOptions,
@@ -200,13 +202,25 @@ export function OrdersPage() {
 
         <div className="mt-4">
           {step === 1 && (
-            <OrderStepClient
-              clients={clients}
-              customerId={draft.customer_id}
-              onSelectCustomer={(id) => setDraft((d) => ({ ...d, customer_id: id }))}
-              deposits={deposits}
-              depositHistory={depositHistory}
-            />
+            <>
+              <OrderStepClient
+                clients={clients}
+                customerId={draft.customer_id}
+                onSelectCustomer={(id) => setDraft((d) => ({ ...d, customer_id: id }))}
+                deposits={deposits}
+                depositHistory={depositHistory}
+              />
+              <div className="mt-4">
+                <ReturnedEmptiesPanel
+                  deposits={deposits}
+                  obligations={customerObligations}
+                  clientName={activeClient?.name ?? null}
+                  value={draft.returned_empties ?? []}
+                  onChange={(returned_empties) => setDraft((d) => ({ ...d, returned_empties }))}
+                  disabled={!draft.customer_id}
+                />
+              </div>
+            </>
           )}
           {step === 2 && (
             <OrderStepLines
@@ -262,6 +276,10 @@ export function OrdersPage() {
               }
               notes={draft.notes}
               onChangeNotes={(notes) => setDraft((d) => ({ ...d, notes }))}
+              returnedEmpties={draft.returned_empties.map((r) => ({
+                packaging_name: r.packaging_name,
+                pieces: r.pieces,
+              }))}
             />
           )}
           {step === 5 && activeOrder && (

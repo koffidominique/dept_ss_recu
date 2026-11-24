@@ -2,11 +2,11 @@
 
 ## Prérequis
 
-- **Node.js `>= 22.0`** (utilise le module natif `node:sqlite` / `DatabaseSync`) et `npm`.
+- **Node.js `>= 22.0`** et `npm` (frontend React/Vite : build, contrôles, tests web).
+- **Toolchain Rust stable** (`rustc`, `cargo`) : **obligatoire**, l'API est servie par `crates/depotpro-server`.
 - **Navigateur moderne** (Chromium, Firefox, Edge ou Safari récent) pour l'interface React et l'impression PDF.
-- *(Optionnel — pour le binaire serveur Rust)* : Toolchain Rust stable (`rustc`, `cargo`) et compilateur C de la plateforme.
 
-## 1. Mode Node.js + Express + Vite (Runtime principal fourni)
+## 1. Mode Web : frontend Vite + API Axum
 
 ### Installation des dépendances
 ```bash
@@ -20,16 +20,21 @@ npm install
 
 ### Démarrage en développement
 ```bash
-npm run dev
+npm run dev          # terminal 1 : frontend Vite
+npm run dev:server   # terminal 2 : API Axum sur http://127.0.0.1:3000
 ```
-Le serveur démarre sur `http://127.0.0.1:3000`, applique automatiquement `migrations/sqlite/0001_initial_v3.sql` si la base n'existe pas encore, et initialise les données de référence minimales (`payment_methods`, `app_settings`).
+Le serveur applique automatiquement les migrations de `migrations/sqlite/` si la
+base n'existe pas encore, puis initialise les données de référence minimales
+(`payment_methods`, `app_settings`).
 
 ### Build et démarrage en production
 ```bash
 npm run build
 NODE_ENV=production npm start
 ```
-`npm run build` génère les assets frontend dans `dist/`, puis `npm start` (`node server.ts`) sert simultanément l'API `/api/*` et le bundle statique `dist/` sur le port `3000`.
+`npm run build` génère les assets frontend dans `dist/`, puis `npm start`
+(`NODE_ENV=production cargo run -p depotpro-server`) sert simultanément l'API
+`/api/*` et le bundle statique `dist/` sur le port `3000`.
 
 ### Premier accès
 Aucun code PIN par défaut n'est préconfiguré. À la première ouverture, l'écran de configuration demande la création du **code PIN propriétaire à 6 chiffres**.

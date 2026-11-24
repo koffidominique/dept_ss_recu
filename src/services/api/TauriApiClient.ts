@@ -10,6 +10,7 @@ import {
   tauriSalesApi,
 } from "./tauri/tauriCommerceCommands.ts";
 import { tauriOrdersApi } from "./tauri/tauriOrdersCommands.ts";
+import { tauriDeliveryApi } from "./tauri/tauriDeliveryCommands.ts";
 import { tauriCommercialDocumentsApi } from "./tauri/tauriCommercialDocuments.ts";
 import {
   tauriConsignmentsApi,
@@ -154,6 +155,21 @@ export class TauriApiClient implements ApiClient {
   getCustomerDeposits = tauriOrdersApi.getCustomerDeposits;
   getCustomerDepositHistory = tauriOrdersApi.getCustomerDepositHistory;
   returnCustomerDeposits = tauriOrdersApi.returnCustomerDeposits;
+
+  /* --- Tournées de livraison --- */
+  listDeliveryRuns = tauriDeliveryApi.listDeliveryRuns;
+  getDeliveryRun = tauriDeliveryApi.getDeliveryRun;
+  createDeliveryRun = tauriDeliveryApi.createDeliveryRun;
+  addDeliveryStop = tauriDeliveryApi.addDeliveryStop;
+  loadDeliveryRun = tauriDeliveryApi.loadDeliveryRun;
+  startDeliveryRun = tauriDeliveryApi.startDeliveryRun;
+  cancelDeliveryRun = tauriDeliveryApi.cancelDeliveryRun;
+  declareDeliveryCollection = tauriDeliveryApi.declareDeliveryCollection;
+  recordDeliveryStopOutcome = tauriDeliveryApi.recordDeliveryStopOutcome;
+  recordDeliveryRunReturn = tauriDeliveryApi.recordDeliveryRunReturn;
+  returnDeliveryRun = tauriDeliveryApi.returnDeliveryRun;
+  reconcileDeliveryRun = tauriDeliveryApi.reconcileDeliveryRun;
+  getDeliveryReconciliation = tauriDeliveryApi.getDeliveryReconciliation;
 
   /* --- Paramètres, Sauvegardes & PDF --- */
   getSettings = tauriSystemApi.getSettings;

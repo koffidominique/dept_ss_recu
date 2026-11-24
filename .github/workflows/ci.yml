@@ -125,6 +125,13 @@ jobs:
   rust-core-tests:
     name: 7. Tests Rust Core (depotpro-core)
     runs-on: ubuntu-latest
+    # Un job de tests ne doit pas pouvoir pendre indefiniment.
+    #
+    # Constate : un run est reste "in progress" plus de 70 minutes, sans log
+    # ni annotation. Rien dans le workflow ne bornait sa duree, donc GitHub
+    # attendait. Un test bloque doit echouer avec un message, pas immobiliser
+    # la PR : ce timeout transforme un gel en echec exploitable.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -67,6 +67,20 @@ pub struct CreateOrderInput {
     pub allow_price_override: Option<bool>,
     pub lines: Vec<OrderLineInput>,
     pub allocations: Option<Vec<OrderAllocationOverrideInput>>,
+    /// Emballages vides que le client rapporte AU MOMENT de la commande.
+    ///
+    /// Deux canaux existent : au dépôt (ce champ) et chez le client via le
+    /// livreur (tournée). Ici on ne traite que le premier. Appliqué dans la
+    /// même transaction que la commande : soit les deux passent, soit aucun.
+    #[serde(default)]
+    pub returned_empties: Option<Vec<ReturnedEmptyInput>>,
+}
+
+/// Un retour d'emballage vide saisi au comptoir pendant la commande.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReturnedEmptyInput {
+    pub packaging_asset_id: i64,
+    pub quantity: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -234,6 +248,10 @@ pub struct CustomerDepositBalanceDto {
     pub id: i64,
     pub customer_id: i64,
     pub packaging_asset_id: i64,
+    /// Consignable lie (packaging_assets.returnable_id, nullable).
+    /// C'est la cle qui permet de rapprocher un retour physique des consignes
+    /// `deposit_issues`, qui sont tenues par consignable et non par asset.
+    pub returnable_id: Option<i64>,
     pub packaging_name: String,
     pub compatibility_class: String,
     pub deposit_value: i64,

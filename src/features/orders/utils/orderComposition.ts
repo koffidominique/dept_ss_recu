@@ -20,6 +20,20 @@ export interface DraftOrderLine {
   unit_price_xof: number;
 }
 
+/**
+ * Emballage vide que le client rapporte EN PASSANT commande.
+ *
+ * Deux canaux existent : au dépôt (ici) et chez lui via le livreur (tournée).
+ * Ce champ ne couvre que le premier. Le second se saisit à l'écran de tournée,
+ * qui écrit `delivery_run_return_allocations`.
+ */
+export interface DraftReturnedEmpty {
+  returnable_id: number;
+  packaging_asset_id: number;
+  packaging_name: string;
+  pieces: number;
+}
+
 export interface OrderDraftState {
   customer_id: number | null;
   payment_method: "cash" | "mobile_money" | "credit" | "mixed";
@@ -34,6 +48,8 @@ export interface OrderDraftState {
   notes: string;
   lines: DraftOrderLine[];
   custom_allocations: PreviewAllocation[] | null;
+  /** Vides rapportés au comptoir, à déduire des consignes à l'enregistrement. */
+  returned_empties: DraftReturnedEmpty[];
 }
 
 const DRAFT_STORAGE_KEY = "depotpro.order_draft.v1";
@@ -58,6 +74,7 @@ export function loadOrderDraft(): OrderDraftState | null {
       notes: parsed.notes ?? "",
       lines: parsed.lines,
       custom_allocations: parsed.custom_allocations ?? null,
+      returned_empties: Array.isArray(parsed.returned_empties) ? parsed.returned_empties : [],
     };
   } catch {
     return null;

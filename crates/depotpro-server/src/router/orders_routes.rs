@@ -5,7 +5,9 @@
 use axum::routing::{get, patch, post};
 use axum::Router;
 
-use crate::handlers::{catalogue_variants_and_prices, orders, orders_packaging, products};
+use crate::handlers::{
+    catalogue_variants_and_prices, delivery, orders, orders_packaging, products,
+};
 use crate::state::AppState;
 
 pub(crate) fn orders_and_variants_router() -> Router<AppState> {
@@ -71,5 +73,36 @@ pub(crate) fn orders_and_variants_router() -> Router<AppState> {
         .route(
             "/api/customers/:id/deposits/returns",
             post(orders_packaging::return_customer_deposits),
+        )
+        // Tournées de livraison (Lots 13 & 14)
+        .route(
+            "/api/delivery-runs",
+            get(delivery::list_runs).post(delivery::create_run),
+        )
+        .route("/api/delivery-runs/:id", get(delivery::get_run))
+        .route("/api/delivery-runs/:id/stops", post(delivery::add_stop))
+        .route("/api/delivery-runs/:id/load", post(delivery::load_run))
+        .route("/api/delivery-runs/:id/start", post(delivery::start_run))
+        .route("/api/delivery-runs/:id/cancel", post(delivery::cancel_run))
+        .route(
+            "/api/delivery-runs/:id/collections",
+            post(delivery::register_collection),
+        )
+        .route(
+            "/api/delivery-runs/:id/stops/outcome",
+            post(delivery::record_stop_outcome),
+        )
+        .route(
+            "/api/delivery-runs/:id/returns",
+            post(delivery::record_run_return),
+        )
+        .route("/api/delivery-runs/:id/return", post(delivery::return_run))
+        .route(
+            "/api/delivery-runs/:id/reconcile",
+            post(delivery::reconcile_run),
+        )
+        .route(
+            "/api/delivery-runs/:id/reconciliation",
+            get(delivery::get_reconciliation),
         )
 }

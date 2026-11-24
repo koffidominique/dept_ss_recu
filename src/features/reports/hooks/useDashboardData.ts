@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { apiClient } from '../../../services/api/createApiClient.ts';
+import { useUiStore } from '../../../stores/uiStore.ts';
+import { hasPermission, PERMISSIONS } from '../../quality/utils/permissions.ts';
 
 export interface MonthlyDayRow {
   day: string;
@@ -15,6 +17,9 @@ export interface MonthlyDayRow {
 
 export function useDashboardData() {
   const qc = useQueryClient();
+  const currentUser = useUiStore((s) => s.currentUser);
+  const canReadReports = hasPermission(currentUser, PERMISSIONS.reportsRead);
+  const canReadSettings = hasPermission(currentUser, PERMISSIONS.settingsRead);
 
   const { monthFrom, monthTo, monthLabel, daysInMonth, yearMonth } = useMemo(() => {
     const now = new Date();
@@ -32,9 +37,13 @@ export function useDashboardData() {
     };
   }, []);
 
+  // Le tableau de bord est la page d'arrivée : sans ce filtre, un livreur y
+  // demandait le tableau de bord, les réglages et les rapports du mois —
+  // trois lectures refusées, à chaque connexion.
   const dashboardQuery = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => apiClient.getDashboard(),
+    enabled: canReadReports,
   });
 
   const settingsQuery = useQuery({
@@ -43,11 +52,13 @@ export function useDashboardData() {
       typeof apiClient.getSettings === 'function'
         ? apiClient.getSettings().catch(() => null)
         : Promise.resolve(null),
+    enabled: canReadSettings,
   });
 
   const monthlyReportQuery = useQuery({
     queryKey: ['reports', 'current-month', monthFrom, monthTo],
     queryFn: () => apiClient.getReports(monthFrom, monthTo),
+    enabled: canReadReports,
   });
 
   const onboardingMutation = useMutation({

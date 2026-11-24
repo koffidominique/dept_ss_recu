@@ -24,6 +24,8 @@ interface OrderStepReviewProps {
   onChangeDeliveryLandmark: (v: string) => void;
   notes: string;
   onChangeNotes: (v: string) => void;
+  /** Vides rapportés au comptoir, déduits des consignes à l'enregistrement. */
+  returnedEmpties?: Array<{ packaging_name: string; pieces: number }>;
 }
 
 export function OrderStepReview({
@@ -49,6 +51,7 @@ export function OrderStepReview({
   onChangeDeliveryLandmark,
   notes,
   onChangeNotes,
+  returnedEmpties = [],
 }: OrderStepReviewProps) {
   const creditForbidden =
     paymentMethod === 'credit' && (!client || client.credit_policy === 'forbidden');
@@ -278,6 +281,21 @@ export function OrderStepReview({
           />
         </div>
       </div>
+
+      {returnedEmpties.length > 0 && (
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 text-xs">
+          <div className="font-semibold text-emerald-900 dark:text-emerald-300">
+            Emballages vides rapportés — déduits à l&apos;enregistrement
+          </div>
+          <p className="mt-1 text-emerald-900 dark:text-emerald-200">
+            {returnedEmpties.map((r) => `${r.pieces} ${r.packaging_name}`).join(', ')}.
+          </p>
+          <p className="mt-1 text-[11px] text-[#667085] dark:text-slate-400">
+            Ces retours soldent les consignes ouvertes les plus anciennes. S&apos;il en reste après
+            déduction, elles apparaissent dans le total consigne ci-dessus.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

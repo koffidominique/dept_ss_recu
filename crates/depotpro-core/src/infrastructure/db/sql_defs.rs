@@ -54,6 +54,13 @@ pub const V3_MIGRATION_0024_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0024_documents_refactor_premium.sql");
 pub const V3_MIGRATION_0025_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0025_deposit_issues_sale_line_id_nullable.sql");
+pub const V3_MIGRATION_0026_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0026_link_packaging_assets_to_returnables.sql");
+pub const V3_MIGRATION_0027_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0027_delivery_runs.sql");
+
+pub const V3_MIGRATION_0028_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0028_delivery_run_reconciliation.sql");
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {
@@ -188,10 +195,25 @@ pub const MIGRATIONS: &[MigrationDef] = &[
         name: "0025_deposit_issues_sale_line_id_nullable",
         sql: V3_MIGRATION_0025_SQL,
     },
+    MigrationDef {
+        version: 26,
+        name: "0026_link_packaging_assets_to_returnables",
+        sql: V3_MIGRATION_0026_SQL,
+    },
+    MigrationDef {
+        version: 27,
+        name: "0027_delivery_runs",
+        sql: V3_MIGRATION_0027_SQL,
+    },
+    MigrationDef {
+        version: 28,
+        name: "0028_delivery_run_reconciliation",
+        sql: V3_MIGRATION_0028_SQL,
+    },
 ];
 
 pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = 1;
-pub const CURRENT_SCHEMA_VERSION: i64 = 25;
+pub const CURRENT_SCHEMA_VERSION: i64 = 28;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationRunReport {

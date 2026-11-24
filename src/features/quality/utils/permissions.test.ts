@@ -143,6 +143,13 @@ describe('cohérence avec la matrice RBAC du serveur', () => {
       'backups:restore',
       'security:manage_users',
       'security:change_owner_pin',
+      // Tournées de livraison : `Role::Owner` porte `Permission::ALL`, donc les
+      // quatre. Le test énumère les codes à la main ; oublier une permission
+      // ici fait échouer la balade sur les routes, pas la matrice serveur.
+      'delivery_runs:read',
+      'delivery_runs:manage',
+      'delivery_runs:execute',
+      'delivery_runs:reconcile',
     ];
     for (const route of Object.keys(ROUTE_PERMISSIONS)) {
       assert.equal(canAccessRoute(user(owner), route), true, `owner refusé sur ${route}`);
@@ -190,5 +197,18 @@ describe('cohérence avec la matrice RBAC du serveur', () => {
     assert.equal(canAccessRoute(user(accountant), '/expenses'), false);
     assert.equal(canAccessRoute(user(accountant), '/backups'), true);
     assert.equal(canAccessRoute(user(accountant), '/stock'), true);
+  });
+
+  it('un livreur ouvre les tournées, un caissier aussi, mais pas un cuisinier', () => {
+    // Role::Driver : delivery_runs:read + execute, et rien d'autre qui touche à
+    // la caisse. C'est la garantie structurelle que son sac reste séparé de la
+    // caisse du dépôt.
+    const driver = ['delivery_runs:read', 'delivery_runs:execute'];
+    assert.equal(canAccessRoute(user(driver), '/delivery-runs'), true);
+    // Role::Cashier porte delivery_runs:read + reconcile.
+    assert.equal(canAccessRoute(user(['delivery_runs:read', 'delivery_runs:reconcile']), '/delivery-runs'), true);
+    // Un rôle sans delivery_runs:read est refusé.
+    assert.equal(canAccessRoute(user(['stock:read']), '/delivery-runs'), false);
+    assert.equal(canAccessRoute(user([]), '/delivery-runs'), false);
   });
 });

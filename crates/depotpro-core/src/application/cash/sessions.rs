@@ -10,7 +10,7 @@ use crate::infrastructure::db::DepotDb;
 
 use super::{
     CashMovementDto, CashSessionDto, CashStatusDto, CashSummaryDto, CloseCashInput,
-    MethodSummaryDto, OpenCashInput,
+    MethodSummaryDto, OpenCashInput, RunInTransitDto,
 };
 
 pub async fn get_cash_status(db: &DepotDb) -> CoreResult<CashStatusDto> {
@@ -75,10 +75,58 @@ pub async fn get_cash_status(db: &DepotDb) -> CoreResult<CashStatusDto> {
     .fetch_all(&db.pool)
     .await?;
 
+    // Argent en transit : les encaissements déclarés par les livreurs.
+    //
+    // Sans ce bloc, ces montants n'existaient nulle part hors de la
+    // réconciliation : ni en caisse (à raison — les compter rendrait le tiroir
+    // faux), ni dans aucun écran. Un gérant qui se demande « où est passé
+    // l'argent encaissé ce matin ? » n'avait aucune réponse.
+    //
+    // Toujours calculé, même sans session ouverte : une tournée peut être sur
+    // la route avant que le tiroir ne le soit.
+    let runs_in_transit = sqlx::query_as::<_, RunInTransitDto>(
+        // ATTENTION, verifie a la duree : `FromRow` lit le nom **SQL** de la
+        // colonne, pas le nom Rust. Avec `rename_all = "camelCase"`, le nom
+        // Rust est `run_id`, donc l'alias SQL doit rester `run_id` ; mettre
+        // `AS run_id` echoue a l'execution avec « no column found for name:
+        // run_id », et pas a la compilation.
+        //
+        // Le `rename_all` ne concerne QUE la serialisation JSON envoyee au
+        // front, ou les champs sortent bien en camelCase.
+        "SELECT dr.id AS run_id,
+                dr.reference AS reference,
+                dr.run_date AS run_date,
+                u.display_name AS driver_name,
+                dr.status AS status,
+                COALESCE((SELECT SUM(c.amount)
+                          FROM delivery_run_collections c
+                          JOIN delivery_run_stops s ON s.id = c.stop_id
+                          WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
+                    AS declared_amount,
+                COALESCE((SELECT SUM(s.expected_amount)
+                          FROM delivery_run_stops s
+                          WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
+                    AS expected_amount,
+                COALESCE((SELECT COUNT(DISTINCT s.id)
+                          FROM delivery_run_collections c
+                          JOIN delivery_run_stops s ON s.id = c.stop_id
+                          WHERE s.run_id = dr.id AND s.status = 'delivered'), 0)
+                    AS declared_stops,
+                (SELECT COUNT(*) FROM delivery_run_stops s WHERE s.run_id = dr.id)
+                    AS planned_stops
+         FROM delivery_runs dr
+         JOIN users u ON u.id = dr.driver_user_id
+         WHERE dr.status = 'in_progress'
+         ORDER BY dr.run_date DESC, dr.id DESC",
+    )
+    .fetch_all(&db.pool)
+    .await?;
+
     Ok(CashStatusDto {
         active_session,
         summary,
         history,
+        runs_in_transit,
     })
 }
 

@@ -10,6 +10,7 @@ import {
   httpSalesApi,
 } from './http/httpCommerceRoutes.ts';
 import { httpOrdersApi } from './http/httpOrdersRoutes.ts';
+import { httpDeliveryApi } from './http/httpDeliveryRoutes.ts';
 import { httpCommercialDocumentsApi } from './http/httpCommercialDocuments.ts';
 import {
   httpConsignmentsApi,
@@ -153,6 +154,21 @@ export class HttpApiClient implements ApiClient {
   getCustomerDeposits = httpOrdersApi.getCustomerDeposits;
   getCustomerDepositHistory = httpOrdersApi.getCustomerDepositHistory;
   returnCustomerDeposits = httpOrdersApi.returnCustomerDeposits;
+
+  /* --- Tournées de livraison --- */
+  listDeliveryRuns = httpDeliveryApi.listDeliveryRuns;
+  getDeliveryRun = httpDeliveryApi.getDeliveryRun;
+  createDeliveryRun = httpDeliveryApi.createDeliveryRun;
+  addDeliveryStop = httpDeliveryApi.addDeliveryStop;
+  loadDeliveryRun = httpDeliveryApi.loadDeliveryRun;
+  startDeliveryRun = httpDeliveryApi.startDeliveryRun;
+  cancelDeliveryRun = httpDeliveryApi.cancelDeliveryRun;
+  declareDeliveryCollection = httpDeliveryApi.declareDeliveryCollection;
+  recordDeliveryStopOutcome = httpDeliveryApi.recordDeliveryStopOutcome;
+  recordDeliveryRunReturn = httpDeliveryApi.recordDeliveryRunReturn;
+  returnDeliveryRun = httpDeliveryApi.returnDeliveryRun;
+  reconcileDeliveryRun = httpDeliveryApi.reconcileDeliveryRun;
+  getDeliveryReconciliation = httpDeliveryApi.getDeliveryReconciliation;
 
   /* --- Paramètres, Sauvegardes & PDF --- */
   getSettings = httpSystemApi.getSettings;
