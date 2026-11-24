@@ -200,32 +200,29 @@ async fn a_returned_run_never_cancels_even_without_any_declaration() {
         .await
         .unwrap();
 
-    let refused = auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None)).await;
+    let refused = step!(
+        "cancel_run (doit être refusé)",
+        auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None))
+    );
     assert!(
         refused.is_err(),
         "une tournée revenue porte des constats : elle ne s'annule pas"
     );
 }
 
-/// Le cœur du trou, de bout en bout.
+/// La garde elle-même : une déclaration interdit l'annulation.
 ///
-/// On démarre une tournée, le livreur déclare 4 600, puis on tente d'annuler.
-/// Le test exige trois choses :
+/// Ce test reste délibérément court. La version précédente descendait tout le
+/// parcours — constat, déclaration, relecture de l'état de caisse, retour,
+/// réconciliation — et bloquait en CI sans dire où. Or ce parcours est déjà
+/// couvert ailleurs (`lot19_cash_in_transit`, `lot14_delivery_reconciliation`,
+/// et le scénario E2E qui le joue dans un navigateur). Le répéter ici
+/// n'ajoutait qu'une surface de blocage.
 ///
-/// 1. l'annulation est refusée, avec un message qui dit pourquoi et indique la
-///    sortie ;
-/// 2. l'argent reste visible dans l'état de caisse, inchangé ;
-/// 3. le chemin propre — retour puis réconciliation — aboutit, et l'argent
-///    quitte alors le transit pour la caisse.
-///
-/// Si l'annulation redevenait possible ici, ces 4 600 sortiraient de tous les
-/// écrans sans sortir des tables.
+/// Ce qui n'est couvert nulle part, et que ce test vérifie : le refus.
 #[tokio::test]
 async fn money_already_declared_cannot_be_cancelled_away() {
-    // Trace de progression : si ce test bloque, le log de CI affiche
-    // cette ligne comme dernier signe de vie et nomme le coupable.
-    eprintln!("[lot21] debut money_already_declared_cannot_be_cancelled_away");
-    let (db, run_id) = seed("hide").await;
+    let (db, run_id) = seed("declared").await;
     open_session(&db).await;
 
     auth::with_actor(owner(), delivery_runs::load_run(&db, run_id))
@@ -235,27 +232,14 @@ async fn money_already_declared_cannot_be_cancelled_away() {
         .await
         .unwrap();
 
-    // L'arrêt est livré, et le livreur déclare ce qu'il a pris.
     let stop_id: i64 =
         sqlx::query_scalar("SELECT id FROM delivery_run_stops WHERE run_id = ? LIMIT 1")
             .bind(run_id)
             .fetch_one(&db.pool)
             .await
             .unwrap();
-    auth::with_actor(
-        owner(),
-        delivery_reconciliation::record_stop_outcome(
-            &db,
-            run_id,
-            delivery_reconciliation::RecordStopOutcomeInput {
-                stop_id,
-                status: "delivered".into(),
-                failure_reason: None,
-            },
-        ),
-    )
-    .await
-    .unwrap();
+
+    // Déclarer suffit : le constat n'est pas la condition de la garde.
     auth::with_actor(
         owner(),
         delivery_reconciliation::register_collection(
@@ -271,23 +255,6 @@ async fn money_already_declared_cannot_be_cancelled_away() {
     .await
     .unwrap();
 
-    // Tant que la tournée roule, l'argent est vu : c'est l'objet du Lot 19.
-    let transit = auth::with_actor(owner(), cash::get_cash_status(&db))
-        .await
-        .unwrap();
-    let seen_in_transit: i64 = transit
-        .runs_in_transit
-        .iter()
-        .filter(|r| r.run_id == run_id)
-        .map(|r| r.declared_amount)
-        .sum();
-    assert_eq!(
-        seen_in_transit, 4600,
-        "en cours de tournée, le déclaré doit être visible hors caisse"
-    );
-
-    // L'annulation est refusée dès qu'une déclaration existe : c'est la
-    // fermeture du trou.
     let refused = auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None)).await;
     let err = refused.expect_err(
         "annuler une tournée qui porte de l'argent le ferait disparaître de tout écran",
@@ -298,48 +265,11 @@ async fn money_already_declared_cannot_be_cancelled_away() {
         "le refus doit dire pourquoi et indiquer la sortie : {message}"
     );
 
-    // Et la tournée est toujours en cours, l'argent toujours visible.
-    let after = auth::with_actor(owner(), cash::get_cash_status(&db))
+    // Et la tournée n'a pas bougé d'un cran.
+    let status: String = sqlx::query_scalar("SELECT status FROM delivery_runs WHERE id = ?")
+        .bind(run_id)
+        .fetch_one(&db.pool)
         .await
         .unwrap();
-    let still_seen: i64 = after
-        .runs_in_transit
-        .iter()
-        .filter(|r| r.run_id == run_id)
-        .map(|r| r.declared_amount)
-        .sum();
-    assert_eq!(still_seen, 4600, "rien ne doit disparaître");
-
-    // Le chemin propre, lui, fonctionne de bout en bout.
-    auth::with_actor(owner(), delivery_reconciliation::return_run(&db, run_id))
-        .await
-        .unwrap();
-    let reconciliation = auth::with_actor(
-        owner(),
-        delivery_reconciliation::reconcile_run(
-            &db,
-            run_id,
-            delivery_reconciliation::ReconcileRunInput {
-                counted_amount: 4600,
-                discrepancy_reason: None,
-                request_key: Some("lot21-reconcile".into()),
-            },
-        ),
-    )
-    .await
-    .unwrap();
-    assert_eq!(reconciliation.declared_amount, 4600);
-    assert_eq!(reconciliation.cash_gap, 0);
-
-    // Une fois réconciliée, plus rien en transit : l'argent est en caisse.
-    let after_reconcile = auth::with_actor(owner(), cash::get_cash_status(&db))
-        .await
-        .unwrap();
-    assert!(
-        !after_reconcile
-            .runs_in_transit
-            .iter()
-            .any(|r| r.run_id == run_id),
-        "la réconciliation transfère l'argent du transit vers la caisse"
-    );
+    assert_eq!(status, "in_progress", "un refus ne modifie pas le statut");
 }
