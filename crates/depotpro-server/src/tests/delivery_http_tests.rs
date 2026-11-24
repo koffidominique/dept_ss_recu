@@ -64,7 +64,10 @@ async fn delivery_routes_are_reachable_and_guarded() {
 
     // Sans jeton : refusé. Ce n'est pas la route qui manque, c'est l'accès.
     let (st_anon, _) = send_http(addr, "GET", "/api/delivery-runs", &[], None).await;
-    assert_eq!(st_anon, 401, "les tournées ne sont pas accessibles sans session");
+    assert_eq!(
+        st_anon, 401,
+        "les tournées ne sont pas accessibles sans session"
+    );
 
     let hdrs = [("Authorization", auth.as_str())];
 
@@ -95,7 +98,7 @@ async fn a_run_can_be_created_and_read_through_http() {
         "/api/auth/users",
         &hdrs,
         Some(
-            r#"{"username":"chauffeur","display_name":"Chauffeur Test","role":"driver","pin":"123456"}"#,
+            r#"{"username":"chauffeur","displayName":"Chauffeur Test","role":"driver","pin":"123456"}"#,
         ),
     )
     .await;
@@ -107,14 +110,7 @@ async fn a_run_can_be_created_and_read_through_http() {
     let payload = format!(
         r#"{{"run_date":"2026-11-24","driver_user_id":{driver_id},"vehicle_label":"Triporteur","request_key":"http-run-1"}}"#
     );
-    let (st, body) = send_http(
-        addr,
-        "POST",
-        "/api/delivery-runs",
-        &hdrs,
-        Some(&payload),
-    )
-    .await;
+    let (st, body) = send_http(addr, "POST", "/api/delivery-runs", &hdrs, Some(&payload)).await;
     assert_eq!(st, 201, "création de tournée : {body}");
     let run = serde_json::from_str::<serde_json::Value>(&body).unwrap();
     assert_eq!(run["status"], "draft");
@@ -125,17 +121,14 @@ async fn a_run_can_be_created_and_read_through_http() {
     let run_id = run["id"].as_i64().unwrap();
 
     // Rejouer la même requête ne crée pas de doublon, même par HTTP.
-    let (st2, body2) = send_http(
-        addr,
-        "POST",
-        "/api/delivery-runs",
-        &hdrs,
-        Some(&payload),
-    )
-    .await;
+    let (st2, body2) = send_http(addr, "POST", "/api/delivery-runs", &hdrs, Some(&payload)).await;
     assert_eq!(st2, 201);
     let again = serde_json::from_str::<serde_json::Value>(&body2).unwrap();
-    assert_eq!(again["id"].as_i64().unwrap(), run_id, "idempotence par request_key");
+    assert_eq!(
+        again["id"].as_i64().unwrap(),
+        run_id,
+        "idempotence par request_key"
+    );
 
     // Lecture détaillée : le contrat de sortie est celui attendu par le front.
     let (st_get, body_get) = send_http(
@@ -163,7 +156,7 @@ async fn reconciling_without_a_stop_or_session_is_refused_over_http() {
         "/api/auth/users",
         &hdrs,
         Some(
-            r#"{"username":"chauffeur2","display_name":"Chauffeur 2","role":"driver","pin":"123456"}"#,
+            r#"{"username":"chauffeur2","displayName":"Chauffeur 2","role":"driver","pin":"123456"}"#,
         ),
     )
     .await;
@@ -200,7 +193,10 @@ async fn reconciling_without_a_stop_or_session_is_refused_over_http() {
         Some(r#"{"counted_amount":0,"discrepancy_reason":null,"request_key":null}"#),
     )
     .await;
-    assert_eq!(st_rec, 422, "réconciliation impossible en draft : {msg_rec}");
+    assert_eq!(
+        st_rec, 422,
+        "réconciliation impossible en draft : {msg_rec}"
+    );
 }
 
 #[tokio::test]
@@ -214,7 +210,7 @@ async fn a_driver_can_start_but_not_reconcile_over_http() {
         "/api/auth/users",
         &hdrs,
         Some(
-            r#"{"username":"chauffeur3","display_name":"Chauffeur 3","role":"driver","pin":"123456"}"#,
+            r#"{"username":"chauffeur3","displayName":"Chauffeur 3","role":"driver","pin":"123456"}"#,
         ),
     )
     .await;
@@ -282,7 +278,10 @@ async fn a_driver_can_start_but_not_reconcile_over_http() {
         None,
     )
     .await;
-    assert_eq!(st_get, 200, "le livreur doit pouvoir lire ses arrêts : {body_get}");
+    assert_eq!(
+        st_get, 200,
+        "le livreur doit pouvoir lire ses arrêts : {body_get}"
+    );
 
     // Mais pas charger la tournée : c'est le gérant qui fige l'attendu.
     let (st_load, _) = send_http(
