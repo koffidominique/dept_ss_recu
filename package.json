@@ -16,7 +16,10 @@
     "test:e2e": "playwright test",
     "benchmark": "cargo run -p depotpro-core --example benchmark_perf",
     "seed:demo": "cargo run -p depotpro-core --example seed_demo",
-    "seed:catalog": "python3 scripts/seed_catalog.py"
+    "seed:catalog": "python3 scripts/seed_catalog.py",
+    "test:web": "tsx --import ./src/test/registerVirtualModules.ts --test --test-force-exit \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "test:visual": "node scripts/visual/audit.mjs",
+    "test:screens": "node scripts/visual/screens.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -55,6 +58,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
+    "axe-core": "^4.14.1",
     "esbuild": "^0.28.0",
     "eslint": "^10.15.0",
     "eslint-plugin-react-hooks": "^7.1.1",

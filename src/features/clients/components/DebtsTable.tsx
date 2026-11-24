@@ -23,7 +23,7 @@ export function DebtsTable({
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.client_name}</div>
-            <div className="text-xs text-[#667085]">{row.original.client_code}</div>
+            <div className="text-xs text-[#667085] dark:text-[#94A3B8]">{row.original.client_code}</div>
           </div>
         ),
       },
@@ -57,7 +57,7 @@ export function DebtsTable({
         cell: ({ row }) => (
           <span
             className={`font-mono-num font-semibold ${
-              row.original.remaining_amount > 0 ? 'text-[#D9901A]' : 'text-[#16A36A]'
+              row.original.remaining_amount > 0 ? 'text-[#8A5A0B] dark:text-[#FBBF24]' : 'text-[#16A36A]'
             }`}
           >
             {formatFcfa(row.original.remaining_amount)}
@@ -86,7 +86,7 @@ export function DebtsTable({
           return (
             <span
               className={`font-mono-num text-xs ${
-                overdue ? 'font-semibold text-[#DC4545]' : ''
+                overdue ? 'font-semibold text-[#BE123C]' : ''
               }`}
             >
               {formatDate(row.original.due_date)}
@@ -117,7 +117,7 @@ export function DebtsTable({
               <button
                 type="button"
                 onClick={() => onOpenPay(row.original)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A36A] px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D7A4C] px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
               >
                 <Wallet className="h-3.5 w-3.5" />
                 Encaisser

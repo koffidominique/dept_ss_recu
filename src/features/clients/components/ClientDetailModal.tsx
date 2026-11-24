@@ -85,18 +85,18 @@ export function ClientDetailModal({
         <div className="mt-4 space-y-5 text-xs">
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-              <div className="text-[#667085]">Solde créances</div>
-              <div className="mt-1 font-mono-num text-sm font-bold text-[#D9901A]">
+              <div className="text-[#667085] dark:text-[#94A3B8]">Solde créances</div>
+              <div className="mt-1 font-mono-num text-sm font-bold text-[#8A5A0B] dark:text-[#FBBF24]">
                 {formatFcfa(target.unpaid_balance)}
               </div>
               {pkgDebt > 0 && (
-                <div className="mt-0.5 text-[11px] text-[#667085]">
+                <div className="mt-0.5 text-[11px] text-[#667085] dark:text-[#94A3B8]">
                   dont {formatFcfa(pkgDebt)} emballages
                 </div>
               )}
             </div>
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-              <div className="text-[#667085]">Politique crédit</div>
+              <div className="text-[#667085] dark:text-[#94A3B8]">Politique crédit</div>
               <div className="mt-1 font-semibold">
                 {target.credit_policy === 'forbidden'
                   ? 'Interdit'
@@ -106,7 +106,7 @@ export function ClientDetailModal({
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-              <div className="text-[#667085]">Emballages dus</div>
+              <div className="text-[#667085] dark:text-[#94A3B8]">Emballages dus</div>
               <div className="mt-1 font-mono-num text-sm font-bold">
                 {target.returnable_pieces_due} pièce(s)
               </div>
@@ -137,7 +137,7 @@ export function ClientDetailModal({
               </div>
             )}
             {clientRecs.length === 0 && pkgDebt <= 0 ? (
-              <p className="text-[#667085]">Aucune créance enregistrée.</p>
+              <p className="text-[#667085] dark:text-[#94A3B8]">Aucune créance enregistrée.</p>
             ) : clientRecs.length === 0 ? null : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {clientRecs.map((r) => {
@@ -148,7 +148,7 @@ export function ClientDetailModal({
                         <span className="font-mono-num font-semibold">{r.sale_reference}</span>
                         <span
                           className={`ml-2 font-mono-num ${
-                            overdue ? 'text-[#DC4545] font-semibold' : 'text-[#667085]'
+                            overdue ? 'text-[#BE123C] font-semibold' : 'text-[#667085] dark:text-[#94A3B8]'
                           }`}
                         >
                           Échéance : {formatDate(r.due_date)} {overdue ? '(En retard)' : ''}
@@ -173,20 +173,20 @@ export function ClientDetailModal({
                 Emballages consignés dus ({clientBalances.length})
               </h4>
               {clientBalances.length > 0 && (
-                <span className="text-[11px] text-[#667085]">
+                <span className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                   Délai de restitution : 15 jours max
                 </span>
               )}
             </div>
             {clientBalances.length === 0 ? (
-              <p className="text-[#667085]">Aucun emballage en attente de retour.</p>
+              <p className="text-[#667085] dark:text-[#94A3B8]">Aucun emballage en attente de retour.</p>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {clientBalances.map((b) => (
                   <div key={b.id} className="flex items-center justify-between px-3 py-2">
                     <span>
                       {b.packaging_name}{' '}
-                      <span className="font-mono-num text-[#667085]">({b.packaging_code})</span>
+                      <span className="font-mono-num text-[#667085] dark:text-[#94A3B8]">({b.packaging_code})</span>
                     </span>
                     <span className="font-mono-num font-semibold">
                       {b.balance_pieces} pcs dues · Val. réf. {formatFcfa(b.deposit_held_amount)}
@@ -202,14 +202,14 @@ export function ClientDetailModal({
               Historique récent des ventes ({clientSales.length})
             </h4>
             {clientSales.length === 0 ? (
-              <p className="text-[#667085]">Aucune vente liée à ce client.</p>
+              <p className="text-[#667085] dark:text-[#94A3B8]">Aucune vente liée à ce client.</p>
             ) : (
               <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-lg border border-slate-200 dark:border-slate-800">
                 {clientSales.map((s) => (
                   <div key={s.id} className="flex items-center justify-between px-3 py-2">
                     <div>
                       <span className="font-mono-num font-semibold">{s.reference}</span>
-                      <span className="ml-2 font-mono-num text-[#667085]">
+                      <span className="ml-2 font-mono-num text-[#667085] dark:text-[#94A3B8]">
                         {formatDateTime(s.created_at)}
                       </span>
                     </div>

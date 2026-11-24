@@ -170,12 +170,7 @@ pub async fn register_packaging_late_return(
     let username = actor.username.clone();
     let credited_amount = auth::with_actor(
         actor,
-        packaging_obligations::register_late_return(
-            &db,
-            deposit_issue_id,
-            pieces,
-            Some(&username),
-        ),
+        packaging_obligations::register_late_return(&db, deposit_issue_id, pieces, Some(&username)),
     )
     .await
     .map_err(|e| e.to_string())?;

@@ -70,8 +70,8 @@ export function SalesHistoryTable({
           <span
             className={`font-mono-num ${
               row.original.remaining_amount > 0
-                ? 'font-semibold text-[#D9901A]'
-                : 'text-[#667085]'
+                ? 'font-semibold text-[#8A5A0B] dark:text-[#FBBF24]'
+                : 'text-[#667085] dark:text-[#94A3B8]'
             }`}
           >
             {formatFcfa(row.original.remaining_amount)}

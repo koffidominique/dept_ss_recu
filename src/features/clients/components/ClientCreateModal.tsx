@@ -43,12 +43,12 @@ export function ClientCreateModal({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.name && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.name.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.name.message}</p>
           )}
         </div>
         <div>
           <label className="block text-xs font-medium">Type</label>
-          <select
+          <select aria-label="Type"
             {...form.register('client_type')}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           >
@@ -133,7 +133,7 @@ export function ClientCreateModal({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.email && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.email.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.email.message}</p>
           )}
         </div>
         <div className="col-span-2">
@@ -146,7 +146,7 @@ export function ClientCreateModal({
         </div>
         <div className="col-span-2 border-t border-slate-200 dark:border-slate-800 pt-3">
           <label className="block text-xs font-medium">Politique de crédit explicite</label>
-          <select
+          <select aria-label="Politique de crédit explicite"
             {...form.register('credit_policy')}
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           >
@@ -165,7 +165,7 @@ export function ClientCreateModal({
               )}
             />
             {form.formState.errors.credit_limit && (
-              <p className="mt-1 text-xs text-[#DC4545]">
+              <p className="mt-1 text-xs text-[#BE123C]">
                 {form.formState.errors.credit_limit.message}
               </p>
             )}

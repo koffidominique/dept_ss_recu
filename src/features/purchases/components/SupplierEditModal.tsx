@@ -54,7 +54,7 @@ function EditSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.name && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.name.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.name.message}</p>
           )}
         </div>
         <div>
@@ -75,7 +75,7 @@ function EditSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.phone && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.phone.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.phone.message}</p>
           )}
         </div>
         <div>
@@ -96,7 +96,7 @@ function EditSupplierBody({
             className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {form.formState.errors.email && (
-            <p className="mt-1 text-xs text-[#DC4545]">{form.formState.errors.email.message}</p>
+            <p className="mt-1 text-xs text-[#BE123C]">{form.formState.errors.email.message}</p>
           )}
         </div>
         <div>
@@ -122,7 +122,7 @@ function EditSupplierBody({
           <input
             type="checkbox"
             {...form.register('is_active')}
-            className="rounded border-slate-300 text-[#2563EB]"
+            className="rounded border-slate-300 text-[#1D4ED8] dark:text-[#60A5FA]"
           />
           Fiche fournisseur active
         </label>
@@ -138,7 +138,7 @@ function EditSupplierBody({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
           </button>

@@ -33,7 +33,7 @@ export function SuppliersTable({
               <span>{row.original.name}</span>
               {row.original.is_active === 0 && <StatusBadge status="archived" />}
             </div>
-            <div className="text-xs text-[#667085]">
+            <div className="text-xs text-[#667085] dark:text-[#94A3B8]">
               {row.original.phone}
               {row.original.payment_terms_days
                 ? ` · Délai ${row.original.payment_terms_days}j`
@@ -56,7 +56,7 @@ export function SuppliersTable({
         cell: ({ row }) => (
           <span
             className={`font-mono-num font-semibold ${
-              row.original.balance_due > 0 ? 'text-[#DC4545]' : 'text-[#16A36A]'
+              row.original.balance_due > 0 ? 'text-[#BE123C]' : 'text-[#16A36A]'
             }`}
           >
             {formatFcfa(row.original.balance_due)}
@@ -97,9 +97,11 @@ export function SuppliersTable({
 export function SupplierDebtsTable({
   debts,
   onPayDebt,
+  emptyMessage,
 }: {
   debts: SupplierDebt[];
   onPayDebt: (debt: SupplierDebt) => void;
+  emptyMessage?: string;
 }) {
   const columns = useMemo<ColumnDef<SupplierDebt>[]>(
     () => [
@@ -111,7 +113,7 @@ export function SupplierDebtsTable({
             <div className="font-mono-num text-xs font-semibold">
               {row.original.receipt_reference}
             </div>
-            <div className="font-mono-num text-[11px] text-[#667085]">
+            <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
               {row.original.order_reference}
             </div>
           </div>
@@ -129,7 +131,7 @@ export function SupplierDebtsTable({
         accessorKey: 'remaining_amount',
         header: 'Reste à payer',
         cell: ({ row }) => (
-          <span className="font-mono-num font-semibold text-[#DC4545]">
+          <span className="font-mono-num font-semibold text-[#BE123C]">
             {formatFcfa(row.original.remaining_amount)}
           </span>
         ),
@@ -169,7 +171,7 @@ export function SupplierDebtsTable({
     <DataTable
       data={debts}
       columns={columns as ColumnDef<SupplierDebt, unknown>[]}
-      emptyMessage="Aucune dette fournisseur enregistrée."
+      emptyMessage={emptyMessage ?? 'Aucune dette fournisseur enregistrée.'}
     />
   );
 }

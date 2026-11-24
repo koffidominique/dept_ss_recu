@@ -49,13 +49,12 @@ pub async fn create_crate_type(
 pub async fn get_crate_type(db: &DepotDb, crate_type_id: i64) -> CoreResult<CrateTypeDto> {
     require_current_actor_permission(Permission::CatalogRead)?;
 
-    let crate_type = sqlx::query_as::<_, CrateTypeDto>(&format!(
-        "{SELECT_CRATE_TYPE_SQL} WHERE id = ?"
-    ))
-    .bind(crate_type_id)
-    .fetch_optional(&db.pool)
-    .await?
-    .ok_or_else(|| CoreError::NotFound("Type de casier introuvable.".to_string()))?;
+    let crate_type =
+        sqlx::query_as::<_, CrateTypeDto>(&format!("{SELECT_CRATE_TYPE_SQL} WHERE id = ?"))
+            .bind(crate_type_id)
+            .fetch_optional(&db.pool)
+            .await?
+            .ok_or_else(|| CoreError::NotFound("Type de casier introuvable.".to_string()))?;
 
     Ok(crate_type)
 }
@@ -70,11 +69,9 @@ pub async fn get_crate_types(db: &DepotDb, active_only: bool) -> CoreResult<Vec<
         .fetch_all(&db.pool)
         .await?
     } else {
-        sqlx::query_as::<_, CrateTypeDto>(&format!(
-            "{SELECT_CRATE_TYPE_SQL} ORDER BY name ASC"
-        ))
-        .fetch_all(&db.pool)
-        .await?
+        sqlx::query_as::<_, CrateTypeDto>(&format!("{SELECT_CRATE_TYPE_SQL} ORDER BY name ASC"))
+            .fetch_all(&db.pool)
+            .await?
     };
 
     Ok(crate_types)

@@ -54,7 +54,9 @@ export function LoginPage() {
         transition={DP_SPRING_SNAPPY}
         onClick={toggleTheme}
         aria-label={theme === 'light' ? 'Passer au mode sombre' : 'Passer au mode clair'}
-        className="fixed right-5 top-5 z-50 rounded-xl border border-white/25 dark:border-white/15 bg-white/10 dark:bg-black/15 backdrop-blur-sm p-2.5 text-white/90 hover:bg-white/20 dark:hover:bg-white/15 hover:border-white/40 transition-colors shadow-lg"
+        /* Sur mobile, le fond clair de la page impose un bouton opaque à texte
+           contrasté ; à partir de lg, le panneau vitré sombre reprend le dessus. */
+        className="fixed right-5 top-5 z-50 rounded-xl border border-slate-300/60 dark:border-white/15 bg-white/95 dark:bg-slate-800/95 lg:bg-white/10 lg:dark:bg-black/15 backdrop-blur-md p-2.5 text-slate-800 dark:text-slate-100 lg:text-white hover:bg-slate-100 dark:hover:bg-slate-700/95 lg:hover:bg-white/20 lg:dark:hover:bg-white/15 hover:border-slate-400 lg:hover:border-white/40 transition-colors shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2"
       >
         {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
       </motion.button>
@@ -212,7 +214,7 @@ export function LoginPage() {
                 transition={DP_SPRING_SNAPPY}
                 disabled={isLoading || loading || currentInput.length !== pinLength}
                 onClick={() => void handleSubmit()}
-                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 dp-btn-elevated py-3.5 text-sm font-semibold text-white hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-blue-700 disabled:shadow-none"
+                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 dp-btn-elevated py-3.5 text-sm font-semibold text-white hover:from-blue-700 hover:to-blue-800 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 disabled:from-blue-400 disabled:to-blue-500 disabled:text-blue-950 disabled:opacity-100 disabled:cursor-not-allowed disabled:hover:from-blue-400 disabled:hover:to-blue-500 disabled:shadow-none"
               >
                 {loading
                   ? 'Vérification...'

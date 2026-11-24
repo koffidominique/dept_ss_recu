@@ -88,10 +88,23 @@ async fn make_beverage_variant(
 #[tokio::test]
 async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     let db = DepotDb::connect(&temp_db_path("cases")).await.unwrap();
+    // confirm_order enregistre l'approbation directe du proprietaire : sans
+    // session identifiee l'operation echoue volontairement (echec ferme).
+    // Cet acteur ne sert qu'a l'approbation ; le nom fige dans les recus
+    // reste celui de l'emetteur explicite (`actor`, plus bas).
+    // C'est deliver_order qui emet le recu v1, avec l'acteur courant : cet
+    // acteur doit donc porter l'identite attendue par l'assertion plus bas
+    // (issued_by_name = "Test proprietaire"), sinon le nom fige serait faux.
+    let approver = SessionIdentity::from_role(
+        "receipt-test-user",
+        "receipt-test",
+        "Test propriétaire",
+        Role::Owner,
+    );
     sqlx::query("INSERT OR IGNORE INTO payment_methods (code, label, is_cash, active) VALUES ('cash', 'Espèces', 1, 1)")
-        .execute(&db.pool)
-        .await
-        .unwrap();
+            .execute(&db.pool)
+            .await
+            .unwrap();
     let cat = products::create_category(&db, "Bières Mixtes", None)
         .await
         .unwrap();
@@ -400,7 +413,10 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         orders::issue_or_get_customer_order_receipt(&db, created.order.id),
     )
     .await;
-    assert!(draft_receipt.is_err(), "un brouillon ne doit pas émettre de reçu");
+    assert!(
+        draft_receipt.is_err(),
+        "un brouillon ne doit pas émettre de reçu"
+    );
     assert_eq!(created.lines.len(), 2);
     assert_eq!(created.allocations.len(), 1);
     assert_eq!(created.links.len(), 2);
@@ -415,13 +431,21 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert!(deps_draft.is_empty());
 
     // Confirm : décrémente le stock en unités de base (200 -> 188), sans créer d'achat fournisseur.
-    let confirmed = orders::confirm_order(&db, created.order.id).await.unwrap();
+    let confirmed = auth::with_actor(
+        approver.clone(),
+        orders::confirm_order(&db, created.order.id),
+    )
+    .await
+    .unwrap();
     assert_eq!(confirmed.order.status, "confirmed");
     let supplier_orders: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM purchase_orders")
         .fetch_one(&db.pool)
         .await
         .unwrap();
-    assert_eq!(supplier_orders, 0, "confirmer une commande client ne doit pas créer de bon fournisseur");
+    assert_eq!(
+        supplier_orders, 0,
+        "confirmer une commande client ne doit pas créer de bon fournisseur"
+    );
     let bock_stock: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
         .bind(bock_id)
         .fetch_one(&db.pool)
@@ -430,7 +454,12 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert_eq!(bock_stock, 188_000);
 
     // Deliver : crée mouvement LIVRAISON_CLIENT & incrémente customer_deposit_balances
-    let delivered = orders::deliver_order(&db, created.order.id).await.unwrap();
+    let delivered = auth::with_actor(
+        approver.clone(),
+        orders::deliver_order(&db, created.order.id),
+    )
+    .await
+    .unwrap();
     assert_eq!(delivered.order.status, "delivered");
     assert_eq!(delivered.customer_deposits.len(), 1);
     assert_eq!(delivered.customer_deposits[0].quantity_held, 1);
@@ -495,39 +524,51 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     )
     .await
     .unwrap();
-    orders::confirm_order(&db, invoice_order.order.id).await.unwrap();
-    sqlx::query("UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?")
-        .bind(invoice_order.order.id)
-        .execute(&db.pool)
-        .await
-        .unwrap();
-    let invoiced = orders::invoice_order(&db, invoice_order.order.id)
-        .await
-        .unwrap();
-    assert_eq!(invoiced.order.status, "paid");
-    let (sales_count, supplier_order_count): (i64, i64) = sqlx::query_as(
-        "SELECT (SELECT COUNT(*) FROM sales WHERE order_id = ?), (SELECT COUNT(*) FROM purchase_orders)",
+    auth::with_actor(
+        approver.clone(),
+        orders::confirm_order(&db, invoice_order.order.id),
     )
-    .bind(invoice_order.order.id)
-    .fetch_one(&db.pool)
     .await
     .unwrap();
-    assert_eq!(sales_count, 1);
-    assert_eq!(supplier_order_count, 0);
-    let sale_reference: String = sqlx::query_scalar("SELECT reference FROM sales WHERE order_id = ?")
+    sqlx::query(
+        "UPDATE orders SET paid_xof = total_to_collect_xof, payment_status = 'paid' WHERE id = ?",
+    )
+    .bind(invoice_order.order.id)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let invoiced = auth::with_actor(
+        approver.clone(),
+        orders::invoice_order(&db, invoice_order.order.id),
+    )
+    .await
+    .unwrap();
+    assert_eq!(invoiced.order.status, "paid");
+    let (sales_count, supplier_order_count): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM sales WHERE order_id = ?), (SELECT COUNT(*) FROM purchase_orders)",
+        )
         .bind(invoice_order.order.id)
         .fetch_one(&db.pool)
         .await
         .unwrap();
+    assert_eq!(sales_count, 1);
+    assert_eq!(supplier_order_count, 0);
+    let sale_reference: String =
+        sqlx::query_scalar("SELECT reference FROM sales WHERE order_id = ?")
+            .bind(invoice_order.order.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
     assert!(sale_reference.starts_with("VTE-"));
 
     // Le reçu est émis depuis la commande livrée, figé en base et idempotent à la réimpression.
-    let actor = SessionIdentity::from_role("receipt-test-user", "receipt-test", "Test propriétaire", Role::Owner);
-    let payments_before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM payments WHERE order_id = ?")
-        .bind(created.order.id)
-        .fetch_one(&db.pool)
-        .await
-        .unwrap();
+    let actor = approver.clone();
+    let payments_before: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM payments WHERE order_id = ?")
+            .bind(created.order.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
     let first_receipt = auth::with_actor(
         actor.clone(),
         orders::issue_or_get_customer_order_receipt(&db, created.order.id),
@@ -535,7 +576,10 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     .await
     .unwrap();
     assert_eq!(first_receipt.version, 1);
-    assert_eq!(first_receipt.receipt_number, format!("REC-{}", created.order.order_number));
+    assert_eq!(
+        first_receipt.receipt_number,
+        format!("REC-{}", created.order.order_number)
+    );
     assert!(first_receipt.snapshot_json.contains("Test propriétaire"));
 
     // Une modification métier ultérieure ne remplace pas silencieusement le reçu émis.
@@ -553,15 +597,24 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     assert_eq!(first_receipt.id, second_receipt.id);
     assert_eq!(first_receipt.snapshot_json, second_receipt.snapshot_json);
     assert!(second_receipt.snapshot_json.contains(&client.name));
-    let payments_after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM payments WHERE order_id = ?")
-        .bind(created.order.id)
-        .fetch_one(&db.pool)
-        .await
-        .unwrap();
-    assert_eq!(payments_before, payments_after, "l'émission ne crée aucun paiement");
+    let payments_after: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM payments WHERE order_id = ?")
+            .bind(created.order.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        payments_before, payments_after,
+        "l'émission ne crée aucun paiement"
+    );
 
     // Les données poussées par le navigateur ne peuvent pas falsifier le PDF du reçu.
-    let pdf_actor = SessionIdentity::from_role("pdf-test-user", "pdf-test", "Test propriétaire", Role::Owner);
+    let pdf_actor = SessionIdentity::from_role(
+        "pdf-test-user",
+        "pdf-test",
+        "Test propriétaire",
+        Role::Owner,
+    );
     let (_pdf_name, receipt_pdf) = auth::with_actor(
         pdf_actor,
         pdf::generate_document_pdf(

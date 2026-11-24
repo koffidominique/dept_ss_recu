@@ -3,6 +3,26 @@
 use crate::application::auth::{self, Permission, Role};
 use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
+
+/// Ligne de commande fournisseur brute lue en base (tuples SQLx).
+type SupplierOrderLineRow = (String, String, i64, String, i64, i64, i64, String, String);
+/// Ligne de reception fournisseur brute lue en base (tuples SQLx).
+type SupplierReceiptLineRow = (
+    String,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+    String,
+    i64,
+    i64,
+    i64,
+    Option<String>,
+    String,
+    String,
+);
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -183,7 +203,11 @@ fn format_milli_quantity(value: i64) -> String {
     }
 }
 
-fn packaging_contents_description(packaging: &str, base_unit: &str, coefficient_milli: i64) -> String {
+fn packaging_contents_description(
+    packaging: &str,
+    base_unit: &str,
+    coefficient_milli: i64,
+) -> String {
     let unit = base_unit.to_lowercase();
     let package = packaging.to_lowercase();
     let contents = if unit.contains("canette") || unit.contains("can") {
@@ -281,6 +305,7 @@ async fn document_snapshot(
 ) -> CoreResult<serde_json::Value> {
     match document_type {
         "customer_order" => {
+            #[allow(clippy::type_complexity)]
             let header: Option<(String, String, i64, i64, i64, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT o.order_number, c.name, o.subtotal_xof, o.discount_xof, o.total_to_collect_xof, o.notes, o.status
@@ -289,8 +314,8 @@ async fn document_snapshot(
                 .bind(document_id)
                 .fetch_optional(&mut **tx)
                 .await?;
-            let (number, party, subtotal, discount, total, notes, status) = header
-                .ok_or_else(|| CoreError::NotFound("Commande client introuvable.".into()))?;
+            let (number, party, subtotal, discount, total, notes, status) =
+                header.ok_or_else(|| CoreError::NotFound("Commande client introuvable.".into()))?;
             let lines: Vec<(String, String, i64, i64, i64)> = sqlx::query_as(
                 "SELECT p.name, v.name, ol.base_quantity, ol.unit_price_xof, ol.line_total_xof
                  FROM order_lines ol JOIN products p ON p.id = ol.product_id
@@ -318,8 +343,8 @@ async fn document_snapshot(
             .bind(document_id)
             .fetch_optional(&mut **tx)
             .await?;
-            let (number, party, total, notes, status) = header
-                .ok_or_else(|| CoreError::NotFound("Bon fournisseur introuvable.".into()))?;
+            let (number, party, total, notes, status) =
+                header.ok_or_else(|| CoreError::NotFound("Bon fournisseur introuvable.".into()))?;
             let lines: Vec<(String, String, i64, i64, i64)> = sqlx::query_as(
                 "SELECT product_name, packaging_name, ordered_quantity_milli, unit_price, line_total
                  FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id",
@@ -489,7 +514,11 @@ pub async fn get_document_detail(
     let mut packaging_lines = Vec::new();
     let mut payments = Vec::new();
     let mut snapshots = Vec::new();
-    let mut notes = None;
+    // Affecte dans chaque branche du match ci-dessous (et reinsigne dans la
+    // branche sales_receipt pour y joindre les emballages). Initialiser a None
+    // serait ecrase avant lecture : signale en -D warnings. Le type doit etre
+    // explicite, sinon l'inference echoue en aval sur query_scalar.
+    let mut notes: Option<String>;
 
     match document_type {
         "customer_order" => {
@@ -534,6 +563,7 @@ pub async fn get_document_detail(
             .map(|(label, amount_xof)| CommercialDocumentDetailPayment { label, amount_xof })
             .collect();
 
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT version, receipt_number, issued_at, issued_by_name, issued_by_role, revision_reason, snapshot_json
@@ -628,6 +658,7 @@ pub async fn get_document_detail(
                 },
             )
             .collect();
+            #[allow(clippy::type_complexity)]
             let deposits: Vec<(String, String, i64, i64, String, i64, String)> = sqlx::query_as(
                 "SELECT COALESCE(json_extract(component.value, '$.kind'), rpt.kind, 'other'),
                         COALESCE(json_extract(component.value, '$.name'), rpt.name, 'Détail non disponible sur cette opération historique'),
@@ -652,41 +683,46 @@ pub async fn get_document_detail(
             let has_packaging = !deposits.is_empty();
             packaging_lines = deposits
                 .into_iter()
-                .map(|(kind, name, expected, returned, detail, amount, di_status)| {
-                    if di_status == "returned" {
-                        returned_packaging_amount += amount;
-                        CommercialDocumentPackagingLine {
-                            label: format!("{name} (retour client reçu)"),
-                            kind,
-                            expected_quantity: 0,
-                            issued_quantity: Some(0),
-                            returned_quantity: Some(expected),
-                            status_label: "Retour reçu · hors total commande".to_string(),
-                            detail: Some("Réintégré au stock d'emballages vides du sous-dépôt".to_string()),
-                            amount: Some(amount),
+                .map(
+                    |(kind, name, expected, returned, detail, amount, di_status)| {
+                        if di_status == "returned" {
+                            returned_packaging_amount += amount;
+                            CommercialDocumentPackagingLine {
+                                label: format!("{name} (retour client reçu)"),
+                                kind,
+                                expected_quantity: 0,
+                                issued_quantity: Some(0),
+                                returned_quantity: Some(expected),
+                                status_label: "Retour reçu · hors total commande".to_string(),
+                                detail: Some(
+                                    "Réintégré au stock d'emballages vides du sous-dépôt"
+                                        .to_string(),
+                                ),
+                                amount: Some(amount),
+                            }
+                        } else {
+                            let remaining = (expected - returned).max(0);
+                            CommercialDocumentPackagingLine {
+                                label: name,
+                                kind,
+                                expected_quantity: expected,
+                                issued_quantity: Some(expected),
+                                returned_quantity: Some(returned),
+                                status_label: if remaining > 0 {
+                                    format!("{remaining} à restituer sous 15 jours")
+                                } else {
+                                    "Restitution complète".to_string()
+                                },
+                                detail: if detail.is_empty() {
+                                    None
+                                } else {
+                                    Some(detail)
+                                },
+                                amount: Some(amount),
+                            }
                         }
-                    } else {
-                        let remaining = (expected - returned).max(0);
-                        CommercialDocumentPackagingLine {
-                            label: name,
-                            kind,
-                            expected_quantity: expected,
-                            issued_quantity: Some(expected),
-                            returned_quantity: Some(returned),
-                            status_label: if remaining > 0 {
-                                format!("{remaining} à restituer sous 15 jours")
-                            } else {
-                                "Restitution complète".to_string()
-                            },
-                            detail: if detail.is_empty() {
-                                None
-                            } else {
-                                Some(detail)
-                            },
-                            amount: Some(amount),
-                        }
-                    }
-                })
+                    },
+                )
                 .collect();
             if has_packaging {
                 let mut note_parts = Vec::new();
@@ -722,10 +758,7 @@ pub async fn get_document_detail(
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
-            lines = sqlx::query_as::<
-                _,
-                (String, String, i64, String, i64, i64, i64, String, String),
-            >(
+            lines = sqlx::query_as::<_, SupplierOrderLineRow>(
                 "SELECT product_name, packaging_name, ordered_quantity_milli, base_unit, coefficient_milli,
                         unit_price, line_total, product_snapshot_json, packaging_snapshot_json
                  FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id",
@@ -805,6 +838,7 @@ pub async fn get_document_detail(
                     },
                 )
                 .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, Option<String>, String)> =
                 sqlx::query_as(
                     "SELECT version, document_number, issued_at, issued_by_name, issued_by_role, revision_reason, snapshot_json
@@ -841,25 +875,7 @@ pub async fn get_document_detail(
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
-            lines = sqlx::query_as::<
-                _,
-                (
-                    String,
-                    String,
-                    i64,
-                    i64,
-                    i64,
-                    i64,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    i64,
-                    Option<String>,
-                    String,
-                    String,
-                ),
-            >(
+            lines = sqlx::query_as::<_, SupplierReceiptLineRow>(
                 "SELECT pol.product_name, pol.packaging_name, prl.quantity_milli,
                         prl.missing_quantity_milli, prl.damaged_quantity_milli, prl.refused_quantity_milli,
                         prl.base_quantity_milli, pol.base_unit, pol.coefficient_milli, prl.unit_price,
@@ -935,19 +951,22 @@ pub async fn get_document_detail(
             .await?;
             packaging_lines = exchanges
                 .into_iter()
-                .map(|(name, code, kind, pieces)| CommercialDocumentPackagingLine {
-                    label: format!("{name} ({code})"),
-                    kind,
-                    expected_quantity: pieces,
-                    issued_quantity: Some(pieces),
-                    returned_quantity: None,
-                    status_label:
-                        "Remis physiquement au fournisseur — échange sans ligne financière"
-                            .to_string(),
-                    detail: None,
-                    amount: None,
-                })
+                .map(
+                    |(name, code, kind, pieces)| CommercialDocumentPackagingLine {
+                        label: format!("{name} ({code})"),
+                        kind,
+                        expected_quantity: pieces,
+                        issued_quantity: Some(pieces),
+                        returned_quantity: None,
+                        status_label:
+                            "Remis physiquement au fournisseur — échange sans ligne financière"
+                                .to_string(),
+                        detail: None,
+                        amount: None,
+                    },
+                )
                 .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
                 "SELECT version, document_number, issued_at, issued_by_name, issued_by_role, snapshot_json
                  FROM purchase_receipt_snapshots WHERE receipt_id = ? ORDER BY version DESC",
@@ -993,6 +1012,7 @@ pub async fn get_document_detail(
             .into_iter()
             .map(|(label, amount_xof)| CommercialDocumentDetailPayment { label, amount_xof })
             .collect();
+            #[allow(clippy::type_complexity)]
             let snap_rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
                 "SELECT version, receipt_number, issued_at, issued_by_name, issued_by_role, snapshot_json
                  FROM payment_receipt_snapshots WHERE payment_id = ? ORDER BY version DESC",

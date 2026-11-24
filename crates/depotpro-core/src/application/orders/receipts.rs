@@ -156,6 +156,7 @@ async fn load_settings_tx(tx: &mut Transaction<'_, Sqlite>) -> CoreResult<AppSet
     .await?)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_insert_snapshot_tx(
     tx: &mut Transaction<'_, Sqlite>,
     order_id: i64,
@@ -302,7 +303,9 @@ async fn build_and_insert_snapshot_tx(
     .bind(version)
     .fetch_optional(&mut **tx)
     .await?
-    .ok_or_else(|| CoreError::NotFound("Snapshot du reçu de commande introuvable après émission.".into()))
+    .ok_or_else(|| {
+        CoreError::NotFound("Snapshot du reçu de commande introuvable après émission.".into())
+    })
 }
 
 pub(crate) async fn ensure_order_receipt_v1_tx(

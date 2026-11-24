@@ -59,27 +59,27 @@ export function OrderStepPackaging({
       )}
 
       {allocations.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-5 text-center text-xs text-[#667085]">
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-5 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
           Aucun emballage physique requis (vente unitaire ou sans contenant consigné).
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-900 text-[#667085]">
+            <thead className="bg-slate-50 dark:bg-slate-900 text-[#667085] dark:text-[#94A3B8]">
               <tr>
-                <th className="px-3 py-2 font-medium">Emballage physique</th>
-                <th className="px-3 py-2 font-medium">Classe</th>
-                <th className="px-3 py-2 font-medium">Quantité</th>
-                <th className="px-3 py-2 font-medium">Consigné</th>
-                <th className="px-3 py-2 font-medium text-right">Consigne unitaire</th>
-                <th className="px-3 py-2 font-medium text-right">Total consigne</th>
+                <th scope="col" className="px-3 py-2 font-medium">Emballage physique</th>
+                <th scope="col" className="px-3 py-2 font-medium">Classe</th>
+                <th scope="col" className="px-3 py-2 font-medium">Quantité</th>
+                <th scope="col" className="px-3 py-2 font-medium">Consigné</th>
+                <th scope="col" className="px-3 py-2 font-medium text-right">Consigne unitaire</th>
+                <th scope="col" className="px-3 py-2 font-medium text-right">Total consigne</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {allocations.map((a, idx) => (
                 <tr key={`${a.packaging_asset_id}-${idx}`}>
                   <td className="px-3 py-2 font-medium">{a.packaging_name}</td>
-                  <td className="px-3 py-2 font-mono-num text-[11px] text-[#667085]">
+                  <td className="px-3 py-2 font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
                     {a.compatibility_class}
                   </td>
                   <td className="px-3 py-2">

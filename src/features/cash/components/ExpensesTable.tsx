@@ -20,7 +20,7 @@ export function ExpensesTable({
         cell: ({ row }) => (
           <div>
             <div className="font-mono-num text-xs font-semibold">{row.original.reference}</div>
-            <div className="font-mono-num text-[11px] text-[#667085]">
+            <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
               {formatDate(row.original.expense_date)}
             </div>
           </div>
@@ -41,7 +41,7 @@ export function ExpensesTable({
         accessorKey: 'amount',
         header: 'Montant',
         cell: ({ row }) => (
-          <span className="font-mono-num font-semibold text-[#DC4545]">
+          <span className="font-mono-num font-semibold text-[#BE123C]">
             {formatFcfa(row.original.amount)}
           </span>
         ),
@@ -50,7 +50,7 @@ export function ExpensesTable({
         accessorKey: 'notes',
         header: 'Notes',
         cell: ({ row }) => (
-          <span className="text-xs text-[#667085]">{row.original.notes || '—'}</span>
+          <span className="text-xs text-[#667085] dark:text-[#94A3B8]">{row.original.notes || '—'}</span>
         ),
       },
       {
@@ -61,13 +61,13 @@ export function ExpensesTable({
             <button
               type="button"
               onClick={() => onPreviewReceipt(row.original)}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs font-medium text-[#2563EB] hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:bg-blue-50 dark:hover:bg-blue-950/30"
             >
               <Eye className="h-3.5 w-3.5" />
               Voir reçu
             </button>
           ) : (
-            <span className="text-xs text-[#667085]">—</span>
+            <span className="text-xs text-[#667085] dark:text-[#94A3B8]">—</span>
           ),
       },
     ],

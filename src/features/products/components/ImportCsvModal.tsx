@@ -42,7 +42,7 @@ export function ImportCsvModal({
             type="button"
             disabled={!csvText.trim() || isPending}
             onClick={onSubmit}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             Lancer l&apos;import
           </button>

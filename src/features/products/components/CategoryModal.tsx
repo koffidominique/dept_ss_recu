@@ -48,7 +48,7 @@ export function CategoryModal({
               className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
             />
             {form.formState.errors.name && (
-              <p className="mt-1 text-[11px] text-[#DC4545]" role="alert">
+              <p className="mt-1 text-[11px] text-[#BE123C]" role="alert">
                 {form.formState.errors.name.message}
               </p>
             )}
@@ -102,7 +102,7 @@ export function CategoryModal({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+            className="rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             Créer la catégorie
           </button>

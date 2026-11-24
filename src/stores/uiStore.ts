@@ -9,6 +9,12 @@ function formatDotMilli(milli: bigint): string {
   return `${intPart.toString()}.${fracPart.toString().padStart(3, '0').replace(/0+$/, '')}`;
 }
 
+export interface CartItemTierPrices {
+  retail: number;
+  semi_wholesale: number;
+  wholesale: number;
+}
+
 export interface CartItem {
   key: string;
   productId: number;
@@ -25,6 +31,7 @@ export interface CartItem {
   quantity: string;
   supportQuantity: string;  // Number of supports (plastic crates) - tracked separately from bottles
   unitPrice: number;
+  tierPrices?: CartItemTierPrices;
   discountAmount: number;
   depositPerPack: number;
   depositMode: 'none' | 'deposit' | null;
@@ -40,6 +47,21 @@ export interface HeldCart {
   priceTier: PriceTier;
   saleType: 'cash' | 'credit';
   discountAmount: number;
+  dueDate?: string;
+  paymentRows?: Array<{ method_code: string; amount: number }>;
+  receivedReturnables?: Array<{ returnable_id: number; pieces: number }>;
+}
+
+export interface HoldCartContextInput {
+  label: string;
+  discountAmount: number;
+  dueDate?: string;
+  paymentRows?: Array<{ method_code: string; amount: number }>;
+  receivedReturnables?: Array<{ returnable_id: number; pieces: number }>;
+}
+
+export interface ResumedHeldCartResult extends HeldCart {
+  autoHeldLabel?: string;
 }
 
 interface UiState {
@@ -66,8 +88,14 @@ interface UiState {
   updateCartItem: (key: string, patch: Partial<CartItem>) => void;
   removeFromCart: (key: string) => void;
   clearCart: () => void;
-  holdCurrentCart: (label: string, discountAmount: number) => void;
-  resumeHeldCart: (id: string) => HeldCart | null;
+  holdCurrentCart: (
+    labelOrContext: string | HoldCartContextInput,
+    discountAmount?: number
+  ) => void;
+  resumeHeldCart: (
+    id: string,
+    activeDraftContext?: Partial<HoldCartContextInput>
+  ) => ResumedHeldCartResult | null;
   deleteHeldCart: (id: string) => void;
   setPosClientId: (id: number | null) => void;
   setPosPriceTier: (tier: PriceTier) => void;
@@ -208,18 +236,29 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   clearCart: () => set({ posCart: [], posSaleType: 'cash' }),
 
-  holdCurrentCart: (label, discountAmount) =>
+  holdCurrentCart: (labelOrContext, discountAmount = 0) =>
     set((state) => {
       if (state.posCart.length === 0) return state;
+      const ctx: HoldCartContextInput =
+        typeof labelOrContext === 'string'
+          ? { label: labelOrContext, discountAmount }
+          : labelOrContext;
       const ticket: HeldCart = {
         id: `hold-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        label: label.trim() || `Ticket ${state.heldCarts.length + 1}`,
+        label: ctx.label.trim() || `Ticket ${state.heldCarts.length + 1}`,
         createdAt: new Date().toISOString(),
         items: state.posCart,
         clientId: state.posClientId,
         priceTier: state.posPriceTier,
         saleType: state.posSaleType,
-        discountAmount: Math.max(0, discountAmount),
+        discountAmount: Math.max(0, ctx.discountAmount),
+        dueDate: ctx.dueDate || undefined,
+        paymentRows:
+          ctx.paymentRows && ctx.paymentRows.length > 0 ? ctx.paymentRows : undefined,
+        receivedReturnables:
+          ctx.receivedReturnables && ctx.receivedReturnables.length > 0
+            ? ctx.receivedReturnables
+            : undefined,
       };
       const nextHeld = [ticket, ...state.heldCarts];
       persistHeldCarts(nextHeld);
@@ -231,19 +270,54 @@ export const useUiStore = create<UiState>((set, get) => ({
       };
     }),
 
-  resumeHeldCart: (id) => {
-    const target = get().heldCarts.find((h) => h.id === id) || null;
+  resumeHeldCart: (id, activeDraftContext) => {
+    const state = get();
+    const target = state.heldCarts.find((h) => h.id === id) || null;
     if (!target) return null;
-    const remaining = get().heldCarts.filter((h) => h.id !== id);
+    let remaining = state.heldCarts.filter((h) => h.id !== id);
+    let autoHeldLabel: string | undefined;
+
+    if (state.posCart.length > 0) {
+      autoHeldLabel =
+        activeDraftContext?.label?.trim() || `Panier sauvegardé (${state.posCart.length} art.)`;
+      const autoSavedTicket: HeldCart = {
+        id: `hold-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        label: autoHeldLabel,
+        createdAt: new Date().toISOString(),
+        items: state.posCart,
+        clientId: state.posClientId,
+        priceTier: state.posPriceTier,
+        saleType: state.posSaleType,
+        discountAmount: Math.max(0, activeDraftContext?.discountAmount ?? 0),
+        dueDate: activeDraftContext?.dueDate || undefined,
+        paymentRows:
+          activeDraftContext?.paymentRows && activeDraftContext.paymentRows.length > 0
+            ? activeDraftContext.paymentRows
+            : undefined,
+        receivedReturnables:
+          activeDraftContext?.receivedReturnables &&
+          activeDraftContext.receivedReturnables.length > 0
+            ? activeDraftContext.receivedReturnables
+            : undefined,
+      };
+      remaining = [autoSavedTicket, ...remaining];
+    }
+
     persistHeldCarts(remaining);
+    const restoredTier: PriceTier =
+      target.priceTier === 'wholesale' ||
+      target.priceTier === 'semi_wholesale' ||
+      target.priceTier === 'retail'
+        ? target.priceTier
+        : 'retail';
     set({
       heldCarts: remaining,
       posCart: target.items,
       posClientId: target.clientId,
-      posPriceTier: 'retail',
+      posPriceTier: restoredTier,
       posSaleType: target.saleType,
     });
-    return target;
+    return { ...target, priceTier: restoredTier, autoHeldLabel };
   },
 
   deleteHeldCart: (id) =>
@@ -254,6 +328,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
 
   setPosClientId: (posClientId) => set({ posClientId }),
-  setPosPriceTier: () => set({ posPriceTier: 'retail' }),
+  setPosPriceTier: (posPriceTier) =>
+    set((state) => ({
+      posPriceTier,
+      posCart: state.posCart.map((c) =>
+        c.tierPrices ? { ...c, unitPrice: c.tierPrices[posPriceTier] } : c
+      ),
+    })),
   setPosSaleType: (posSaleType) => set({ posSaleType }),
 }));

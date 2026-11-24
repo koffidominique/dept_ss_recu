@@ -33,7 +33,7 @@ export function PurchasesTable({
         cell: ({ row }) => (
           <div>
             <div className="font-mono-num text-xs font-semibold">{row.original.reference}</div>
-            <div className="font-mono-num text-[11px] text-[#667085]">
+            <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
               {formatDateTime(row.original.created_at)}
             </div>
           </div>
@@ -104,7 +104,7 @@ export function PurchasesTable({
                 <button
                   type="button"
                   onClick={() => onCancel(row.original)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 px-2.5 py-1.5 text-xs font-medium text-[#DC4545] hover:bg-rose-50 dark:hover:bg-rose-950/30 whitespace-nowrap shrink-0"
+                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 px-2.5 py-1.5 text-xs font-medium text-[#BE123C] hover:bg-rose-50 dark:hover:bg-rose-950/30 whitespace-nowrap shrink-0"
                 >
                   <Ban className="h-3.5 w-3.5" />
                   Annuler

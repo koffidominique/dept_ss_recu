@@ -115,280 +115,275 @@ async fn lot3_concurrent_sales_receptions_receivables_cash_close_and_stock_moves
     auth::with_actor(
         SessionIdentity::from_role("1", "owner", "Propriétaire", Role::Owner),
         async {
-        let (_path, db, prod_id, pkg_id, supplier_id, client_id) =
-            setup_fixture("concurrent_ops").await;
+            let (_path, db, prod_id, pkg_id, supplier_id, client_id) =
+                setup_fixture("concurrent_ops").await;
 
-        // 1. Deux ventes simultanées (60 + 60 sur stock 100 -> exactement 1 succès et 1 rejet stock insuffisant)
-        let (s1, s2) = tokio::join!(
-            sales::create_sale(
-                &db,
-                sales::CreateSaleInput {
-                    request_key: "lot3-sale-1".to_string(),
-                    client_id: None,
-                    sale_type: "cash".to_string(),
-                    price_tier: "retail".to_string(),
-                    discount_amount: None,
-                    notes: None,
-                    lines: vec![sales::CreateSaleLineInput {
-                        product_id: prod_id,
-                        packaging_id: pkg_id,
-                        quantity: "60".to_string(),
+            // 1. Deux ventes simultanées (60 + 60 sur stock 100 -> exactement 1 succès et 1 rejet stock insuffisant)
+            let (s1, s2) = tokio::join!(
+                sales::create_sale(
+                    &db,
+                    sales::CreateSaleInput {
+                        request_key: "lot3-sale-1".to_string(),
+                        client_id: None,
+                        sale_type: "cash".to_string(),
+                        price_tier: "retail".to_string(),
                         discount_amount: None,
-                    }],
-                    payments: vec![sales::PaymentPartInput {
-                        method_code: "cash".to_string(),
-                        amount: 24_000,
+                        notes: None,
+                        lines: vec![sales::CreateSaleLineInput {
+                            product_id: prod_id,
+                            packaging_id: pkg_id,
+                            quantity: "60".to_string(),
+                            discount_amount: None,
+                        }],
+                        payments: vec![sales::PaymentPartInput {
+                            method_code: "cash".to_string(),
+                            amount: 24_000
+                        }],
+                        due_date: None,
                         ..Default::default()
-                    }],
-                    due_date: None,
-                    ..Default::default()
-                },
-            ),
-            sales::create_sale(
-                &db,
-                sales::CreateSaleInput {
-                    request_key: "lot3-sale-2".to_string(),
-                    client_id: None,
-                    sale_type: "cash".to_string(),
-                    price_tier: "retail".to_string(),
-                    discount_amount: None,
-                    notes: None,
-                    lines: vec![sales::CreateSaleLineInput {
-                        product_id: prod_id,
-                        packaging_id: pkg_id,
-                        quantity: "60".to_string(),
+                    },
+                ),
+                sales::create_sale(
+                    &db,
+                    sales::CreateSaleInput {
+                        request_key: "lot3-sale-2".to_string(),
+                        client_id: None,
+                        sale_type: "cash".to_string(),
+                        price_tier: "retail".to_string(),
                         discount_amount: None,
-                    }],
-                    payments: vec![sales::PaymentPartInput {
-                        method_code: "cash".to_string(),
-                        amount: 24_000,
+                        notes: None,
+                        lines: vec![sales::CreateSaleLineInput {
+                            product_id: prod_id,
+                            packaging_id: pkg_id,
+                            quantity: "60".to_string(),
+                            discount_amount: None,
+                        }],
+                        payments: vec![sales::PaymentPartInput {
+                            method_code: "cash".to_string(),
+                            amount: 24_000
+                        }],
+                        due_date: None,
                         ..Default::default()
-                    }],
-                    due_date: None,
-                    ..Default::default()
-                },
-            ),
-        );
+                    },
+                ),
+            );
             assert_eq!(usize::from(s1.is_ok()) + usize::from(s2.is_ok()), 1);
-        let stock_after_sales: i64 =
-            sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
-                .bind(prod_id)
-                .fetch_one(&db.pool)
-                .await
-                .unwrap();
-        assert_eq!(stock_after_sales, 40_000);
+            let stock_after_sales: i64 =
+                sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+                    .bind(prod_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(stock_after_sales, 40_000);
 
-        // 2. Deux réceptions simultanées sur un même BC de 10 unités (8 + 8 -> exactement 1 succès, aucun dépassement)
-        let po = purchases::create_purchase_order(
-            &db,
-            purchases::CreatePurchaseOrderInput {
-                request_key: "lot3-po-1".to_string(),
-                supplier_id,
-                expected_date: None,
-                notes: None,
-                lines: vec![purchases::PurchaseOrderLineInput {
-                    product_id: prod_id,
-                    packaging_id: pkg_id,
-                    quantity: "10".to_string(),
-                    unit_price: 250,
-                }],
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        let po_line_id = po.lines[0].id;
-
-        let (r1, r2) = tokio::join!(
-            purchases::receive_purchase_order(
+            // 2. Deux réceptions simultanées sur un même BC de 10 unités (8 + 8 -> exactement 1 succès, aucun dépassement)
+            let po = purchases::create_purchase_order(
                 &db,
-                po.id,
-                purchases::ReceivePurchaseOrderInput {
-                    request_key: "lot3-rec-1".to_string(),
+                purchases::CreatePurchaseOrderInput {
+                    request_key: "lot3-po-1".to_string(),
+                    supplier_id,
+                    expected_date: None,
                     notes: None,
-                    lines: vec![purchases::ReceiveLineInput {
-                        purchase_order_line_id: po_line_id,
-                        received_quantity: "8".to_string(),
-                        discrepancy_reason: None,
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                },
-            ),
-            purchases::receive_purchase_order(
-                &db,
-                po.id,
-                purchases::ReceivePurchaseOrderInput {
-                    request_key: "lot3-rec-2".to_string(),
-                    notes: None,
-                    lines: vec![purchases::ReceiveLineInput {
-                        purchase_order_line_id: po_line_id,
-                        received_quantity: "8".to_string(),
-                        discrepancy_reason: None,
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                },
-            ),
-        );
-        assert_eq!(usize::from(r1.is_ok()) + usize::from(r2.is_ok()), 1);
-        let stock_after_rec: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
-            .bind(prod_id)
-            .fetch_one(&db.pool)
-            .await
-            .unwrap();
-        assert_eq!(stock_after_rec, 48_000);
-
-        // 3. Deux mouvements de stock concurrents (+12 et -5 -> solde exact 55)
-        let (m1, m2) = tokio::join!(
-            inventory::adjust_stock(
-                &db,
-                inventory::AdjustStockInput {
-                    product_id: prod_id,
-                    direction: "in".to_string(),
-                    quantity: "12".to_string(),
-                    reason: "Ajustement entrée Lot 3".to_string(),
-                    request_key: "lot3-adj-in".to_string(),
-                },
-            ),
-            inventory::adjust_stock(
-                &db,
-                inventory::AdjustStockInput {
-                    product_id: prod_id,
-                    direction: "out".to_string(),
-                    quantity: "5".to_string(),
-                    reason: "Ajustement sortie Lot 3".to_string(),
-                    request_key: "lot3-adj-out".to_string(),
-                },
-            ),
-        );
-        assert!(m1.is_ok() && m2.is_ok());
-        let stock_after_adj: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
-            .bind(prod_id)
-            .fetch_one(&db.pool)
-            .await
-            .unwrap();
-        assert_eq!(stock_after_adj, 55_000);
-
-        // 4. Vente et paiement de créance simultanés
-        let credit_sale = sales::create_sale(
-            &db,
-            sales::CreateSaleInput {
-                request_key: "lot3-credit-sale".to_string(),
-                client_id: Some(client_id),
-                sale_type: "credit".to_string(),
-                price_tier: "retail".to_string(),
-                discount_amount: None,
-                notes: None,
-                lines: vec![sales::CreateSaleLineInput {
-                    product_id: prod_id,
-                    packaging_id: pkg_id,
-                    quantity: "10".to_string(),
-                    discount_amount: None,
-                }],
-                payments: vec![],
-                due_date: None,
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        let rec_id = credit_sale.receivable_id.expect("receivable created");
-
-        let (cash_sale_res, pay_rec_res) = tokio::join!(
-            sales::create_sale(
-                &db,
-                sales::CreateSaleInput {
-                    request_key: "lot3-sale-concurrent-rec".to_string(),
-                    client_id: None,
-                    sale_type: "cash".to_string(),
-                    price_tier: "retail".to_string(),
-                    discount_amount: None,
-                    notes: None,
-                    lines: vec![sales::CreateSaleLineInput {
+                    lines: vec![purchases::PurchaseOrderLineInput {
                         product_id: prod_id,
                         packaging_id: pkg_id,
+                        quantity: "10".to_string(),
+                        unit_price: 250,
+                    }],
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            let po_line_id = po.lines[0].id;
+
+            let (r1, r2) = tokio::join!(
+                purchases::receive_purchase_order(
+                    &db,
+                    po.id,
+                    purchases::ReceivePurchaseOrderInput {
+                        request_key: "lot3-rec-1".to_string(),
+                        notes: None,
+                        lines: vec![purchases::ReceiveLineInput {
+                            purchase_order_line_id: po_line_id,
+                            received_quantity: "8".to_string(),
+                            discrepancy_reason: None,
+                            ..Default::default()
+                        }]
+                    },
+                ),
+                purchases::receive_purchase_order(
+                    &db,
+                    po.id,
+                    purchases::ReceivePurchaseOrderInput {
+                        request_key: "lot3-rec-2".to_string(),
+                        notes: None,
+                        lines: vec![purchases::ReceiveLineInput {
+                            purchase_order_line_id: po_line_id,
+                            received_quantity: "8".to_string(),
+                            discrepancy_reason: None,
+                            ..Default::default()
+                        }]
+                    },
+                ),
+            );
+            assert_eq!(usize::from(r1.is_ok()) + usize::from(r2.is_ok()), 1);
+            let stock_after_rec: i64 =
+                sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+                    .bind(prod_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(stock_after_rec, 48_000);
+
+            // 3. Deux mouvements de stock concurrents (+12 et -5 -> solde exact 55)
+            let (m1, m2) = tokio::join!(
+                inventory::adjust_stock(
+                    &db,
+                    inventory::AdjustStockInput {
+                        product_id: prod_id,
+                        direction: "in".to_string(),
+                        quantity: "12".to_string(),
+                        reason: "Ajustement entrée Lot 3".to_string(),
+                        request_key: "lot3-adj-in".to_string(),
+                    },
+                ),
+                inventory::adjust_stock(
+                    &db,
+                    inventory::AdjustStockInput {
+                        product_id: prod_id,
+                        direction: "out".to_string(),
                         quantity: "5".to_string(),
-                        discount_amount: None,
-                    }],
-                    payments: vec![sales::PaymentPartInput {
-                        method_code: "cash".to_string(),
-                        amount: 2_000,
-                        ..Default::default()
-                    }],
-                    due_date: None,
-                    ..Default::default()
-                },
-            ),
-            cash::pay_receivable(
-                &db,
-                rec_id,
-                cash::PayReceivableInput {
-                    request_key: "lot3-pay-rec-1".to_string(),
-                    note: Some("Acompte simultané".to_string()),
-                    parts: vec![sales::PaymentPartInput {
-                        method_code: "cash".to_string(),
-                        amount: 1_500,
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                },
-            ),
-        );
-        assert!(cash_sale_res.is_ok() && pay_rec_res.is_ok());
+                        reason: "Ajustement sortie Lot 3".to_string(),
+                        request_key: "lot3-adj-out".to_string(),
+                    },
+                ),
+            );
+            assert!(m1.is_ok() && m2.is_ok());
+            let stock_after_adj: i64 =
+                sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
+                    .bind(prod_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(stock_after_adj, 55_000);
 
-        // 5. Vente et clôture de caisse simultanées (aucune vente enregistrée sur une caisse déjà fermée)
-        let status = cash::get_cash_status(&db).await.unwrap();
-        let sid = status.active_session.unwrap().id;
-
-        let (race_sale, race_close) = tokio::join!(
-            sales::create_sale(
+            // 4. Vente et paiement de créance simultanés
+            let credit_sale = sales::create_sale(
                 &db,
                 sales::CreateSaleInput {
-                    request_key: "lot3-sale-vs-close".to_string(),
-                    client_id: None,
-                    sale_type: "cash".to_string(),
+                    request_key: "lot3-credit-sale".to_string(),
+                    client_id: Some(client_id),
+                    sale_type: "credit".to_string(),
                     price_tier: "retail".to_string(),
                     discount_amount: None,
                     notes: None,
                     lines: vec![sales::CreateSaleLineInput {
                         product_id: prod_id,
                         packaging_id: pkg_id,
-                        quantity: "2".to_string(),
+                        quantity: "10".to_string(),
                         discount_amount: None,
                     }],
-                    payments: vec![sales::PaymentPartInput {
-                        method_code: "cash".to_string(),
-                        amount: 800,
-                        ..Default::default()
-                    }],
+                    payments: vec![],
                     due_date: None,
                     ..Default::default()
                 },
-            ),
-            cash::close_cash_session(
-                &db,
-                cash::CloseCashInput {
-                    session_id: sid,
-                    physical_cash: 48_300,
-                    closing_notes: Some("Clôture concurrente Lot 3".to_string()),
-                    request_key: "lot3-close-vs-sale".to_string(),
-                },
-            ),
-        );
+            )
+            .await
+            .unwrap();
+            let rec_id = credit_sale.receivable_id.expect("receivable created");
 
-        assert!(race_close.is_ok());
-        let closed_dto = race_close.unwrap();
-        if race_sale.is_ok() {
-            // Si la vente a été exécutée avant la clôture, son encaissement (800) doit être dans theoretical_cash (47500 + 800 = 48300)
-            assert_eq!(closed_dto.theoretical_cash, Some(48_300));
-        } else {
-            // Si la clôture a gagné le verrou, la vente doit être rejetée pour session fermée et theoretical_cash reste 47500
-            assert!(matches!(race_sale, Err(CoreError::SessionNotOpen(_))));
-            assert_eq!(closed_dto.theoretical_cash, Some(47_500));
-        }
+            let (cash_sale_res, pay_rec_res) = tokio::join!(
+                sales::create_sale(
+                    &db,
+                    sales::CreateSaleInput {
+                        request_key: "lot3-sale-concurrent-rec".to_string(),
+                        client_id: None,
+                        sale_type: "cash".to_string(),
+                        price_tier: "retail".to_string(),
+                        discount_amount: None,
+                        notes: None,
+                        lines: vec![sales::CreateSaleLineInput {
+                            product_id: prod_id,
+                            packaging_id: pkg_id,
+                            quantity: "5".to_string(),
+                            discount_amount: None,
+                        }],
+                        payments: vec![sales::PaymentPartInput {
+                            method_code: "cash".to_string(),
+                            amount: 2_000
+                        }],
+                        due_date: None,
+                        ..Default::default()
+                    },
+                ),
+                cash::pay_receivable(
+                    &db,
+                    rec_id,
+                    cash::PayReceivableInput {
+                        request_key: "lot3-pay-rec-1".to_string(),
+                        note: Some("Acompte simultané".to_string()),
+                        parts: vec![sales::PaymentPartInput {
+                            method_code: "cash".to_string(),
+                            amount: 1_500
+                        }],
+                        ..Default::default()
+                    },
+                ),
+            );
+            assert!(cash_sale_res.is_ok() && pay_rec_res.is_ok());
 
-        db.verify_integrity().await.unwrap();
+            // 5. Vente et clôture de caisse simultanées (aucune vente enregistrée sur une caisse déjà fermée)
+            let status = cash::get_cash_status(&db).await.unwrap();
+            let sid = status.active_session.unwrap().id;
+
+            let (race_sale, race_close) = tokio::join!(
+                sales::create_sale(
+                    &db,
+                    sales::CreateSaleInput {
+                        request_key: "lot3-sale-vs-close".to_string(),
+                        client_id: None,
+                        sale_type: "cash".to_string(),
+                        price_tier: "retail".to_string(),
+                        discount_amount: None,
+                        notes: None,
+                        lines: vec![sales::CreateSaleLineInput {
+                            product_id: prod_id,
+                            packaging_id: pkg_id,
+                            quantity: "2".to_string(),
+                            discount_amount: None,
+                        }],
+                        payments: vec![sales::PaymentPartInput {
+                            method_code: "cash".to_string(),
+                            amount: 800
+                        }],
+                        due_date: None,
+                        ..Default::default()
+                    },
+                ),
+                cash::close_cash_session(
+                    &db,
+                    cash::CloseCashInput {
+                        session_id: sid,
+                        physical_cash: 48_300,
+                        closing_notes: Some("Clôture concurrente Lot 3".to_string()),
+                        request_key: "lot3-close-vs-sale".to_string(),
+                    },
+                ),
+            );
+
+            assert!(race_close.is_ok());
+            let closed_dto = race_close.unwrap();
+            if race_sale.is_ok() {
+                // Si la vente a été exécutée avant la clôture, son encaissement (800) doit être dans theoretical_cash (47500 + 800 = 48300)
+                assert_eq!(closed_dto.theoretical_cash, Some(48_300));
+            } else {
+                // Si la clôture a gagné le verrou, la vente doit être rejetée pour session fermée et theoretical_cash reste 47500
+                assert!(matches!(race_sale, Err(CoreError::SessionNotOpen(_))));
+                assert_eq!(closed_dto.theoretical_cash, Some(47_500));
+            }
+
+            db.verify_integrity().await.unwrap();
         },
     )
     .await;

@@ -32,11 +32,11 @@ export function MetricCard({
     tone === 'success'
       ? 'text-[#16A36A] dark:text-emerald-400'
       : tone === 'warning'
-      ? 'text-[#D9901A] dark:text-amber-400'
+      ? 'text-[#8A5A0B] dark:text-amber-300'
       : tone === 'danger'
-      ? 'text-[#DC4545] dark:text-rose-400'
+      ? 'text-[#BE123C] dark:text-rose-400'
       : tone === 'accent'
-      ? 'text-[#2563EB] dark:text-[#60A5FA]'
+      ? 'text-[#1D4ED8] dark:text-[#60A5FA]'
       : 'text-[#182230] dark:text-slate-100';
 
   const noteText = subtext ?? hint;

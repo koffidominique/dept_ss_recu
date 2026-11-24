@@ -88,7 +88,7 @@ export function ProductStepPackaging({
 
           <div>
             <label className="block text-xs font-medium">Conditionnement principal</label>
-            <select
+            <select aria-label="Conditionnement principal"
               value={pkgName}
               onChange={(e) => {
                 const next = e.target.value as ProductFormValues['packaging_name'];
@@ -143,8 +143,8 @@ export function ProductStepPackaging({
                   onClick={() => form.setValue('packaging_coeff', String(n))}
                   className={`rounded border px-2 py-0.5 text-[11px] font-mono-num ${
                     String(n) === form.watch('packaging_coeff')
-                      ? 'border-[#2563EB] bg-blue-50 text-[#2563EB] dark:bg-blue-950/40'
-                      : 'border-slate-200 dark:border-slate-700 text-[#667085]'
+                      ? 'border-[#2563EB] bg-blue-50 text-[#1D4ED8] dark:text-[#60A5FA] dark:bg-blue-950/40'
+                      : 'border-slate-200 dark:border-slate-700 text-[#667085] dark:text-[#94A3B8]'
                   }`}
                 >
                   ×{n}

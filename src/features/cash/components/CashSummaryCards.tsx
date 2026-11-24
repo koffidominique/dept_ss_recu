@@ -57,7 +57,7 @@ export function CashSummaryCards({
               <div className="mt-2 font-mono-num text-lg font-bold text-[#182230] dark:text-slate-100">
                 {formatFcfa(m.total_in - m.total_out)}
               </div>
-              <div className="mt-1 flex justify-between font-mono-num text-[11px] text-[#667085]">
+              <div className="mt-1 flex justify-between font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
                 <span>Entrées : {formatFcfa(m.total_in)}</span>
                 <span>Sorties : {formatFcfa(m.total_out)}</span>
               </div>

@@ -57,7 +57,7 @@ export function CompanySettingsCard({
               className="h-14 w-14 rounded-lg border border-slate-200 dark:border-slate-700 bg-white object-contain p-1 shrink-0"
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-[#667085] shrink-0">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-[#667085] dark:text-[#94A3B8] shrink-0">
               <ImageIcon className="h-5 w-5" />
             </div>
           )}
@@ -86,7 +86,7 @@ export function CompanySettingsCard({
                   <button
                     type="button"
                     onClick={() => onUpdateForm((p) => ({ ...p, logo_path: null }))}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[#DC4545] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[#BE123C] hover:bg-rose-50 dark:hover:bg-rose-950/30"
                   >
                     <Trash2 className="h-3 w-3" />
                     Retirer
@@ -224,7 +224,7 @@ export function CompanySettingsCard({
       </div>
 
       <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-3">
-        <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-[#667085]">
+        <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#94A3B8]">
           Documents &amp; numérotation
         </h4>
         <div className="grid grid-cols-3 gap-3 text-xs">
@@ -288,13 +288,13 @@ export function CompanySettingsCard({
       </div>
 
       <div className="space-y-3 border-t border-slate-200 dark:border-slate-800 pt-4 text-xs">
-        <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-[#667085]">
+        <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-[#667085] dark:text-[#94A3B8]">
           Commercial, crédit &amp; affichage
         </h4>
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium">Autoriser le stock négatif en vente</div>
-            <div className="text-[#667085]">
+            <div className="text-[#667085] dark:text-[#94A3B8]">
               Décoché par défaut pour bloquer les ventes hors stock.
             </div>
           </div>
@@ -316,7 +316,7 @@ export function CompanySettingsCard({
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium">Mode sombre</div>
-            <div className="text-[#667085]">
+            <div className="text-[#667085] dark:text-[#94A3B8]">
               Basculer entre le thème clair et le thème sombre.
             </div>
           </div>

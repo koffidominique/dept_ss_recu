@@ -386,7 +386,6 @@ async fn lot9_22_scenarios_business_parity() {
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 18_100,
-                    ..Default::default()
                 }],
                 due_date: None,
                 ..Default::default()
@@ -445,7 +444,6 @@ async fn lot9_22_scenarios_business_parity() {
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 18_100,
-                    ..Default::default()
                 }],
                 due_date: None,
                 ..Default::default()
@@ -510,7 +508,6 @@ async fn lot9_22_scenarios_business_parity() {
                 payments: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 1_200,
-                    ..Default::default()
                 }],
                 due_date: None,
                 ..Default::default()
@@ -547,17 +544,14 @@ async fn lot9_22_scenarios_business_parity() {
                     sales::PaymentPartInput {
                         method_code: "cash".to_string(),
                         amount: 4_100,
-                        ..Default::default()
                     },
                     sales::PaymentPartInput {
                         method_code: "wave".to_string(),
                         amount: 6_000,
-                        ..Default::default()
                     },
                     sales::PaymentPartInput {
                         method_code: "orange_money".to_string(),
                         amount: 8_000,
-                        ..Default::default()
                     },
                 ],
                 due_date: None,
@@ -643,7 +637,6 @@ async fn lot9_22_scenarios_business_parity() {
                 payments: vec![sales::PaymentPartInput {
                     method_code: "wave".to_string(),
                     amount: 18_100,
-                    ..Default::default()
                 }],
                 due_date: None,
                 ..Default::default()
@@ -681,7 +674,6 @@ async fn lot9_22_scenarios_business_parity() {
                 parts: vec![sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 40_000,
-                    ..Default::default()
                 }],
                 ..Default::default()
             },
@@ -699,12 +691,10 @@ async fn lot9_22_scenarios_business_parity() {
                     sales::PaymentPartInput {
                         method_code: "cash".to_string(),
                         amount: 10_000,
-                        ..Default::default()
                     },
                     sales::PaymentPartInput {
                         method_code: "wave".to_string(),
                         amount: 5_000,
-                        ..Default::default()
                     },
                 ],
                 ..Default::default()
@@ -752,7 +742,6 @@ async fn lot9_22_scenarios_business_parity() {
                     discrepancy_reason: None,
                     ..Default::default()
                 }],
-                ..Default::default()
             },
         )
         .await
@@ -778,7 +767,6 @@ async fn lot9_22_scenarios_business_parity() {
                     discrepancy_reason: None,
                     ..Default::default()
                 }],
-                ..Default::default()
             },
         )
         .await;
@@ -796,7 +784,6 @@ async fn lot9_22_scenarios_business_parity() {
                     discrepancy_reason: None,
                     ..Default::default()
                 }],
-                ..Default::default()
             },
         )
         .await

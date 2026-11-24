@@ -1,5 +1,9 @@
-import { CheckCircle2, HardDrive, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, HardDrive, RefreshCw, ShieldAlert } from 'lucide-react';
 import type { LocalDbStatus } from '../../../types/erp.ts';
+import {
+  evaluateBackupHealth,
+  type BackupFreshness,
+} from '../../quality/utils/operationalSafety.ts';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
@@ -17,12 +21,20 @@ export function LocalDbStatusCard({ status, isFetching, onRefreshIntegrity }: Pr
   if (!status) return null;
 
   const isHealthy = status.integrity === 'ok' && status.foreignKeyErrors === 0;
+  const backupHealth = evaluateBackupHealth(status.lastBackupAt, new Date());
+
+  const backupTone: Record<BackupFreshness, string> = {
+    fresh: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    aging: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300',
+    stale: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    none: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+  };
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-[#2563EB]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-[#1D4ED8] dark:text-[#60A5FA]">
             <HardDrive className="h-4 w-4" />
           </div>
           <div>
@@ -56,11 +68,27 @@ export function LocalDbStatusCard({ status, isFetching, onRefreshIntegrity }: Pr
           </div>
         </div>
 
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${backupTone[backupHealth.freshness]}`}
+          >
+            {backupHealth.freshness === 'fresh' ? (
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+            )}
+            {backupHealth.label}
+          </span>
+          <span className="max-w-[22rem] text-right text-[11px] text-[#667085] dark:text-slate-400">
+            {backupHealth.detail}
+          </span>
+        </div>
+
         <button
           type="button"
           disabled={isFetching}
           onClick={onRefreshIntegrity}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
           Vérifier l’intégrité locale

@@ -25,7 +25,7 @@ export function PaymentMethodsCard({
           <div key={pm.code} className="flex items-center justify-between py-2.5">
             <div>
               <div className="font-medium">{pm.label}</div>
-              <div className="font-mono-num text-[11px] text-[#667085]">
+              <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
                 {pm.code} · {pm.is_cash === 1 ? 'Espèces (non désactivable)' : 'Canal digital'}
               </div>
             </div>
@@ -33,7 +33,7 @@ export function PaymentMethodsCard({
               disabled={pm.is_cash === 1}
               checked={pm.active === 1}
               onCheckedChange={(checked) => onToggleMethod(pm.code, checked)}
-              className="relative h-5 w-9 rounded-full bg-slate-300 dark:bg-slate-700 data-[state=checked]:bg-[#16A36A] disabled:opacity-60"
+              className="relative h-5 w-9 rounded-full bg-slate-300 dark:bg-slate-700 data-[state=checked]:bg-[#0D7A4C] disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100"
             >
               <Switch.Thumb className="block h-4 w-4 translate-x-0.5 rounded-full bg-white transition-transform data-[state=checked]:translate-x-[18px]" />
             </Switch.Root>
@@ -52,7 +52,7 @@ export function PaymentMethodsCard({
           type="button"
           disabled={!newMethodLabel.trim() || isAdding}
           onClick={onAddMethod}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <Plus className="h-3.5 w-3.5" />
           Ajouter
@@ -80,7 +80,7 @@ export function PinSecurityCard({
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] dp-surface p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <KeyRound className="h-4 w-4 text-[#2563EB]" />
+        <KeyRound className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
         <h3 className="font-display text-sm font-semibold">Sécurité · Code PIN propriétaire</h3>
       </div>
       <div className="grid grid-cols-2 gap-3 text-xs">
@@ -112,7 +112,7 @@ export function PinSecurityCard({
           type="button"
           disabled={currentPin.length !== 6 || newPin.length !== 6 || isPending}
           onClick={onSubmit}
-          className="rounded-lg bg-[#182230] dark:bg-slate-100 px-4 py-2 text-xs font-semibold text-white dark:text-slate-900 disabled:opacity-40"
+          className="rounded-lg bg-[#182230] dark:bg-slate-100 px-4 py-2 text-xs font-semibold text-white dark:text-slate-900 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           Modifier le code PIN
         </button>
@@ -153,7 +153,7 @@ export function UsersRbacCard({
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-[#2563EB]" />
+        <Users className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
         <h3 className="font-display text-sm font-semibold">Opérateurs &amp; Rôles (RBAC)</h3>
       </div>
       <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -162,9 +162,9 @@ export function UsersRbacCard({
             <div>
               <div className="font-medium">
                 {u.displayName}{' '}
-                <span className="font-mono-num text-[11px] text-[#667085]">(@{u.username})</span>
+                <span className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">(@{u.username})</span>
               </div>
-              <div className="text-[11px] text-[#667085]">
+              <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                 {u.roleLabel} · {u.active ? 'Actif' : 'Désactivé'}
               </div>
             </div>
@@ -172,7 +172,7 @@ export function UsersRbacCard({
               disabled={u.role === 'owner'}
               checked={u.active}
               onCheckedChange={(checked) => onToggleUser(u.id, checked)}
-              className="relative h-5 w-9 rounded-full bg-slate-300 dark:bg-slate-700 data-[state=checked]:bg-[#16A36A] disabled:opacity-60"
+              className="relative h-5 w-9 rounded-full bg-slate-300 dark:bg-slate-700 data-[state=checked]:bg-[#0D7A4C] disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100"
             >
               <Switch.Thumb className="block h-4 w-4 translate-x-0.5 rounded-full bg-white transition-transform data-[state=checked]:translate-x-[18px]" />
             </Switch.Root>
@@ -195,6 +195,7 @@ export function UsersRbacCard({
           className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5"
         />
         <select
+          aria-label="Rôle du nouvel utilisateur"
           value={newUserRole}
           onChange={(e) => onChangeRole(e.target.value as UserRole)}
           className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5"
@@ -223,7 +224,7 @@ export function UsersRbacCard({
             isCreating
           }
           onClick={onCreateUser}
-          className="col-span-2 inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+          className="col-span-2 inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <Plus className="h-3.5 w-3.5" />
           Ajouter un compte opérateur

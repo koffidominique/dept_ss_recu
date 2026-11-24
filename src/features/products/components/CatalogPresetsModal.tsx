@@ -115,7 +115,7 @@ function CatalogPresetsDialogContent({
                 name="preset-activate-mode"
                 checked={activateMode}
                 onChange={() => setActivateMode(true)}
-                className="text-[#2563EB]"
+                className="text-[#1D4ED8] dark:text-[#60A5FA]"
               />
               Activer immédiatement
             </label>
@@ -125,7 +125,7 @@ function CatalogPresetsDialogContent({
                 name="preset-activate-mode"
                 checked={!activateMode}
                 onChange={() => setActivateMode(false)}
-                className="text-[#2563EB]"
+                className="text-[#1D4ED8] dark:text-[#60A5FA]"
               />
               Charger en inactif (archivé)
             </label>
@@ -143,7 +143,7 @@ function CatalogPresetsDialogContent({
               type="button"
               disabled={selectedKeys.size === 0 || isPending}
               onClick={() => onApply(Array.from(selectedKeys), activateMode)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               <PackagePlus className="h-4 w-4" />
               {isPending
@@ -172,7 +172,7 @@ function CatalogPresetsDialogContent({
                 onClick={() => setBreweryFilter(tab.id)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   breweryFilter === tab.id
-                    ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#2563EB] dark:text-blue-300'
+                    ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#1D4ED8] dark:text-blue-300'
                     : 'border-slate-200 dark:border-slate-700 text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
@@ -197,7 +197,7 @@ function CatalogPresetsDialogContent({
               onClick={() => setCategoryFilter('ALL')}
               className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 categoryFilter === 'ALL'
-                  ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#2563EB] dark:text-blue-300'
+                  ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#1D4ED8] dark:text-blue-300'
                   : 'border-slate-200 dark:border-slate-700 text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
@@ -210,7 +210,7 @@ function CatalogPresetsDialogContent({
                 onClick={() => setCategoryFilter(cat)}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   categoryFilter === cat
-                    ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#2563EB] dark:text-blue-300'
+                    ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/40 text-[#1D4ED8] dark:text-blue-300'
                     : 'border-slate-200 dark:border-slate-700 text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
@@ -247,7 +247,7 @@ function CatalogPresetsDialogContent({
               <button
                 type="button"
                 onClick={clearSelection}
-                className="rounded-md px-2 py-1 text-[#667085] hover:text-[#182230] dark:text-slate-400 dark:hover:text-slate-200"
+                className="rounded-md px-2 py-1 text-[#667085] dark:text-[#94A3B8] hover:text-[#182230] dark:text-slate-400 dark:hover:text-slate-200"
               >
                 Vider ({selectedKeys.size})
               </button>
@@ -259,11 +259,11 @@ function CatalogPresetsDialogContent({
         </div>
 
         {isLoading ? (
-          <div className="py-10 text-center text-xs text-[#667085]">
+          <div className="py-10 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
             Chargement du catalogue brasseries...
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="py-10 text-center text-xs text-[#667085]">
+          <div className="py-10 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
             Aucun produit prédéfini ne correspond à ce filtre.
           </div>
         ) : (
@@ -287,7 +287,7 @@ function CatalogPresetsDialogContent({
                       aria-label={`Sélectionner ${item.name}`}
                       checked={checked}
                       onChange={() => toggleKey(item.key)}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#1D4ED8] dark:text-[#60A5FA] focus:ring-[#2563EB]"
                     />
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -313,7 +313,7 @@ function CatalogPresetsDialogContent({
                           </span>
                         )}
                         {isArchived && (
-                          <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-semibold text-[#D9901A] dark:text-amber-400">
+                          <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-semibold text-[#8A5A0B] dark:text-amber-300">
                             Archivé ({item.existing_reference})
                           </span>
                         )}
@@ -331,7 +331,7 @@ function CatalogPresetsDialogContent({
                         <span>Achat : {formatFcfa(item.purchase_price)}</span>
                         <span>Gros : {formatFcfa(item.wholesale_price)}</span>
                         <span>Demi-gros : {formatFcfa(item.semi_wholesale_price)}</span>
-                        <span className="font-semibold text-[#2563EB] dark:text-[#60A5FA]">
+                        <span className="font-semibold text-[#1D4ED8] dark:text-[#60A5FA]">
                           Détail : {formatFcfa(item.retail_price)}
                         </span>
                       </div>
@@ -344,12 +344,12 @@ function CatalogPresetsDialogContent({
                           >
                             <Layers className="h-3 w-3 text-slate-400" />
                             <span className="capitalize font-medium">{pk.name}</span>
-                            <span className="font-mono-num text-[#667085]">×{pk.coefficient}</span>
-                            <span className="font-mono-num text-[#2563EB] dark:text-[#60A5FA]">
+                            <span className="font-mono-num text-[#667085] dark:text-[#94A3B8]">×{pk.coefficient}</span>
+                            <span className="font-mono-num text-[#1D4ED8] dark:text-[#60A5FA]">
                               {formatFcfa(pk.retail_price)}
                             </span>
                             {pk.deposit_mode === 'deposit' && (
-                              <span className="text-[10px] font-medium text-[#D9901A]">
+                              <span className="text-[10px] font-medium text-[#8A5A0B] dark:text-[#FBBF24]">
                                 · Consigné
                               </span>
                             )}
@@ -369,7 +369,7 @@ function CatalogPresetsDialogContent({
                         type="button"
                         disabled={isPending}
                         onClick={() => onApply([item.key], true)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1.5 text-[11px] font-semibold text-[#D9901A] hover:bg-amber-100 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1.5 text-[11px] font-semibold text-[#8A5A0B] dark:text-[#FBBF24] hover:bg-amber-100 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                       >
                         <Sparkles className="h-3 w-3" />
                         Réactiver
@@ -379,7 +379,7 @@ function CatalogPresetsDialogContent({
                         type="button"
                         disabled={isPending}
                         onClick={() => onApply([item.key], activateMode)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[#2563EB]/30 bg-blue-50 dark:bg-blue-950/30 px-2.5 py-1.5 text-[11px] font-semibold text-[#2563EB] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#2563EB]/30 bg-blue-50 dark:bg-blue-950/30 px-2.5 py-1.5 text-[11px] font-semibold text-[#1D4ED8] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                       >
                         <PackagePlus className="h-3 w-3" />
                         {activateMode ? 'Activer' : 'Charger inactif'}

@@ -92,9 +92,12 @@ pub async fn update_purchase_order(
 ) -> Result<serde_json::Value, String> {
     let actor = verify_desktop_perm(&state, &token, Permission::PurchasesWrite).await?;
     let db = state.db().await;
-    let po = auth::with_actor(actor, purchases::update_purchase_order(&db, purchase_order_id, payload))
-        .await
-        .map_err(|e| e.to_string())?;
+    let po = auth::with_actor(
+        actor,
+        purchases::update_purchase_order(&db, purchase_order_id, payload),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     serde_json::to_value(po).map_err(|e| e.to_string())
 }
 
@@ -159,9 +162,12 @@ pub async fn get_purchase_receipt_detail(
 ) -> Result<serde_json::Value, String> {
     let actor = verify_desktop_perm(&state, &token, Permission::PurchasesRead).await?;
     let db = state.db().await;
-    let item = auth::with_actor(actor, purchases::get_purchase_receipt_detail(&db, receipt_id))
-        .await
-        .map_err(|e| e.to_string())?;
+    let item = auth::with_actor(
+        actor,
+        purchases::get_purchase_receipt_detail(&db, receipt_id),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     serde_json::to_value(item).map_err(|e| e.to_string())
 }
 

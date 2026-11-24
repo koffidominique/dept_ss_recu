@@ -6,8 +6,9 @@ use axum::routing::{get, post, put};
 use axum::Router;
 
 use crate::handlers::{
-    auth, backups, cash_and_reports, commercial_documents, consignments, health, packaging_components,
-    partial_returns_and_validation, products, products_presets, purchases, sales, stock,
+    auth, backups, cash_and_reports, commercial_documents, consignments, health,
+    packaging_components, partial_returns_and_validation, products, products_presets, purchases,
+    sales, stock,
 };
 use crate::state::AppState;
 
@@ -29,10 +30,22 @@ pub(crate) fn core_and_commerce_router() -> Router<AppState> {
         .route("/api/dashboard", get(auth::dashboard))
         // Registre documentaire & approbation Owner
         .route("/api/commercial-documents", get(commercial_documents::list))
-        .route("/api/commercial-documents/:document_type/:id", get(commercial_documents::detail))
-        .route("/api/commercial-documents/:document_type/:id/submit", post(commercial_documents::submit))
-        .route("/api/commercial-documents/:document_type/:id/review", post(commercial_documents::review))
-        .route("/api/commercial-documents/:document_type/:id/events", get(commercial_documents::events))
+        .route(
+            "/api/commercial-documents/:document_type/:id",
+            get(commercial_documents::detail),
+        )
+        .route(
+            "/api/commercial-documents/:document_type/:id/submit",
+            post(commercial_documents::submit),
+        )
+        .route(
+            "/api/commercial-documents/:document_type/:id/review",
+            post(commercial_documents::review),
+        )
+        .route(
+            "/api/commercial-documents/:document_type/:id/events",
+            get(commercial_documents::events),
+        )
         // Produits & catégories
         .route(
             "/api/categories",

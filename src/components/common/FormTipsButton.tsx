@@ -24,7 +24,7 @@ export function FormTipsButton({
       transition={DP_SPRING_SNAPPY}
       onClick={() => openTips(topicId)}
       title="Afficher les conseils et règles métier"
-      className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-[#667085] dark:text-slate-300 hover:border-[#2563EB]/60 hover:text-[#2563EB] dark:hover:text-[#60A5FA] hover:shadow-sm transition-colors whitespace-nowrap shrink-0 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-[#667085] dark:text-slate-300 hover:border-[#2563EB]/60 hover:text-[#1D4ED8] dark:text-[#60A5FA] dark:hover:text-[#60A5FA] hover:shadow-sm transition-colors whitespace-nowrap shrink-0 ${className}`}
     >
       <HelpCircle className="h-3.5 w-3.5 shrink-0" />
       <span>{label}</span>

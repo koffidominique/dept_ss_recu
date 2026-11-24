@@ -187,6 +187,18 @@ async fn axum_orders_mixed_crate_and_deposit_lifecycle() {
         .unwrap();
     assert_eq!(ord_json["order"]["status"], "draft");
 
+    // pay_order exige une session de caisse ouverte (require_open_session_tx) :
+    // sans elle, l'encaissement renvoie 400 et le scenario ne peut pas aboutir.
+    let (st, _) = send_http(
+        addr,
+        "POST",
+        "/api/cash/open",
+        &hdrs,
+        Some(r#"{"opening_cash":1000,"request_key":"axum-orders-open"}"#),
+    )
+    .await;
+    assert_eq!(st, 201, "ouverture de caisse requise par l'encaissement");
+
     let (st, _) = send_http(
         addr,
         "PATCH",

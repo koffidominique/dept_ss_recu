@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { SearchInput } from '../components/forms/SearchInput.tsx';
 import { ErrorState, LoadingState } from '../components/common/States.tsx';
+import { isPastDueDate } from '../features/dashboard/utils/workQueue.ts';
+import { formatFcfa } from '../utils/format.ts';
 import type { Supplier, SupplierDebt } from '../types/erp.ts';
 import {
   useSuppliersMutations,
@@ -28,6 +31,13 @@ export function SuppliersPage() {
   const [payDebtTarget, setPayDebtTarget] = useState<SupplierDebt | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // `?dettes=en_retard` : lien direct depuis la file de travail du tableau de bord.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const onlyOverdue = searchParams.get('dettes') === 'en_retard';
+  const setOnlyOverdue = (next: boolean) => {
+    setSearchParams(next ? { dettes: 'en_retard' } : {}, { replace: true });
+  };
+
   const { suppliersQuery, debtsQuery, purchasesQuery, activeMethods } = useSuppliersQueries(
     search,
     Boolean(detailTarget)
@@ -53,6 +63,13 @@ export function SuppliersPage() {
   });
 
   const { data: suppliers, isLoading, error, refetch } = suppliersQuery;
+
+  const now = new Date();
+  const allDebts = debtsQuery.data || [];
+  const openDebts = allDebts.filter((d) => d.remaining_amount > 0 && d.status !== 'paid');
+  const overdueDebts = openDebts.filter((d) => isPastDueDate(d.due_date, now));
+  const visibleDebts = onlyOverdue ? overdueDebts : allDebts;
+  const overdueTotal = overdueDebts.reduce((sum, d) => sum + d.remaining_amount, 0);
 
   return (
     <div className="space-y-6">
@@ -95,12 +112,38 @@ export function SuppliersPage() {
         />
       )}
 
-      <div className="space-y-3">
-        <h3 className="font-display text-sm font-semibold text-[#182230] dark:text-slate-100">
-          Dettes fournisseurs issues des réceptions
-        </h3>
+      <div className="space-y-3" id="dettes-fournisseurs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-display text-sm font-semibold text-[#182230] dark:text-slate-100">
+            Dettes fournisseurs issues des réceptions
+          </h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={onlyOverdue}
+              onClick={() => setOnlyOverdue(!onlyOverdue)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                onlyOverdue
+                  ? 'border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 text-[#BE123C] dark:text-rose-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              Échéance dépassée ({overdueDebts.length})
+            </button>
+            {onlyOverdue && (
+              <span className="font-mono-num text-xs font-semibold text-[#BE123C] dark:text-rose-300">
+                {formatFcfa(overdueTotal)}
+              </span>
+            )}
+          </div>
+        </div>
         <SupplierDebtsTable
-          debts={debtsQuery.data || []}
+          debts={visibleDebts}
+          emptyMessage={
+            onlyOverdue
+              ? 'Aucune dette fournisseur échue : toutes les échéances sont respectées.'
+              : 'Aucune dette fournisseur enregistrée.'
+          }
           onPayDebt={(debt) => {
             setErrorMsg(null);
             setPayDebtTarget(debt);

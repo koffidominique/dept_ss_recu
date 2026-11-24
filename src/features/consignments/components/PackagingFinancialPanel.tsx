@@ -376,7 +376,7 @@ export function PackagingFinancialPanel() {
           !['settled', 'returned', 'cancelled', 'converted'].includes(o.status);
 
         if (maxLateReturn <= 0 && !canDeclareLoss) {
-          return <span className="text-xs text-[#667085]">—</span>;
+          return <span className="text-xs text-[#667085] dark:text-[#94A3B8]">—</span>;
         }
 
         return (
@@ -433,7 +433,7 @@ export function PackagingFinancialPanel() {
           type="button"
           disabled={processingDue}
           onClick={handleProcessDue}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1E40AF] disabled:opacity-50 shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1E40AF] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 shrink-0"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${processingDue ? 'animate-spin' : ''}`} />
           {processingDue ? 'Traitement…' : 'Traiter les échéances (> 15 j)'}
@@ -468,7 +468,7 @@ export function PackagingFinancialPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-xs font-medium text-[#667085] dark:text-slate-300">Client :</label>
-          <select
+          <select aria-label="Client"
             value={clientId ?? ''}
             onChange={(e) => setClientId(e.target.value ? Number(e.target.value) : null)}
             className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-2 text-xs"
@@ -556,6 +556,7 @@ export function PackagingFinancialPanel() {
             Tout solder
           </button>
           <select
+            aria-label="Moyen de paiement du solde emballages"
             value={payMethod}
             onChange={(e) => setPayMethod(e.target.value)}
             className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs"
@@ -581,7 +582,7 @@ export function PackagingFinancialPanel() {
             type="button"
             disabled={paying}
             onClick={handlePay}
-            className="rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             {paying ? '…' : 'Enregistrer le règlement'}
           </button>
@@ -599,7 +600,7 @@ export function PackagingFinancialPanel() {
             <button
               type="button"
               onClick={() => setLateReturnTarget(null)}
-              className="text-[#667085] hover:text-[#182230] dark:hover:text-white"
+              className="text-[#667085] dark:text-[#94A3B8] hover:text-[#182230] dark:hover:text-white"
             >
               Fermer
             </button>
@@ -637,7 +638,7 @@ export function PackagingFinancialPanel() {
               type="button"
               disabled={submittingLateReturn}
               onClick={handleLateReturnSubmit}
-              className="rounded-lg bg-emerald-600 px-3.5 py-1.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-lg bg-emerald-600 px-3.5 py-1.5 font-semibold text-white hover:bg-emerald-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               {submittingLateReturn ? 'Validation…' : 'Confirmer l’entrée stock sous-dépôt'}
             </button>
@@ -656,7 +657,7 @@ export function PackagingFinancialPanel() {
             <button
               type="button"
               onClick={() => setLossTarget(null)}
-              className="text-[#667085] hover:text-[#182230] dark:hover:text-white"
+              className="text-[#667085] dark:text-[#94A3B8] hover:text-[#182230] dark:hover:text-white"
             >
               Fermer
             </button>
@@ -688,7 +689,7 @@ export function PackagingFinancialPanel() {
               type="button"
               disabled={submittingLoss}
               onClick={handleDeclareLossSubmit}
-              className="rounded-lg bg-amber-600 px-3.5 py-1.5 font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              className="rounded-lg bg-amber-600 px-3.5 py-1.5 font-semibold text-white hover:bg-amber-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               {submittingLoss ? 'Envoi…' : 'Enregistrer la déclaration'}
             </button>
@@ -710,15 +711,15 @@ export function PackagingFinancialPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-[#667085]">
-                  <th className="py-2">Réf.</th>
-                  <th className="py-2">Client / Vente</th>
-                  <th className="py-2">Emballage</th>
-                  <th className="py-2 text-right">Qté</th>
-                  <th className="py-2 text-right">Montant consigne</th>
-                  <th className="py-2">Motif</th>
-                  <th className="py-2">Statut</th>
-                  <th className="py-2 text-right">Action</th>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-[#667085] dark:text-[#94A3B8]">
+                  <th scope="col" className="py-2">Réf.</th>
+                  <th scope="col" className="py-2">Client / Vente</th>
+                  <th scope="col" className="py-2">Emballage</th>
+                  <th scope="col" className="py-2 text-right">Qté</th>
+                  <th scope="col" className="py-2 text-right">Montant consigne</th>
+                  <th scope="col" className="py-2">Motif</th>
+                  <th scope="col" className="py-2">Statut</th>
+                  <th scope="col" className="py-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -727,7 +728,7 @@ export function PackagingFinancialPanel() {
                     <td className="py-2 font-mono-num">{l.request_key}</td>
                     <td className="py-2">
                       <div>{l.client_name || 'Comptoir'}</div>
-                      <div className="text-[11px] text-[#667085]">
+                      <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                         {l.sale_reference || `#${l.deposit_issue_id}`} ·{' '}
                         {formatDateTime(l.created_at)}
                       </div>
@@ -755,12 +756,12 @@ export function PackagingFinancialPanel() {
                           type="button"
                           disabled={validatingLossId === l.id}
                           onClick={() => handleValidateLoss(l.id)}
-                          className="rounded-lg bg-[#1D4ED8] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#1E40AF] disabled:opacity-50"
+                          className="rounded-lg bg-[#1D4ED8] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#1E40AF] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                         >
                           {validatingLossId === l.id ? '…' : 'Valider en créance'}
                         </button>
                       ) : (
-                        <span className="text-[#667085]">—</span>
+                        <span className="text-[#667085] dark:text-[#94A3B8]">—</span>
                       )}
                     </td>
                   </tr>

@@ -215,6 +215,7 @@ pub async fn create_sale_return(
                 .await?;
                 let prev_restocked_milli = (cum_restocked_milli - *base_qty_milli).max(0);
 
+                #[allow(clippy::type_complexity)]
                 let line_issues: Vec<(i64, Option<i64>, i64, i64, i64, i64, i64)> = sqlx::query_as(
                     "SELECT id, client_id, returnable_id, pieces, returned_pieces,
                             lost_pieces + destroyed_pieces + converted_pieces, unit_value

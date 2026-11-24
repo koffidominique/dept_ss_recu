@@ -105,10 +105,34 @@ pub(crate) fn draw_table_header(cmds: &mut Vec<String>, y: &mut f64) {
     }
     let white = (1.0, 1.0, 1.0);
     draw_text_right(cmds, MARGIN + 68.0, *y - 13.5, "Qté", 8.5, true, white);
-    draw_text(cmds, MARGIN + 82.0, *y - 13.5, "Désignation", 8.5, true, white);
-    draw_text_right(cmds, MARGIN + 428.0, *y - 13.5, "Prix unitaire", 8.0, true, white);
+    draw_text(
+        cmds,
+        MARGIN + 82.0,
+        *y - 13.5,
+        "Désignation",
+        8.5,
+        true,
+        white,
+    );
+    draw_text_right(
+        cmds,
+        MARGIN + 428.0,
+        *y - 13.5,
+        "Prix unitaire",
+        8.0,
+        true,
+        white,
+    );
     draw_text_right(cmds, RIGHT - 6.0, *y - 13.5, "Total", 8.5, true, white);
-    draw_line(cmds, MARGIN, *y - 20.0, RIGHT, *y - 20.0, (0.0, 0.0, 0.0), 0.8);
+    draw_line(
+        cmds,
+        MARGIN,
+        *y - 20.0,
+        RIGHT,
+        *y - 20.0,
+        (0.0, 0.0, 0.0),
+        0.8,
+    );
     *y -= 24.0;
 }
 
@@ -124,7 +148,9 @@ pub(crate) fn decode_logo_jpeg(data_url: &str) -> Option<PdfJpegImage> {
     if data_url.len() > 500_000 {
         return None;
     }
-    let encoded = data_url.strip_prefix("data:image/jpeg;base64,").unwrap_or(data_url);
+    let encoded = data_url
+        .strip_prefix("data:image/jpeg;base64,")
+        .unwrap_or(data_url);
     let data = BASE64.decode(encoded).ok()?;
     if data.len() < 16
         || data.get(0..2) != Some(&[0xff, 0xd8][..])
@@ -195,15 +221,19 @@ pub(crate) fn decode_logo_jpeg(data_url: &str) -> Option<PdfJpegImage> {
 }
 
 pub(crate) fn draw_logo_image(cmds: &mut Vec<String>, x: f64, y: f64, width: f64, height: f64) {
-    cmds.push(format!("q {width:.2} 0 0 {height:.2} {x:.2} {y:.2} cm /Logo Do Q"));
+    cmds.push(format!(
+        "q {width:.2} 0 0 {height:.2} {x:.2} {y:.2} cm /Logo Do Q"
+    ));
 }
 
 pub(crate) fn assemble_pdf_bytes(pages: &[Vec<String>], logo: Option<&PdfJpegImage>) -> Vec<u8> {
     let mut objects: Vec<Vec<u8>> = vec![
         b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
         Vec::new(),
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_vec(),
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>".to_vec(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+            .to_vec(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
+            .to_vec(),
     ];
     if let Some(image) = logo {
         let color_space = if image.components == 1 {
@@ -231,11 +261,16 @@ pub(crate) fn assemble_pdf_bytes(pages: &[Vec<String>], logo: Option<&PdfJpegIma
         let content_obj = format!(
             "<< /Length {} >>\nstream\n{stream_data}\nendstream",
             stream_data.len()
-        ).into_bytes();
+        )
+        .into_bytes();
         objects.push(content_obj);
         let page_obj_id = objects.len() + 1;
         page_obj_ids.push(page_obj_id);
-        let image_resource = if logo.is_some() { " /XObject << /Logo 5 0 R >>" } else { "" };
+        let image_resource = if logo.is_some() {
+            " /XObject << /Logo 5 0 R >>"
+        } else {
+            ""
+        };
         objects.push(format!(
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_W:.0} {PAGE_H:.0}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{image_resource} >> /Contents {content_obj_id} 0 R >>"
         ).into_bytes());
@@ -246,7 +281,8 @@ pub(crate) fn assemble_pdf_bytes(pages: &[Vec<String>], logo: Option<&PdfJpegIma
         "<< /Type /Pages /Kids [{}] /Count {} >>",
         kids.join(" "),
         page_obj_ids.len()
-    ).into_bytes();
+    )
+    .into_bytes();
 
     let mut out = Vec::with_capacity(8192);
     out.extend_from_slice(b"%PDF-1.4\n");
@@ -260,14 +296,19 @@ pub(crate) fn assemble_pdf_bytes(pages: &[Vec<String>], logo: Option<&PdfJpegIma
     }
 
     let xref_offset = out.len();
-    out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes());
+    out.extend_from_slice(
+        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
+    );
     for off in offsets.iter().skip(1) {
         out.extend_from_slice(format!("{off:010} 00000 n \n").as_bytes());
     }
-    out.extend_from_slice(format!(
-        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
-        objects.len() + 1
-    ).as_bytes());
+    out.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
     out
 }
 
@@ -281,7 +322,10 @@ mod logo_tests {
     fn accepts_and_embeds_a_small_jpeg_company_logo() {
         let image = decode_logo_jpeg(TEST_LOGO_JPEG).expect("valid JPEG should be accepted");
         assert_eq!((image.width, image.height), (2, 2));
-        let pdf = assemble_pdf_bytes(&[vec!["q 34 0 0 34 40 700 cm /Logo Do Q".into()]], Some(&image));
+        let pdf = assemble_pdf_bytes(
+            &[vec!["q 34 0 0 34 40 700 cm /Logo Do Q".into()]],
+            Some(&image),
+        );
         let text = String::from_utf8_lossy(&pdf);
         assert!(text.contains("/Subtype /Image"));
         assert!(text.contains("/ColorSpace /DeviceRGB"));

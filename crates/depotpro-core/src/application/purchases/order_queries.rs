@@ -130,6 +130,7 @@ pub async fn get_purchase_receipt_detail(
     receipt_id: i64,
 ) -> CoreResult<PurchaseReceiptDetailDto> {
     require_current_actor_permission(Permission::PurchasesRead)?;
+    #[allow(clippy::type_complexity)]
     let header: Option<(
         i64,
         String,

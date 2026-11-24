@@ -30,7 +30,7 @@ export function Logo({
       </svg>}
       {!collapsed && (
         <span className="font-display text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-          DEPOT<span className="text-[#2563EB] dark:text-[#60A5FA]">PRO</span>
+          DEPOT<span className="text-[#1D4ED8] dark:text-[#60A5FA]">PRO</span>
         </span>
       )}
     </div>

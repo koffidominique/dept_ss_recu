@@ -31,17 +31,29 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
     lines: &[PreparedSaleLine],
 ) -> CoreResult<()> {
     for line in lines {
-        let (brand, brewery_name, variant_name, volume_ml): (Option<String>, Option<String>, Option<String>, Option<i64>) = sqlx::query_as(
+        let (brand, brewery_name, variant_name, volume_ml): (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+        ) = sqlx::query_as(
             "SELECT COALESCE(p.brand, br.name), b.name, pv.name, pv.volume_ml FROM products p
              LEFT JOIN brands br ON br.id = p.brand_id
              LEFT JOIN breweries b ON b.id = COALESCE(p.brewery_id, br.brewery_id)
              LEFT JOIN product_variants pv ON pv.id = ? WHERE p.id = ?",
-        ).bind(line.variant_id).bind(line.product_id).fetch_one(&mut **tx).await?;
+        )
+        .bind(line.variant_id)
+        .bind(line.product_id)
+        .fetch_one(&mut **tx)
+        .await?;
         let mut deposit_component_snapshots = Vec::with_capacity(line.deposit_items.len());
         for (returnable_id, pieces, unit_value, amount) in &line.deposit_items {
             let (code, name, kind): (String, String, String) = sqlx::query_as(
                 "SELECT code, name, kind FROM returnable_packaging_types WHERE id = ?",
-            ).bind(returnable_id).fetch_one(&mut **tx).await?;
+            )
+            .bind(returnable_id)
+            .fetch_one(&mut **tx)
+            .await?;
             deposit_component_snapshots.push(serde_json::json!({
                 "returnableId": returnable_id, "code": code, "name": name, "kind": kind,
                 "pieces": pieces, "unitValueXof": unit_value, "amountXof": amount
@@ -51,7 +63,8 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
             "id": line.product_id, "name": line.product_name, "brand": brand,
             "brewery": brewery_name, "variantId": line.variant_id, "variant": variant_name,
             "volumeMl": volume_ml, "baseUnit": line.base_unit
-        }).to_string();
+        })
+        .to_string();
         let packaging_snapshot_json = serde_json::json!({
             "id": line.packaging_id, "name": line.packaging_name,
             "salesUnit": line.sales_unit_label, "coefficientMilli": line.coeff_milli,
@@ -59,7 +72,8 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
             "unitPriceXof": line.unit_price, "discountXof": line.line_discount,
             "lineTotalXof": line.line_total, "depositRegime": line.deposit_mode,
             "depositItems": deposit_component_snapshots
-        }).to_string();
+        })
+        .to_string();
         let line_id = sqlx::query(
             "INSERT INTO sale_lines (sale_id, product_id, packaging_id, variant_id, sales_unit_id, sales_unit_label, product_name, packaging_name, base_unit, coefficient_milli, quantity_milli, base_quantity_milli, unit_price, discount_amount, line_total, cost_num, cost_den, product_snapshot_json, packaging_snapshot_json)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -99,8 +113,9 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         .await?;
         if updated.rows_affected() != 1 {
             return Err(CoreError::InsufficientStock(format!(
-                "Stock insuffisant pour \"{}\" lors de l'enregistrement."
-            , line.product_name)));
+                "Stock insuffisant pour \"{}\" lors de l'enregistrement.",
+                line.product_name
+            )));
         }
         let next_stock: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
             .bind(line.product_id)
@@ -185,7 +200,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 .await?;
 
                 crate::application::orders::packaging_and_returns::sync_customer_deposit_asset_delta_tx(
-                    tx, cid, rid, pieces, unit_val,
+                    tx, cid, *rid, *pieces, *unit_val,
                 )
                 .await?;
             }

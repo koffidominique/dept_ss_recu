@@ -81,7 +81,9 @@ pub(crate) async fn insert_initial_packagings_tx(
             first_pkg_id = Some(pkg_id);
         }
 
-        let mode = if pkg.deposit_mode.as_deref() == Some("deposit") && !is_non_consignable_packaging(&pkg.name) {
+        let mode = if pkg.deposit_mode.as_deref() == Some("deposit")
+            && !is_non_consignable_packaging(&pkg.name)
+        {
             "deposit"
         } else {
             "none"

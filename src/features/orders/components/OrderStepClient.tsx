@@ -115,7 +115,7 @@ export function OrderStepClient({
         <button
           type="button"
           onClick={() => setCreating((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs font-medium text-[#2563EB]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]"
         >
           <Plus className="h-3.5 w-3.5" />
           Nouveau client rapide
@@ -232,7 +232,7 @@ export function OrderStepClient({
               type="button"
               disabled={saving || !name.trim()}
               onClick={() => void handleQuickCreate()}
-              className="rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+              className="rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               Créer
             </button>
@@ -244,7 +244,7 @@ export function OrderStepClient({
         <label className="block text-xs font-medium text-[#182230] dark:text-slate-200">
           Client sélectionné *
         </label>
-        <select
+        <select aria-label="Client sélectionné"
           value={customerId ?? ''}
           onChange={(e) => onSelectCustomer(e.target.value ? Number(e.target.value) : null)}
           className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
@@ -308,7 +308,7 @@ export function OrderStepClient({
               <strong
                 className={
                   activeClient.unpaid_balance > 0
-                    ? 'text-[#DC4545] font-mono-num'
+                    ? 'text-[#BE123C] font-mono-num'
                     : 'text-emerald-700 dark:text-emerald-400 font-mono-num'
                 }
               >

@@ -72,6 +72,7 @@ export function BackupsPage() {
             ref={fileInputRef}
             type="file"
             accept=".db,.dpbkp"
+            aria-label="Choisir un fichier de sauvegarde à importer"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -83,7 +84,7 @@ export function BackupsPage() {
             type="button"
             disabled={importMut.isPending}
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
           >
             <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
             Importer (.db / .dpbkp)
@@ -95,7 +96,7 @@ export function BackupsPage() {
               setPassphrase('');
               setPassphraseAction({ mode: 'create' });
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-semibold text-[#182230] dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
           >
             <Lock className="h-3.5 w-3.5 text-amber-600" />
             Sauvegarde chiffrée
@@ -104,7 +105,7 @@ export function BackupsPage() {
             type="button"
             disabled={createMut.isPending}
             onClick={() => createMut.mutate()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
           >
             <DatabaseBackup className="h-4 w-4" />
             Créer une sauvegarde maintenant

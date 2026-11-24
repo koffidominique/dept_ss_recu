@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toDisplayableError } from '../../quality/utils/operationalSafety.ts';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type { BackupFile } from '../../../types/erp.ts';
 
@@ -48,7 +49,7 @@ export function useBackupsMutations({
     onError: (err) =>
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur sauvegarde.',
+        text: toDisplayableError(err, { fallback: 'Erreur sauvegarde.' }).message,
       }),
   });
 
@@ -66,7 +67,7 @@ export function useBackupsMutations({
     onError: (err) =>
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur sauvegarde chiffrée.',
+        text: toDisplayableError(err, { fallback: 'Erreur sauvegarde chiffrée.' }).message,
       }),
   });
 
@@ -84,7 +85,7 @@ export function useBackupsMutations({
     onError: (err) =>
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur import sauvegarde.',
+        text: toDisplayableError(err, { fallback: 'Erreur import sauvegarde.' }).message,
       }),
   });
 
@@ -108,7 +109,7 @@ export function useBackupsMutations({
     onError: (err) =>
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur vérification.',
+        text: toDisplayableError(err, { fallback: 'Erreur vérification.' }).message,
       }),
   });
 
@@ -136,7 +137,7 @@ export function useBackupsMutations({
       onClearRestoreTarget();
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur restauration.',
+        text: toDisplayableError(err, { fallback: 'Erreur restauration.' }).message,
       });
     },
   });
@@ -157,7 +158,7 @@ export function useBackupsMutations({
     } catch (err) {
       onStatus({
         type: 'err',
-        text: err instanceof Error ? err.message : 'Erreur téléchargement.',
+        text: toDisplayableError(err, { fallback: 'Erreur téléchargement.' }).message,
       });
     }
   };

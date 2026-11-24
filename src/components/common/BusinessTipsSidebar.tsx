@@ -31,7 +31,7 @@ export function BusinessTipsSidebar({
         <label className="block text-[11px] font-medium text-[#667085] dark:text-slate-400 mb-1">
           Module ou écran
         </label>
-        <select
+        <select aria-label="Module ou écran"
           value={activeTopic.id}
           onChange={(e) => onSelectTopic(e.target.value)}
           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-medium"
@@ -77,7 +77,7 @@ export function BusinessTipsSidebar({
                       {isCurrentPage && (
                         <span
                           className={`text-[10px] shrink-0 ${
-                            isSelected ? 'text-blue-100' : 'text-[#2563EB] dark:text-[#60A5FA]'
+                            isSelected ? 'text-blue-100' : 'text-[#1D4ED8] dark:text-[#60A5FA]'
                           }`}
                         >
                           Actuel

@@ -67,7 +67,7 @@ export function ErrorState({
       transition={{ duration: 0.22, ease: DP_EASE }}
       className="flex flex-col items-center justify-center rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 dp-surface px-6 py-10 text-center"
     >
-      <AlertCircle className="h-8 w-8 text-[#DC4545]" aria-hidden="true" />
+      <AlertCircle className="h-8 w-8 text-[#BE123C]" aria-hidden="true" />
       <h3 className="mt-3 font-display text-sm font-semibold text-[#182230] dark:text-slate-100">
         Impossible de charger les données
       </h3>

@@ -11,10 +11,10 @@ use crate::domain::quantity::Quantity;
 use crate::error::{CoreError, CoreResult};
 
 pub(crate) use super::create_deposit_helpers::normalize_sale_payments_tx;
-use crate::application::products::create_packagings::is_non_consignable_packaging;
 use super::create_deposit_helpers::{finalize_shared_deposits, SharedDepositAccum};
 use super::create_line_resolver::resolve_line_unit_tx;
 use super::CreateSaleLineV4Input;
+use crate::application::products::create_packagings::is_non_consignable_packaging;
 
 pub(crate) struct PreparedSaleLine {
     pub product_id: i64,

@@ -45,7 +45,7 @@ export function DashboardOverdueAlerts({ kpis }: { kpis: DashboardData['kpis'] }
           className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 dp-surface-interactive px-4 py-3 text-xs hover:scale-[1.01] hover:bg-amber-100/70 dark:hover:bg-amber-950/50"
         >
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-4 w-4 text-[#D9901A] shrink-0" />
+            <AlertTriangle className="h-4 w-4 text-[#8A5A0B] dark:text-[#FBBF24] shrink-0" />
             <div>
               <div className="font-semibold text-[#182230] dark:text-amber-200">
                 {overdueReceivablesCount} créance(s) client à échéance dépassée
@@ -55,7 +55,7 @@ export function DashboardOverdueAlerts({ kpis }: { kpis: DashboardData['kpis'] }
               </div>
             </div>
           </div>
-          <span className="font-semibold text-[#D9901A] dark:text-amber-300 whitespace-nowrap shrink-0">
+          <span className="font-semibold text-[#8A5A0B] dark:text-amber-300 whitespace-nowrap shrink-0">
             Relancer →
           </span>
         </Link>
@@ -66,7 +66,7 @@ export function DashboardOverdueAlerts({ kpis }: { kpis: DashboardData['kpis'] }
           className="flex items-center justify-between gap-3 rounded-xl border border-rose-300 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/30 dp-surface-interactive px-4 py-3 text-xs hover:scale-[1.01] hover:bg-rose-100/70 dark:hover:bg-rose-950/50"
         >
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-4 w-4 text-[#DC4545] shrink-0" />
+            <AlertTriangle className="h-4 w-4 text-[#BE123C] shrink-0" />
             <div>
               <div className="font-semibold text-[#182230] dark:text-rose-200">
                 {overdueSupplierDebtsCount} dette(s) fournisseur échue(s)
@@ -76,7 +76,7 @@ export function DashboardOverdueAlerts({ kpis }: { kpis: DashboardData['kpis'] }
               </div>
             </div>
           </div>
-          <span className="font-semibold text-[#DC4545] dark:text-rose-300 whitespace-nowrap shrink-0">
+          <span className="font-semibold text-[#BE123C] dark:text-rose-300 whitespace-nowrap shrink-0">
             Régler →
           </span>
         </Link>

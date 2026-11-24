@@ -35,7 +35,7 @@ export function buildMovementColumns(): ColumnDef<ReturnableMovementRow>[] {
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.original.packaging_name}</div>
-          <div className="font-mono-num text-[11px] text-[#667085]">
+          <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
             {row.original.packaging_code}
           </div>
         </div>
@@ -57,7 +57,7 @@ export function buildMovementColumns(): ColumnDef<ReturnableMovementRow>[] {
         const isIn = ['initial', 'entry', 'correction_in'].includes(row.original.movement_type);
         return (
           <span
-            className={`font-mono-num font-semibold ${isIn ? 'text-[#16A36A]' : 'text-[#DC4545]'}`}
+            className={`font-mono-num font-semibold ${isIn ? 'text-[#16A36A]' : 'text-[#BE123C]'}`}
           >
             {isIn ? '+' : '-'}
             {formatNumber(row.original.quantity)} pcs
@@ -81,7 +81,7 @@ export function buildMovementColumns(): ColumnDef<ReturnableMovementRow>[] {
         <div className="text-xs">
           <div>{row.original.reason}</div>
           {row.original.reference_document && (
-            <div className="font-mono-num text-[11px] text-[#667085]">
+            <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
               {row.original.reference_document}
             </div>
           )}
@@ -101,7 +101,7 @@ export function buildReturnColumns(
       cell: ({ row }) => (
         <div>
           <div className="font-mono-num text-xs font-semibold">{row.original.reference}</div>
-          <div className="font-mono-num text-[11px] text-[#667085]">
+          <div className="font-mono-num text-[11px] text-[#667085] dark:text-[#94A3B8]">
             {formatDateTime(row.original.created_at)}
           </div>
         </div>

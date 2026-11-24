@@ -1,7 +1,8 @@
+import { useRef } from 'react';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
-import { newRequestKey } from '../../../utils/format.ts';
+import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
 
 export const expenseSchema = z.object({
   category: z.string().trim().min(1, 'La catégorie est obligatoire.'),
@@ -36,11 +37,20 @@ export function useCreateExpenseMutation(options: {
   onError: (msg: string) => void;
 }) {
   const qc = useQueryClient();
+  const keyTrackerRef = useRef(createIdempotentRequestTracker('exp'));
 
   return useMutation({
     mutationFn: (values: ExpenseFormValues) =>
       apiClient.createExpense({
-        request_key: newRequestKey('exp'),
+        request_key: keyTrackerRef.current.resolveKey(
+          JSON.stringify({
+            category: values.category.trim(),
+            amount: values.amount,
+            method_code: values.method_code,
+            beneficiary: values.beneficiary?.trim() || '',
+            notes: values.notes?.trim() || '',
+          })
+        ),
         category: values.category,
         amount: values.amount,
         method_code: values.method_code,
@@ -49,6 +59,7 @@ export function useCreateExpenseMutation(options: {
         receipt_path: values.receipt_path || null,
       }),
     onSuccess: () => {
+      keyTrackerRef.current.reset();
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['cash'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });

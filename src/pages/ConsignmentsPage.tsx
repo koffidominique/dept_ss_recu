@@ -109,37 +109,37 @@ export function ConsignmentsPage() {
           <Tabs.List className="inline-flex flex-wrap rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] dp-surface p-1">
             <Tabs.Trigger
               value="issues"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               Consignes clients ouvertes ({openIssues.length})
             </Tabs.Trigger>
             <Tabs.Trigger
               value="balances"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               Soldes par client ({clientBalances.length})
             </Tabs.Trigger>
             <Tabs.Trigger
               value="catalog"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] transition-all hover:text-[#182230] dark:hover:text-slate-100 data-[state=active]:bg-[#2563EB] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               Catalogue &amp; stock vides ({types.length})
             </Tabs.Trigger>
             <Tabs.Trigger
               value="movements"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
             >
               Journal mouvements ({recentMovements.length})
             </Tabs.Trigger>
             <Tabs.Trigger
               value="financial"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
             >
               Créances d'emballages
             </Tabs.Trigger>
             <Tabs.Trigger
               value="returns"
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white"
             >
               Historique des retours ({returns.length})
             </Tabs.Trigger>

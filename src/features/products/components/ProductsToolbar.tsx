@@ -52,6 +52,7 @@ export function ProductsToolbar({
         />
 
         <select
+          aria-label="Filtrer par catégorie"
           value={categoryId ?? ''}
           onChange={(e) => onCategoryChange(e.target.value ? Number(e.target.value) : undefined)}
           className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-3 py-2 text-xs font-medium text-[#182230] dark:text-slate-200"
@@ -69,7 +70,7 @@ export function ProductsToolbar({
           onClick={onToggleLowStock}
           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
             lowStockOnly
-              ? 'border-[#D9901A] bg-amber-50 dark:bg-amber-950/30 text-[#D9901A]'
+              ? 'border-[#D9901A] bg-amber-50 dark:bg-amber-950/30 text-[#8A5A0B] dark:text-[#FBBF24]'
               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] text-[#667085] dark:text-slate-300'
           }`}
         >
@@ -81,7 +82,7 @@ export function ProductsToolbar({
           onClick={onToggleArchived}
           className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
             includeArchived
-              ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/30 text-[#2563EB]'
+              ? 'border-[#2563EB] bg-blue-50 dark:bg-blue-950/30 text-[#1D4ED8] dark:text-[#60A5FA]'
               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] text-[#667085] dark:text-slate-300'
           }`}
         >
@@ -118,7 +119,7 @@ export function ProductsToolbar({
         <button
           type="button"
           onClick={onOpenPresets}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-[#2563EB] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3.5 py-2 text-xs font-semibold text-[#1D4ED8] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 whitespace-nowrap shrink-0"
         >
           <PackagePlus className="h-3.5 w-3.5" />
           Catalogue brasseries

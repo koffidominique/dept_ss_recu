@@ -225,7 +225,7 @@ export function DocumentPrintModal({
                     type="button"
                     disabled={downloadingPdf}
                     onClick={handleDownloadPdf}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A36A] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D7A4C] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100 whitespace-nowrap shrink-0"
                   >
                     <Download className="h-3.5 w-3.5" />
                     {downloadingPdf ? 'Génération...' : 'Télécharger PDF'}
@@ -234,7 +234,7 @@ export function DocumentPrintModal({
                     type="button"
                     disabled={downloadingPdf}
                     onClick={handleSendWhatsApp}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1DA851] disabled:opacity-50 whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1DA851] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
                   >
                     <MessageCircle className="h-3.5 w-3.5" />
                     {downloadingPdf ? 'Génération...' : 'Envoyer par WhatsApp'}

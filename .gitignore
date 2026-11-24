@@ -18,3 +18,6 @@ test-results/
 target/
 src-tauri/gen/
 __pycache__/
+
+# Captures et rapports de la vérification visuelle (Lot 6)
+out/

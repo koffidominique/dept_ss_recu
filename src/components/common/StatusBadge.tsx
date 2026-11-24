@@ -31,18 +31,18 @@ const CONFIG: Record<
 > = {
   draft: { label: 'Brouillon', colorClass: 'text-slate-600 dark:text-slate-400', Icon: FileEdit },
   validated: { label: 'Validé', colorClass: 'text-[#16A36A] dark:text-emerald-400', Icon: CheckCircle2 },
-  confirmed: { label: 'Confirmée', colorClass: 'text-[#2563EB] dark:text-[#60A5FA]', Icon: Clock },
-  open: { label: 'Ouverte', colorClass: 'text-[#2563EB] dark:text-[#60A5FA]', Icon: Clock },
+  confirmed: { label: 'Confirmée', colorClass: 'text-[#1D4ED8] dark:text-[#60A5FA]', Icon: Clock },
+  open: { label: 'Ouverte', colorClass: 'text-[#1D4ED8] dark:text-[#60A5FA]', Icon: Clock },
   closed: { label: 'Clôturée', colorClass: 'text-slate-600 dark:text-slate-400', Icon: CheckCircle2 },
   paid: { label: 'Payé', colorClass: 'text-[#16A36A] dark:text-emerald-400', Icon: CheckCircle2 },
   active: { label: 'Actif', colorClass: 'text-[#16A36A] dark:text-emerald-400', Icon: CheckCircle2 },
   received: { label: 'Reçue', colorClass: 'text-[#16A36A] dark:text-emerald-400', Icon: CheckCircle2 },
-  partial: { label: 'Partiel', colorClass: 'text-[#D9901A] dark:text-amber-400', Icon: RefreshCw },
-  partially_returned: { label: 'Retour partiel', colorClass: 'text-[#D9901A] dark:text-amber-400', Icon: RefreshCw },
-  returned: { label: 'Retournée', colorClass: 'text-[#D9901A] dark:text-amber-400', Icon: RefreshCw },
-  overdue: { label: 'En retard', colorClass: 'text-[#DC4545] dark:text-rose-400', Icon: AlertTriangle },
+  partial: { label: 'Partiel', colorClass: 'text-[#8A5A0B] dark:text-amber-300', Icon: RefreshCw },
+  partially_returned: { label: 'Retour partiel', colorClass: 'text-[#8A5A0B] dark:text-amber-300', Icon: RefreshCw },
+  returned: { label: 'Retournée', colorClass: 'text-[#8A5A0B] dark:text-amber-300', Icon: RefreshCw },
+  overdue: { label: 'En retard', colorClass: 'text-[#BE123C] dark:text-rose-400', Icon: AlertTriangle },
   archived: { label: 'Archivé', colorClass: 'text-slate-500 dark:text-slate-400', Icon: Archive },
-  cancelled: { label: 'Annulé', colorClass: 'text-[#DC4545] dark:text-rose-400', Icon: XCircle },
+  cancelled: { label: 'Annulé', colorClass: 'text-[#BE123C] dark:text-rose-400', Icon: XCircle },
 };
 
 export function StatusBadge({

@@ -15,7 +15,7 @@ const FEATURE_HIGHLIGHTS = [
 
 export function LoginShowcasePanel() {
   return (
-    <div className="relative w-full lg:w-1/2 min-h-screen">
+    <div className="relative hidden lg:block lg:w-1/2 min-h-screen">
       {/* Image d'arrière-plan entrepôt */}
       <img
         src="/assets/aistudio/Gemini_Generated_Image_rrtmzrrtmzrrtmzr.jpeg"

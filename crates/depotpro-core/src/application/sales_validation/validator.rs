@@ -164,7 +164,11 @@ pub async fn validate_sale_compatibility(
     Ok(ValidationResultDto {
         is_valid: errors.is_empty(),
         can_proceed,
-        issues: warnings.iter().cloned().chain(errors.iter().cloned()).collect(),
+        issues: warnings
+            .iter()
+            .cloned()
+            .chain(errors.iter().cloned())
+            .collect(),
         warnings,
         errors,
     })

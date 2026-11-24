@@ -136,6 +136,7 @@ export function CatalogueAdminPanel() {
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs w-64"
         />
         <select
+          aria-label="Filtrer par marque"
           value={brandFilter}
           onChange={(e) =>
             setBrandFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))

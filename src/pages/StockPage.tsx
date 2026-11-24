@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   AlertTriangle,
@@ -29,15 +30,27 @@ import {
   StockMovementsTable,
 } from '../features/inventory/components/StockTables.tsx';
 import { StockAdjustModal } from '../features/inventory/components/StockAdjustModal.tsx';
+import { OfflineWorkBanner } from '../features/dashboard/components/WorkQueuePanel.tsx';
+import { useConnectionState } from '../features/dashboard/hooks/useConnectionState.ts';
 
 export function StockPage() {
+  // `?alerte=rupture` / `?alerte=seuil` : liens directs de la file de travail.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawAlerte = searchParams.get('alerte');
+  const alertFilter: 'rupture' | 'seuil' | null =
+    rawAlerte === 'rupture' || rawAlerte === 'seuil' ? rawAlerte : null;
   const [activeTab, setActiveTab] = useState<'balances' | 'movements'>('balances');
   const [search, setSearch] = useState('');
-  const [onlyLow, setOnlyLow] = useState(false);
+  const setOnlyLow = (next: boolean) => {
+    const params: Record<string, string> = {};
+    if (next) params.alerte = alertFilter ?? 'seuil';
+    setSearchParams(params, { replace: true });
+  };
   const [printDoc, setPrintDoc] = useState<PrintableDocumentData | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjProductId, setAdjProductId] = useState<number>(0);
   const [adjError, setAdjError] = useState<string | null>(null);
+  const { isOnline, offlineSince, serverState } = useConnectionState();
   const [adjSuccess, setAdjSuccess] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useStockOverviewQuery();
@@ -68,15 +81,15 @@ export function StockPage() {
     if (q && !p.name.toLowerCase().includes(q) && !p.reference.toLowerCase().includes(q)) {
       return false;
     }
-    if (onlyLow && p.stock_milli > p.min_stock_milli) {
-      return false;
-    }
+    if (alertFilter === 'rupture' && p.stock_milli > 0) return false;
+    if (alertFilter === 'seuil' && p.stock_milli > p.min_stock_milli) return false;
     return true;
   });
 
   const totalKnownValuation = allProducts.reduce((s, p) => s + (p.valuation_fcfa ?? 0), 0);
   const unknownCostCount = allProducts.filter((p) => p.average_cost_fcfa === null).length;
   const lowCount = allProducts.filter((p) => p.stock_milli <= p.min_stock_milli).length;
+  const outCount = allProducts.filter((p) => p.stock_milli <= 0).length;
 
   const openAdjustModal = (targetProductId?: number) => {
     setAdjProductId(targetProductId || allProducts[0]?.id || 0);
@@ -86,6 +99,11 @@ export function StockPage() {
 
   return (
     <div className="space-y-5">
+      <OfflineWorkBanner
+        isOnline={isOnline}
+        offlineSince={offlineSince}
+        serverState={serverState}
+      />
       {adjSuccess && (
         <InlineAlert
           variant="success"
@@ -127,14 +145,14 @@ export function StockPage() {
           <Tabs.List className="inline-flex rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-1">
             <Tabs.Trigger
               value="balances"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white transition-colors"
             >
               <Boxes className="h-3.5 w-3.5" />
               Niveaux & valorisation
             </Tabs.Trigger>
             <Tabs.Trigger
               value="movements"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[#667085] dark:text-[#94A3B8] data-[state=active]:bg-[#2563EB] data-[state=active]:text-white transition-colors"
             >
               <History className="h-3.5 w-3.5" />
               Journal des mouvements ({movements.length})
@@ -142,15 +160,47 @@ export function StockPage() {
           </Tabs.List>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex items-center gap-2 text-xs font-medium text-[#182230] dark:text-slate-200 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={onlyLow}
-                onChange={(e) => setOnlyLow(e.target.checked)}
-                className="rounded border-slate-300 text-[#2563EB]"
-              />
-              Alertes uniquement
-            </label>
+            <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
+              <button
+                type="button"
+                aria-pressed={alertFilter === null}
+                onClick={() => setOnlyLow(false)}
+                className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                  alertFilter === null
+                    ? 'bg-[#2563EB] text-white'
+                    : 'text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Tout
+              </button>
+              <button
+                type="button"
+                aria-pressed={alertFilter === 'seuil'}
+                onClick={() => setOnlyLow(true)}
+                className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                  alertFilter === 'seuil'
+                    ? 'bg-[#9A6300] text-white'
+                    : 'text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Seuil ({lowCount})
+              </button>
+              <button
+                type="button"
+                aria-pressed={alertFilter === 'rupture'}
+                onClick={() => {
+                  const params: Record<string, string> = { alerte: 'rupture' };
+                  setSearchParams(params, { replace: true });
+                }}
+                className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                  alertFilter === 'rupture'
+                    ? 'bg-[#BE123C] text-white'
+                    : 'text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                Ruptures ({outCount})
+              </button>
+            </div>
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -164,7 +214,7 @@ export function StockPage() {
               type="button"
               disabled={allProducts.length === 0}
               onClick={() => openAdjustModal()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Ajuster le stock
@@ -188,9 +238,12 @@ export function StockPage() {
                   docType: 'RAPPORT DE STOCK & VALORISATION',
                   reference: `STK-${today}`,
                   date: new Date().toISOString(),
-                  statusLabel: onlyLow
-                    ? 'Articles sous seuil uniquement'
-                    : `${products.length} article(s)`,
+                  statusLabel:
+                    alertFilter === 'rupture'
+                      ? 'Ruptures de stock uniquement'
+                      : alertFilter === 'seuil'
+                        ? 'Articles sous seuil uniquement'
+                        : `${products.length} article(s)`,
                   lines: products.slice(0, 100).map((p) => ({
                     label: `${p.reference} · ${p.name}`,
                     sublabel:

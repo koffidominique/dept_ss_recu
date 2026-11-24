@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { PackageCheck, PauseCircle, PlayCircle, RotateCcw, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
 import { FormTipsButton } from '../../../components/common/FormTipsButton.tsx';
 import { DP_EASE } from '../../../components/motion/MotionPrimitives.tsx';
+import { MoneyInput } from '../../../components/common/MoneyInput.tsx';
 import { QuantityInput } from '../../../components/common/QuantityInput.tsx';
 import { formatFcfa } from '../../../utils/format.ts';
 import type { CartItem, HeldCart } from '../../../stores/uiStore.ts';
@@ -10,8 +11,10 @@ import type { Client, ClientPackagingBalance, PaymentMethodConfig } from '../../
 import {
   computeAvailableReturnableRows,
   computeReturnedPackagingSummary,
+  parseQtyInputToMilliBigInt,
   type SaleCalculationResult,
 } from '../utils/saleCalculations.ts';
+import type { PosCheckoutReadiness } from '../utils/posCartBuilders.ts';
 import { PosPaymentPanel } from './PosPaymentPanel.tsx';
 
 interface PosCartPanelProps {
@@ -35,6 +38,8 @@ interface PosCartPanelProps {
   ) => void;
   activeMethods: PaymentMethodConfig[];
   errorMsg: string | null;
+  readiness: PosCheckoutReadiness;
+  isOnline?: boolean;
   isSubmitting: boolean;
   onUpdateCartItem: (key: string, patch: Partial<CartItem>) => void;
   onRemoveFromCart: (key: string) => void;
@@ -67,6 +72,8 @@ export function PosCartPanel({
   onPaymentRowsChange,
   activeMethods,
   errorMsg,
+  readiness,
+  isOnline = true,
   isSubmitting,
   onUpdateCartItem,
   onRemoveFromCart,
@@ -104,7 +111,7 @@ export function PosCartPanel({
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] dp-surface p-5 space-y-4">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2 font-display text-sm font-semibold">
-            <ShoppingCart className="h-4 w-4 text-[#2563EB]" />
+            <ShoppingCart className="h-4 w-4 text-[#1D4ED8] dark:text-[#60A5FA]" />
             <span>Panier de vente ({posCart.length})</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -112,7 +119,7 @@ export function PosCartPanel({
               <button
                 type="button"
                 onClick={onOpenHeldModal}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-[11px] font-semibold text-[#D9901A]"
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 text-[11px] font-semibold text-[#8A5A0B] dark:text-[#FBBF24]"
               >
                 <PlayCircle className="h-3.5 w-3.5" />
                 En attente ({heldCarts.length})
@@ -122,7 +129,7 @@ export function PosCartPanel({
               <button
                 type="button"
                 onClick={onHoldCart}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-[11px] font-medium text-[#667085] hover:border-[#2563EB] hover:text-[#2563EB]"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-[11px] font-medium text-[#667085] dark:text-[#94A3B8] hover:border-[#2563EB] hover:text-[#1D4ED8] dark:text-[#60A5FA]"
               >
                 <PauseCircle className="h-3.5 w-3.5" />
                 Mettre en attente
@@ -133,7 +140,7 @@ export function PosCartPanel({
               <button
                 type="button"
                 onClick={onClearCart}
-                className="text-xs font-medium text-[#DC4545] hover:underline"
+                className="text-xs font-medium text-[#BE123C] hover:underline"
               >
                 Vider
               </button>
@@ -152,13 +159,14 @@ export function PosCartPanel({
                 type="button"
                 onClick={onOpenQuickClient}
                 aria-label="Créer rapidement un client"
-                className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#2563EB] hover:underline"
+                className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:underline"
               >
                 <UserPlus className="h-3 w-3" />
                 Nouveau client
               </button>
             </div>
             <select
+              aria-label="Client de la vente"
               value={posClientId ?? ''}
               onChange={(e) => onClientChange(e.target.value ? Number(e.target.value) : null)}
               className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2 text-xs"
@@ -192,7 +200,7 @@ export function PosCartPanel({
                 onClick={() => onSaleTypeChange('credit')}
                 className={`rounded-md py-1.5 text-xs font-medium ${
                   posSaleType === 'credit'
-                    ? 'bg-[#D9901A] text-white'
+                    ? 'bg-[#9A6300] text-white'
                     : 'text-[#667085] dark:text-slate-300'
                 }`}
               >
@@ -231,7 +239,7 @@ export function PosCartPanel({
                 <button
                   type="button"
                   onClick={onResetReceivedReturnables}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#667085] hover:text-[#DC4545]"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#667085] dark:text-[#94A3B8] hover:text-[#BE123C]"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Réinitialiser
@@ -297,7 +305,7 @@ export function PosCartPanel({
                                 Math.max(0, current - 1)
                               )
                             }
-                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                             aria-label={`Diminuer ${row.packaging_name}`}
                           >
                             −
@@ -328,7 +336,7 @@ export function PosCartPanel({
                                 Math.min(row.max_returnable_pieces, current + 1)
                               )
                             }
-                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            className="h-7 w-7 rounded-md border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-800"
                             aria-label={`Augmenter ${row.packaging_name}`}
                           >
                             +
@@ -342,7 +350,7 @@ export function PosCartPanel({
                                 row.max_returnable_pieces
                               )
                             }
-                            className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 disabled:opacity-40"
+                            className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                           >
                             Max
                           </button>
@@ -369,12 +377,22 @@ export function PosCartPanel({
           </div>
         )}
 
+        {!selectedClient && (totals.totalDeposit ?? 0) > 0 && (
+          <div className="rounded-lg border border-amber-200/80 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 text-[11px] text-amber-900 dark:text-amber-200">
+            Sélectionnez ou créez un client pour enregistrer un retour d&apos;emballages vides sur cette vente.
+          </div>
+        )}
+
         {posSaleType === 'credit' && (
           <div>
-            <label className="block text-xs font-medium text-[#667085] dark:text-slate-400">
+            <label
+              htmlFor="pos-due-date"
+              className="block text-xs font-medium text-[#667085] dark:text-slate-400"
+            >
               Date d&apos;échéance (optionnelle, sinon calculée selon délai client)
             </label>
             <input
+              id="pos-due-date"
               type="date"
               value={dueDate}
               onChange={(e) => onDueDateChange(e.target.value)}
@@ -384,15 +402,38 @@ export function PosCartPanel({
         )}
 
         {/* Lignes du panier */}
-        <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
           {posCart.length === 0 ? (
             <p className="py-8 text-center text-xs text-[#667085] dark:text-slate-400">
-              Sélectionnez un conditionnement à gauche pour démarrer la vente.
+              Sélectionnez un conditionnement à gauche ou scannez un article (F2) pour démarrer la vente.
             </p>
           ) : (
             <AnimatePresence initial={false}>
               {posCart.map((item) => {
                 const lineCalc = totals.lineResults[item.key];
+                const parsedMilli = parseQtyInputToMilliBigInt(item.quantity || '0');
+                const canDecrementOne = parsedMilli.ok && parsedMilli.milli > 1000n;
+                const adjustWholeStep = (delta: 1 | -1) => {
+                  const cur = parseQtyInputToMilliBigInt(item.quantity || '0');
+                  if (!cur.ok) {
+                    if (delta > 0) onUpdateCartItem(item.key, { quantity: '1' });
+                    return;
+                  }
+                  const next = cur.milli + BigInt(delta) * 1000n;
+                  if (next <= 0n) return;
+                  const intPart = next / 1000n;
+                  const fracPart = next % 1000n;
+                  const formatted =
+                    fracPart === 0n
+                      ? intPart.toString()
+                      : `${intPart.toString()}.${fracPart.toString().padStart(3, '0').replace(/0+$/, '')}`;
+                  onUpdateCartItem(item.key, { quantity: formatted });
+                };
+                const exceedsShownStock =
+                  Boolean(lineCalc?.valid) &&
+                  lineCalc?.baseQtyMilli !== null &&
+                  lineCalc.baseQtyMilli > item.stockMilli;
+
                 return (
                   <motion.div
                     key={item.key}
@@ -416,28 +457,76 @@ export function PosCartPanel({
                             ? ` + consigne ${formatFcfa(item.depositPerPack)}`
                             : ''}
                         </div>
+                        {exceedsShownStock && (
+                          <div className="text-[10px] font-medium text-[#8A5A0B] dark:text-amber-300">
+                            Attention : quantité supérieure au stock affiché
+                          </div>
+                        )}
                       </div>
                       <button
                         type="button"
+                        aria-label={`Retirer ${item.productName} (${item.salesUnitLabel || item.packagingName})`}
                         onClick={() => onRemoveFromCart(item.key)}
-                        className="text-slate-400 hover:text-[#DC4545] transition-colors"
+                        className="rounded p-1 text-slate-400 hover:text-[#BE123C] transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <QuantityInput
-                        value={item.quantity}
-                        onChange={(q) => onUpdateCartItem(item.key, { quantity: q })}
-                        allowFraction={item.allowFraction}
-                        unit={item.packagingName}
-                        error={lineCalc && !lineCalc.valid ? lineCalc.error || undefined : undefined}
-                        className="w-36"
-                      />
-                      <div className="font-mono-num text-xs font-semibold">
-                        {lineCalc && lineCalc.valid && lineCalc.lineNet !== null
-                          ? formatFcfa(lineCalc.lineNet)
-                          : '—'}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={!canDecrementOne}
+                          aria-label={`Diminuer quantité ${item.productName}`}
+                          onClick={() => adjustWholeStep(-1)}
+                          className="h-8 w-7 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-35"
+                        >
+                          −
+                        </button>
+                        <QuantityInput
+                          value={item.quantity}
+                          onChange={(q) => onUpdateCartItem(item.key, { quantity: q })}
+                          allowFraction={item.allowFraction}
+                          unit={item.packagingName}
+                          error={lineCalc && !lineCalc.valid ? lineCalc.error || undefined : undefined}
+                          className="w-32"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Augmenter quantité ${item.productName}`}
+                          onClick={() => adjustWholeStep(1)}
+                          className="h-8 w-7 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 text-[10px] text-[#667085] dark:text-slate-400">
+                          <span>Remise</span>
+                          <MoneyInput
+                            aria-label={`Remise ligne ${item.productName}`}
+                            value={item.discountAmount}
+                            onChange={(disc) =>
+                              onUpdateCartItem(item.key, { discountAmount: disc })
+                            }
+                            className="w-24"
+                          />
+                        </div>
+                        <div className="text-right min-w-[78px]">
+                          <div className="font-mono-num text-xs font-semibold">
+                            {lineCalc && lineCalc.valid && lineCalc.lineNet !== null
+                              ? formatFcfa(lineCalc.lineNet)
+                              : '—'}
+                          </div>
+                          {lineCalc &&
+                            lineCalc.valid &&
+                            lineCalc.lineDeposit !== null &&
+                            lineCalc.lineDeposit > 0 && (
+                              <div className="font-mono-num text-[10px] text-[#8A5A0B] dark:text-amber-300">
+                                +{formatFcfa(lineCalc.lineDeposit)} cons.
+                              </div>
+                            )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -458,7 +547,8 @@ export function PosCartPanel({
           onPaymentRowsChange={onPaymentRowsChange}
           activeMethods={activeMethods}
           errorMsg={errorMsg}
-          cartLength={posCart.length}
+          readiness={readiness}
+          isOnline={isOnline}
           isSubmitting={isSubmitting}
           onSubmitSale={onSubmitSale}
         />

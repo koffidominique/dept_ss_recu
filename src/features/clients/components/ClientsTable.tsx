@@ -50,9 +50,9 @@ export function ClientsTable({
         header: 'Politique de crédit',
         cell: ({ row }) => {
           const p = row.original.credit_policy;
-          if (p === 'forbidden') return <span className="text-xs text-[#667085]">Crédit interdit</span>;
+          if (p === 'forbidden') return <span className="text-xs text-[#667085] dark:text-[#94A3B8]">Crédit interdit</span>;
           if (p === 'unlimited')
-            return <span className="text-xs font-medium text-[#2563EB]">Crédit sans plafond</span>;
+            return <span className="text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA]">Crédit sans plafond</span>;
           return (
             <span className="font-mono-num text-xs font-medium text-[#182230] dark:text-slate-200">
               Plafond {formatFcfa(row.original.credit_limit)} · {row.original.payment_terms_days}j
@@ -66,7 +66,7 @@ export function ClientsTable({
         cell: ({ row }) => (
           <span
             className={`font-mono-num font-semibold ${
-              row.original.unpaid_balance > 0 ? 'text-[#D9901A]' : 'text-[#667085]'
+              row.original.unpaid_balance > 0 ? 'text-[#8A5A0B] dark:text-[#FBBF24]' : 'text-[#667085] dark:text-[#94A3B8]'
             }`}
           >
             {formatFcfa(row.original.unpaid_balance)}

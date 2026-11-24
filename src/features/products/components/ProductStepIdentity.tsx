@@ -56,7 +56,7 @@ export function ProductStepIdentity({
           className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
         />
         {form.formState.errors.name && (
-          <p className="mt-1 text-[11px] text-[#DC4545]" role="alert">
+          <p className="mt-1 text-[11px] text-[#BE123C]" role="alert">
             {form.formState.errors.name.message}
           </p>
         )}
@@ -65,7 +65,7 @@ export function ProductStepIdentity({
             role="status"
             className="mt-1.5 flex items-start gap-2 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-900 dark:text-amber-200"
           >
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#D9901A]" />
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8A5A0B] dark:text-[#FBBF24]" />
             <span>
               Doublon détecté : « {duplicateMatch.name} » ({duplicateMatch.reference}) existe déjà
               dans le catalogue.
@@ -248,13 +248,13 @@ export function ProductStepIdentity({
                 void onImageFileChange(e.target.files?.[0]);
                 e.currentTarget.value = '';
               }}
-              className="text-xs text-[#667085] file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-slate-800 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[#182230] dark:file:text-slate-200"
+              className="text-xs text-[#667085] dark:text-[#94A3B8] file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 dark:file:bg-slate-800 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[#182230] dark:file:text-slate-200"
             />
             {form.watch('image_path') && (
               <button
                 type="button"
                 onClick={() => form.setValue('image_path', null)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs text-[#DC4545] hover:bg-red-50"
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs text-[#BE123C] hover:bg-red-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Retirer

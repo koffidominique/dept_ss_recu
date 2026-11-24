@@ -62,11 +62,11 @@ export function SaleDetailModal({
 
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[#667085]">
-                    <th className="py-2">Article</th>
-                    <th className="py-2">Qté</th>
-                    <th className="py-2 text-right">PU</th>
-                    <th className="py-2 text-right">Total</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[#667085] dark:text-[#94A3B8]">
+                    <th scope="col" className="py-2">Article</th>
+                    <th scope="col" className="py-2">Qté</th>
+                    <th scope="col" className="py-2 text-right">PU</th>
+                    <th scope="col" className="py-2 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -74,7 +74,7 @@ export function SaleDetailModal({
                     <tr key={l.id}>
                       <td className="py-2">
                         <div className="font-medium">{l.product_name}</div>
-                        <div className="text-[11px] text-[#667085]">
+                        <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
                           Conditionnement : {l.sales_unit_label || l.packaging_name} · {packagingContentsLabel(l.sales_unit_label || l.packaging_name, l.base_unit, l.coefficient_milli)} · total {formatQty(l.base_quantity_milli)} {l.base_unit}
                         </div>
                       </td>
@@ -114,7 +114,7 @@ export function SaleDetailModal({
                   <span className="font-mono-num">{formatFcfa(sale.paid_amount)}</span>
                 </div>
                 {sale.remaining_amount > 0 && (
-                  <div className="flex justify-between text-[#D9901A] font-semibold">
+                  <div className="flex justify-between text-[#8A5A0B] dark:text-[#FBBF24] font-semibold">
                     <span>Reste à payer</span>
                     <span className="font-mono-num">{formatFcfa(sale.remaining_amount)}</span>
                   </div>
@@ -172,7 +172,7 @@ export function SaleDetailModal({
 
               {sale.returns.length > 0 && (
                 <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 p-3 text-xs space-y-2">
-                  <div className="font-semibold text-[#D9901A]">Avoirs / Retours émis</div>
+                  <div className="font-semibold text-[#8A5A0B] dark:text-[#FBBF24]">Avoirs / Retours émis</div>
                   {sale.returns.map((ret) => (
                     <div key={ret.id} className="flex items-center justify-between gap-2">
                       <div>
@@ -241,7 +241,7 @@ export function SaleDetailModal({
                     <button
                       type="button"
                       onClick={() => onOpenCancel(sale)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#DC4545] px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-700"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#BE123C] px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-700"
                     >
                       <Ban className="h-3.5 w-3.5" />
                       Annuler la vente

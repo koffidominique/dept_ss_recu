@@ -51,7 +51,7 @@ export function BreweryQuickSelect({
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#2563EB] hover:underline"
+          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:underline"
         >
           <Plus className="h-3 w-3" />
           Ajouter
@@ -93,7 +93,7 @@ export function BreweryQuickSelect({
             type="button"
             disabled={saving}
             onClick={() => void handleCreate()}
-            className="rounded bg-[#2563EB] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded bg-[#2563EB] px-2.5 py-1 text-xs font-medium text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             OK
           </button>
@@ -158,7 +158,7 @@ export function BrandQuickSelect({
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#2563EB] hover:underline"
+          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[#1D4ED8] dark:text-[#60A5FA] hover:underline"
         >
           <Plus className="h-3 w-3" />
           Ajouter
@@ -200,7 +200,7 @@ export function BrandQuickSelect({
             type="button"
             disabled={saving}
             onClick={() => void handleCreate()}
-            className="rounded bg-[#2563EB] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded bg-[#2563EB] px-2.5 py-1 text-xs font-medium text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
           >
             OK
           </button>

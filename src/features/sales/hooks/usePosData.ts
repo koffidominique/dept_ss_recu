@@ -77,10 +77,16 @@ export function usePosQueries(search: string, posClientId: number | null = null)
 
   return {
     productsRes: productsQuery.data,
+    isLoadingProducts: productsQuery.isLoading,
+    isFetchingProducts: productsQuery.isFetching,
+    productsError:
+      productsQuery.error instanceof Error ? productsQuery.error.message : null,
+    refetchProducts: productsQuery.refetch,
     clients: clientsQuery.data,
     clientReturnables,
     isLoadingClientReturnables: posClientId !== null && clientReturnablesQuery.isLoading,
     cashStatus: cashQuery.data,
+    isCashLoading: cashQuery.isLoading,
     activeMethods,
   };
 }

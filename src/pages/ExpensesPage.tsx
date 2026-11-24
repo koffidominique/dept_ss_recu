@@ -90,8 +90,9 @@ export function ExpensesPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] px-4 py-3 text-xs">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="font-semibold text-[#667085]">Filtres :</span>
+          <span className="font-semibold text-[#667085] dark:text-[#94A3B8]">Filtres :</span>
           <select
+            aria-label="Filtrer les dépenses par catégorie"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5"
@@ -125,7 +126,7 @@ export function ExpensesPage() {
                 setFilterFrom('');
                 setFilterTo('');
               }}
-              className="text-[#2563EB] hover:underline font-medium"
+              className="text-[#1D4ED8] dark:text-[#60A5FA] hover:underline font-medium"
             >
               Réinitialiser
             </button>
@@ -135,7 +136,7 @@ export function ExpensesPage() {
           type="button"
           disabled={items.length === 0}
           onClick={() => exportExpensesCsv(items)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
         >
           <Download className="h-3.5 w-3.5" />
           Exporter CSV

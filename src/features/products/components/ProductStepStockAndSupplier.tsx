@@ -63,7 +63,7 @@ export function ProductStepStockAndSupplier({
           control={form.control}
           name="default_location_id"
           render={({ field }) => (
-            <select
+            <select aria-label="Emplacement principal"
               value={field.value ?? ''}
               onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
               className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
@@ -117,7 +117,7 @@ export function ProductStepStockAndSupplier({
       <div>
         <label className="block text-xs font-medium">Unité d&apos;achat &amp; colisage</label>
         <div className="mt-1 flex gap-2">
-          <select
+          <select aria-label="Unité d'achat & colisage"
             {...form.register('purchase_unit')}
             className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           >

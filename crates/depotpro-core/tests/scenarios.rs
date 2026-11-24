@@ -115,13 +115,15 @@ async fn rust_core_scenarios_a_through_l() {
                 deposit_mode: Some("none".to_string()),
                 components: None,
             },
-        ).await;
+        )
+        .await;
         assert!(result.is_ok());
         if allowed_pkg == "bouteille" {
             nonreturnable_bottle = result.ok();
         }
     }
-    let nonreturnable_bottle = nonreturnable_bottle.expect("conditionnement bouteille non consigné créé");
+    let nonreturnable_bottle =
+        nonreturnable_bottle.expect("conditionnement bouteille non consigné créé");
     assert!(products::upsert_packaging(
         &db,
         prod.id,
@@ -204,14 +206,13 @@ async fn rust_core_scenarios_a_through_l() {
             purchases::ReceivePurchaseOrderInput {
                 request_key: "rust-rec-1".to_string(),
                 notes: None,
-            lines: vec![purchases::ReceiveLineInput {
-                purchase_order_line_id: po_line_id,
-                received_quantity: "10".to_string(),
-                discrepancy_reason: None,
-                ..Default::default()
-            }],
-            ..Default::default()
-        },
+                lines: vec![purchases::ReceiveLineInput {
+                    purchase_order_line_id: po_line_id,
+                    received_quantity: "10".to_string(),
+                    discrepancy_reason: None,
+                    ..Default::default()
+                }],
+            },
         ),
     )
     .await
@@ -272,7 +273,6 @@ async fn rust_core_scenarios_a_through_l() {
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
                 amount: 15_600 + 2_500,
-                ..Default::default()
             }],
             due_date: None,
             ..Default::default()
@@ -281,17 +281,33 @@ async fn rust_core_scenarios_a_through_l() {
     .await
     .unwrap();
     assert_eq!(sale_c.sale.total_deposit, 2_500);
-    assert_ne!(sale_c.lines[0].product_snapshot_json, "{}", "Snapshot produit vente enregistré");
-    let packaging_snapshot: serde_json::Value = serde_json::from_str(&sale_c.lines[0].packaging_snapshot_json).unwrap();
+    assert_ne!(
+        sale_c.lines[0].product_snapshot_json, "{}",
+        "Snapshot produit vente enregistré"
+    );
+    let packaging_snapshot: serde_json::Value =
+        serde_json::from_str(&sale_c.lines[0].packaging_snapshot_json).unwrap();
     assert_eq!(packaging_snapshot["depositRegime"], "deposit");
-    assert!(!packaging_snapshot["depositItems"].as_array().unwrap().is_empty());
+    assert!(!packaging_snapshot["depositItems"]
+        .as_array()
+        .unwrap()
+        .is_empty());
     let historic_product_snapshot = sale_c.lines[0].product_snapshot_json.clone();
     sqlx::query("UPDATE products SET brand = 'Marque modifiée après vente' WHERE id = ?")
-        .bind(prod.id).execute(&db.pool).await.unwrap();
+        .bind(prod.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
     let historic_sale = sales::get_sale_detail(&db, sale_c.sale.id).await.unwrap();
-    assert_eq!(historic_sale.lines[0].product_snapshot_json, historic_product_snapshot);
+    assert_eq!(
+        historic_sale.lines[0].product_snapshot_json,
+        historic_product_snapshot
+    );
     sqlx::query("UPDATE products SET brand = 'SOLIBRA' WHERE id = ?")
-        .bind(prod.id).execute(&db.pool).await.unwrap();
+        .bind(prod.id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
     let stock_after_c: i64 = sqlx::query_scalar("SELECT stock_milli FROM products WHERE id = ?")
         .bind(prod.id)
         .fetch_one(&db.pool)
@@ -315,20 +331,30 @@ async fn rust_core_scenarios_a_through_l() {
                 quantity: "1".to_string(),
                 discount_amount: Some(0),
             }],
-            payments: vec![sales::PaymentPartInput { method_code: "cash".to_string(), amount: 500, ..Default::default() }],
+            payments: vec![sales::PaymentPartInput {
+                method_code: "cash".to_string(),
+                amount: 500,
+            }],
             due_date: None,
             ..Default::default()
         },
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     assert!(nonreturnable_sale.deposits.is_empty());
-    let nonreturnable_snapshot: serde_json::Value = serde_json::from_str(
-        &nonreturnable_sale.lines[0].packaging_snapshot_json,
-    ).unwrap();
+    let nonreturnable_snapshot: serde_json::Value =
+        serde_json::from_str(&nonreturnable_sale.lines[0].packaging_snapshot_json).unwrap();
     assert_eq!(nonreturnable_snapshot["depositRegime"], "none");
-    assert!(nonreturnable_snapshot["depositItems"].as_array().unwrap().is_empty());
-    let nonreturnable_issue_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM deposit_issues WHERE sale_id = ?",
-    ).bind(nonreturnable_sale.sale.id).fetch_one(&db.pool).await.unwrap();
+    assert!(nonreturnable_snapshot["depositItems"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let nonreturnable_issue_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM deposit_issues WHERE sale_id = ?")
+            .bind(nonreturnable_sale.sale.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
     assert_eq!(nonreturnable_issue_count, 0);
 
     // Scénario K — Retour emballage consigné (bon état + endommagé -> solde client soldé)
@@ -467,7 +493,6 @@ async fn rust_core_scenarios_a_through_l() {
             parts: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
                 amount: 20_000,
-                ..Default::default()
             }],
             ..Default::default()
         },
@@ -496,17 +521,14 @@ async fn rust_core_scenarios_a_through_l() {
                 sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 10_000,
-                    ..Default::default()
                 },
                 sales::PaymentPartInput {
                     method_code: "wave".to_string(),
                     amount: 15_000,
-                    ..Default::default()
                 },
                 sales::PaymentPartInput {
                     method_code: "orange_money".to_string(),
                     amount: 25_000,
-                    ..Default::default()
                 },
             ],
             due_date: None,
@@ -949,7 +971,6 @@ async fn scenario_t_company_logo_and_wave_refund() {
             payments: vec![sales::PaymentPartInput {
                 method_code: "wave".to_string(),
                 amount: 1200,
-                ..Default::default()
             }],
             due_date: None,
             ..Default::default()
@@ -1131,7 +1152,6 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
                     discrepancy_reason: None,
                     ..Default::default()
                 }],
-                ..Default::default()
             },
         ),
     )
@@ -1404,8 +1424,7 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 9_200,
-                ..Default::default()
+                amount: 9_200
             }],
             due_date: None,
             ..Default::default()
@@ -1441,7 +1460,6 @@ async fn scenario_u_cancel_po_and_overdue_kpis() {
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
                 amount: 17_400,
-                ..Default::default()
             }],
             due_date: None,
             ..Default::default()

@@ -17,6 +17,7 @@ pub(crate) async fn issue_reserved_packaging_tx(
     rec_ref: &str,
     po_ref: &str,
 ) -> CoreResult<()> {
+    #[allow(clippy::type_complexity)]
     let reservations: Vec<(i64, i64, i64, i64, String, String, String)> = sqlx::query_as(
         "SELECT returnable_id, required_pieces, reserved_pieces, issued_pieces, code_snapshot, name_snapshot, kind_snapshot
          FROM purchase_order_packaging_requirements WHERE purchase_order_line_id = ? AND reservation_status IN ('reserved', 'partially_issued')",
@@ -24,7 +25,9 @@ pub(crate) async fn issue_reserved_packaging_tx(
     for (returnable_id, required, reserved, issued, code, name, kind) in reservations {
         let target_numerator = (required as i128)
             .checked_mul(cumulative_received_milli as i128)
-            .ok_or_else(|| CoreError::Validation("Débordement de la quantité physique reçue.".into()))?;
+            .ok_or_else(|| {
+                CoreError::Validation("Débordement de la quantité physique reçue.".into())
+            })?;
         if target_numerator % ordered_milli as i128 != 0 {
             return Err(CoreError::Validation(format!(
                 "La réception partielle génère une quantité fractionnaire d'emballages ({code}); réceptionnez une quantité physique entière."
@@ -34,12 +37,16 @@ pub(crate) async fn issue_reserved_packaging_tx(
             .map_err(|_| CoreError::Validation("Débordement quantité emballages.".into()))?;
         let delta = target - issued;
         if delta < 0 {
-            return Err(CoreError::Internal("La réservation d'emballages est incohérente.".into()));
+            return Err(CoreError::Internal(
+                "La réservation d'emballages est incohérente.".into(),
+            ));
         }
         if delta > reserved {
             return Err(CoreError::InsufficientStock(format!("La réservation {code} ne couvre pas la réception (réservé {reserved}, requis {delta}).")));
         }
-        if delta == 0 { continue; }
+        if delta == 0 {
+            continue;
+        }
 
         let before: i64 = sqlx::query_scalar(
             "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",
@@ -53,7 +60,11 @@ pub(crate) async fn issue_reserved_packaging_tx(
         sqlx::query(
             "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
              ON CONFLICT(packaging_id) DO UPDATE SET quantity = excluded.quantity",
-        ).bind(returnable_id).bind(after).execute(&mut **tx).await?;
+        )
+        .bind(returnable_id)
+        .bind(after)
+        .execute(&mut **tx)
+        .await?;
         sqlx::query(
             "UPDATE packaging_assets SET stock_empty = MAX(0, stock_empty - ?) WHERE returnable_id = ?",
         )
@@ -97,4 +108,3 @@ pub(crate) async fn release_order_packaging_reservations_tx(
     .await?;
     Ok(())
 }
-

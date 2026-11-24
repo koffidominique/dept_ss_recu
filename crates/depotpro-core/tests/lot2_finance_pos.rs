@@ -255,12 +255,10 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
                 sales::PaymentPartInput {
                     method_code: "cash".to_string(),
                     amount: 10_000,
-                    ..Default::default()
                 },
                 sales::PaymentPartInput {
                     method_code: "wave".to_string(),
                     amount: 4_350,
-                    ..Default::default()
                 },
             ],
             due_date: None,
@@ -294,8 +292,7 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 750,
-                ..Default::default()
+                amount: 750
             }],
             due_date: None,
             ..Default::default()
@@ -321,8 +318,7 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 33,
-                ..Default::default()
+                amount: 33
             }],
             due_date: None,
             ..Default::default()
@@ -347,8 +343,7 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 500,
-                ..Default::default()
+                amount: 500
             }],
             notes: None,
             due_date: None,
@@ -375,8 +370,7 @@ async fn lot2_pos_parity_credit_limits_cash_diff_and_consignments() {
             }],
             payments: vec![sales::PaymentPartInput {
                 method_code: "cash".to_string(),
-                amount: 900,
-                ..Default::default()
+                amount: 900
             }],
             due_date: None,
             ..Default::default()

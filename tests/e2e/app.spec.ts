@@ -244,6 +244,18 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     const { token } = (await loginRes.json()) as { token: string };
     const authHeaders = { Authorization: `Bearer ${token}` };
 
+    // L'encaissement est bloque sans session de caisse ouverte (le bouton
+    // « Encaisser solde » reste desactive). Le Scenario 2 en ouvre deja une et
+    // ne la cloture pas : l'appel est donc idempotent, un 400 SESSION_ALREADY_OPEN
+    // signifiant simplement que la precondition est deja remplie.
+    const openRes = await page.request.post('/api/cash/open', {
+      headers: authHeaders,
+      data: { opening_cash: 1000, request_key: 'e2e-scenario6-open' },
+    });
+    if (!openRes.ok()) {
+      expect((await openRes.json()).code).toBe('SESSION_ALREADY_OPEN');
+    }
+
     const catRes = await page.request.get('/api/categories', { headers: authHeaders });
     expect(catRes.ok()).toBeTruthy();
     const cats = (await catRes.json()) as Array<{ id: number }>;
@@ -285,9 +297,15 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
 
     // Étape 1 : création rapide client
     await page.getByRole('button', { name: 'Nouveau client rapide' }).click();
-    await page.getByPlaceholder('Nom client *').fill('Maquis E2E Plateau');
+    // La refonte du recu (PR #3) a remplace le placeholder « Nom client * »
+    // par un libelle « Nom du client * », sans association htmlFor/id : on
+    // cible donc le champ par son attribut autocomplete, stable et unique.
+    await page.locator('input[autocomplete="organization"]').fill('Maquis E2E Plateau');
     await page.getByRole('button', { name: 'Créer', exact: true }).click();
-    await expect(page.getByText(/Solde consigné en cours — Maquis E2E Plateau/i)).toBeVisible();
+    // Le panneau emballages confirme le client actif (libelle reel de
+    // OrderStepClient ; l ancien attendu « Solde consigne en cours » n a jamais
+    // existe dans l application).
+    await expect(page.getByText(/Emballages dus — Maquis E2E Plateau/i)).toBeVisible();
     await page.getByRole('button', { name: 'Suivant' }).click();
 
     // Étape 2 : casier mixte (12 Bock 33cl + 12 Drogba 33cl)
@@ -316,19 +334,30 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     await page.getByRole('button', { name: 'Mettre à jour le brouillon' }).click();
     await expect(page.getByText(/Commande #ORD-.*\(DRAFT\)/)).toBeVisible();
 
+    // Confirmer et livrer ouvrent une ConfirmationDialog : sans la valider,
+    // aucune mutation n'est envoyee et le statut ne change jamais.
     await page.getByRole('button', { name: 'Confirmer (déduire stock)' }).click();
+    await page.getByRole('button', { name: 'Confirmer et déduire le stock' }).click();
     await expect(page.getByText(/\(CONFIRMED\)/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Livrer (imputer consignes client)' }).click();
+    await page.getByRole('button', { name: 'Valider la livraison' }).click();
     await expect(page.getByText(/\(DELIVERED\)/)).toBeVisible();
 
+    // Ordre metier impose par le noyau : encaisser le solde AVANT de facturer.
+    // Encaisser apres facturation ferait echouer invoice_order cote serveur
+    // (politique credit du client = forbidden pour le solde restant), et
+    // facturer une commande deja soldee la fait passer directement a 'paid'.
     await page.getByRole('button', { name: /Encaisser solde/i }).click();
+    await expect(page.getByRole('button', { name: /Encaisser solde/i })).toBeHidden();
+
+    await page.getByRole('button', { name: 'Facturer', exact: true }).click();
     await expect(page.getByText(/\(PAID\)/)).toBeVisible();
 
-    await page.getByRole('button', { name: /Retourner 1 Casier 24 × 33cl verre/i }).click();
-    await expect(
-      page.getByRole('button', { name: /Retourner 1 Casier 24 × 33cl verre/i })
-    ).toBeHidden();
+    // Libelle reel du bouton de restitution (OrderStepConfirm) : « Restituer (n) ».
+    const restitute = page.getByRole('button', { name: /Restituer \(1\)/i });
+    await restitute.click();
+    await expect(restitute).toBeHidden();
 
     expect(errors).toEqual([]);
   });

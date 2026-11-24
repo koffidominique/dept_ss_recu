@@ -54,7 +54,7 @@ export function ConfirmationDialog({
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 {destructive && (
-                  <div className="rounded-lg bg-rose-50 dark:bg-rose-950/50 p-2 text-[#DC4545] shrink-0">
+                  <div className="rounded-lg bg-rose-50 dark:bg-rose-950/50 p-2 text-[#BE123C] shrink-0">
                     <AlertTriangle className="h-5 w-5" />
                   </div>
                 )}
@@ -67,8 +67,11 @@ export function ConfirmationDialog({
                   </Dialog.Description>
                 </div>
               </div>
-              <Dialog.Close className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-                <X className="h-4 w-4" />
+              <Dialog.Close
+                aria-label="Fermer la fenêtre"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#111A2E]"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
               </Dialog.Close>
             </div>
 
@@ -104,9 +107,9 @@ export function ConfirmationDialog({
                 disabled={loading}
                 onClick={onConfirm}
                 className={cn(
-                  'rounded-lg px-4 py-2 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0 disabled:opacity-50',
+                  'rounded-lg px-4 py-2 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100',
                   destructive
-                    ? 'bg-[#DC4545] hover:bg-rose-700 shadow-sm hover:shadow-md'
+                    ? 'bg-[#BE123C] hover:bg-rose-700 shadow-sm hover:shadow-md'
                     : 'bg-[#2563EB] hover:bg-blue-700 dp-btn-elevated'
                 )}
               >

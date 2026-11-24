@@ -20,24 +20,40 @@ async fn purchase_order_needs_owner_approval_and_keeps_audit_snapshots() {
         .execute(&db.pool).await.expect("purchase order");
 
     let buyer = SessionIdentity::from_role("1", "buyer", "Buyer", Role::StockManager);
-    auth::with_actor(buyer, commercial_documents::submit_for_approval(&db, "purchase_order", 1))
-        .await.expect("submit for owner approval");
+    auth::with_actor(
+        buyer,
+        commercial_documents::submit_for_approval(&db, "purchase_order", 1),
+    )
+    .await
+    .expect("submit for owner approval");
 
     let blocked = {
         let (_guard, mut tx) = db.begin_write().await.expect("transaction");
-        let result = commercial_documents::require_approval_or_owner("purchase_order", 1, &mut tx).await;
+        let result =
+            commercial_documents::require_approval_or_owner("purchase_order", 1, &mut tx).await;
         tx.rollback().await.expect("rollback");
         result
     };
-    assert!(blocked.is_err(), "unapproved purchase orders must not be received by staff");
+    assert!(
+        blocked.is_err(),
+        "unapproved purchase orders must not be received by staff"
+    );
 
     let owner = SessionIdentity::from_role("2", "owner", "Owner", Role::Owner);
-    auth::with_actor(owner.clone(), commercial_documents::review_document(
-        &db,
-        "purchase_order",
-        1,
-        ReviewDecisionInput { action: "approved".into(), reason: None },
-    )).await.expect("owner approval");
+    auth::with_actor(
+        owner.clone(),
+        commercial_documents::review_document(
+            &db,
+            "purchase_order",
+            1,
+            ReviewDecisionInput {
+                action: "approved".into(),
+                reason: None,
+            },
+        ),
+    )
+    .await
+    .expect("owner approval");
 
     let approved_ok = {
         let (_guard, mut tx) = db.begin_write().await.expect("transaction");
@@ -75,22 +91,41 @@ async fn rejection_requires_a_reason_and_does_not_approve() {
     sqlx::query("INSERT INTO purchase_orders (id, reference, request_key, supplier_id, status, total_amount) VALUES (1, 'PO-TEST-0002', 'po-test-key-2', 1, 'confirmed', 50000)")
         .execute(&db.pool).await.expect("purchase order");
     let buyer = SessionIdentity::from_role("1", "buyer", "Buyer", Role::StockManager);
-    auth::with_actor(buyer, commercial_documents::submit_for_approval(&db, "purchase_order", 1))
-        .await.expect("submit");
+    auth::with_actor(
+        buyer,
+        commercial_documents::submit_for_approval(&db, "purchase_order", 1),
+    )
+    .await
+    .expect("submit");
     let owner = SessionIdentity::from_role("2", "owner", "Owner", Role::Owner);
-    let missing_reason = auth::with_actor(owner.clone(), commercial_documents::review_document(
-        &db,
-        "purchase_order",
-        1,
-        ReviewDecisionInput { action: "rejected".into(), reason: None },
-    )).await;
+    let missing_reason = auth::with_actor(
+        owner.clone(),
+        commercial_documents::review_document(
+            &db,
+            "purchase_order",
+            1,
+            ReviewDecisionInput {
+                action: "rejected".into(),
+                reason: None,
+            },
+        ),
+    )
+    .await;
     assert!(missing_reason.is_err());
-    auth::with_actor(owner, commercial_documents::review_document(
-        &db,
-        "purchase_order",
-        1,
-        ReviewDecisionInput { action: "rejected".into(), reason: Some("Prix à vérifier".into()) },
-    )).await.expect("rejection with reason");
+    auth::with_actor(
+        owner,
+        commercial_documents::review_document(
+            &db,
+            "purchase_order",
+            1,
+            ReviewDecisionInput {
+                action: "rejected".into(),
+                reason: Some("Prix à vérifier".into()),
+            },
+        ),
+    )
+    .await
+    .expect("rejection with reason");
     let status: String = sqlx::query_scalar("SELECT status FROM commercial_document_workflows WHERE document_type = 'purchase_order' AND document_id = 1")
         .fetch_one(&db.pool).await.expect("workflow status");
     assert_eq!(status, "rejected");

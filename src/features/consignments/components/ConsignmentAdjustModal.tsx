@@ -34,7 +34,7 @@ function ConsignmentAdjustFormBody({
       <div className="mt-4 space-y-3 text-xs">
         <div>
           <label className="block font-medium">Type de mouvement</label>
-          <select
+          <select aria-label="Type de mouvement"
             value={movementType}
             onChange={(e) =>
               setMovementType(e.target.value as 'entry' | 'breakage' | 'loss' | 'exit')

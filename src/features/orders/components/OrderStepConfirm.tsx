@@ -1,18 +1,41 @@
 import { useState } from 'react';
-import { Banknote, CheckCircle2, PackageCheck, Pencil, Printer, RotateCcw, Truck, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ban,
+  Banknote,
+  CheckCircle2,
+  Clock,
+  PackageCheck,
+  Pencil,
+  Printer,
+  RotateCcw,
+  Truck,
+  XCircle,
+} from 'lucide-react';
+import { ConfirmationDialog } from '../../../components/common/ConfirmationDialog.tsx';
 import type { CustomerOrderDetail } from '../../../types/erp.ts';
-import { formatDateTime, formatFcfa } from '../../../utils/format.ts';
+import { formatDateTime, formatFcfa, newRequestKey } from '../../../utils/format.ts';
+import {
+  computeOrderLifecycleStages,
+  normalizeOrderSettlementMethod,
+} from '../../inventory/utils/phase2OperationsGuards.ts';
 
 interface OrderStepConfirmProps {
   orderDetail: CustomerOrderDetail;
   isBusy: boolean;
   isOwner: boolean;
+  hasOpenCashSession?: boolean;
   onSubmitForApproval: () => void;
   onConfirm: () => void;
   onDeliver: () => void;
   onInvoice: () => void;
-  onPayFull: () => void;
-  onPayCustom: (input: { amount_xof: number; method: string; external_reference?: string }) => void;
+  onPayFull: (requestKey: string, method: string) => void;
+  onPayCustom: (input: {
+    amount_xof: number;
+    method: string;
+    external_reference?: string;
+    request_key: string;
+  }) => void;
   onPrintPaymentReceipt: (paymentId: number) => void;
   onCancel: () => void;
   onEditDraft: () => void;
@@ -26,6 +49,7 @@ export function OrderStepConfirm({
   orderDetail,
   isBusy,
   isOwner,
+  hasOpenCashSession = true,
   onSubmitForApproval,
   onConfirm,
   onDeliver,
@@ -42,14 +66,61 @@ export function OrderStepConfirm({
 }: OrderStepConfirmProps) {
   const { order, lines, allocations } = orderDetail;
   const remainingToPay = Math.max(0, order.total_to_collect_xof - order.paid_xof);
-  const [showCustomPay, setShowCustomPay] = useState(false);
-  const [payAmount, setPayAmount] = useState<number>(remainingToPay);
-  const [payMethod, setPayMethod] = useState<string>(order.planned_payment_channel || order.payment_method || 'cash');
-  const [externalRef, setExternalRef] = useState('');
+  const defaultSettlementMethod = normalizeOrderSettlementMethod(
+    order.planned_payment_channel,
+    order.payment_method
+  );
+  // Le formulaire d'encaissement est indexé sur l'identité métier de la commande
+  // (montant restant + canal prévu) : un changement de solde réinitialise donc
+  // l'état dérivé sans effet ni `setState` en cascade.
+  const settlementSig = `${order.id}:${order.total_to_collect_xof}:${order.paid_xof}:${defaultSettlementMethod}`;
+  const [showCustomPay, setShowCustomPayRaw] = useState<{ sig: string } | null>(null);
+  const [payAmountDraft, setPayAmountDraft] = useState<{ sig: string; value: number } | null>(
+    null
+  );
+  const [payMethodDraft, setPayMethodDraft] = useState<{ sig: string; value: string } | null>(
+    null
+  );
+  const [externalRefDraft, setExternalRefDraft] = useState<{ sig: string; value: string } | null>(
+    null
+  );
+  const [payKeyState, setPayKeyState] = useState<{
+    sig: string | null;
+    key: string;
+    fingerprint: string | null;
+  }>(() => ({ sig: settlementSig, key: newRequestKey('ordpay'), fingerprint: null }));
+
+  const customPayOpen = showCustomPay?.sig === settlementSig;
+  const payAmount = payAmountDraft?.sig === settlementSig ? payAmountDraft.value : remainingToPay;
+  const payMethod =
+    payMethodDraft?.sig === settlementSig ? payMethodDraft.value : defaultSettlementMethod;
+  const externalRef = externalRefDraft?.sig === settlementSig ? externalRefDraft.value : '';
+  const effectivePayKeyState =
+    payKeyState.sig === settlementSig
+      ? payKeyState
+      : { sig: settlementSig, key: newRequestKey('ordpay'), fingerprint: null };
+
+  const setShowCustomPay = (updater: boolean | ((current: boolean) => boolean)) => {
+    setShowCustomPayRaw((prev) => {
+      const current = prev?.sig === settlementSig;
+      const value = typeof updater === 'function' ? updater(current) : updater;
+      return value ? { sig: settlementSig } : null;
+    });
+  };
+  const setPayAmount = (value: number) =>
+    setPayAmountDraft({ sig: settlementSig, value: Math.max(1, value || 0) });
+  const setPayMethod = (value: string) => setPayMethodDraft({ sig: settlementSig, value });
+  const setExternalRef = (value: string) => setExternalRefDraft({ sig: settlementSig, value });
+  const [pendingAction, setPendingAction] = useState<'confirm' | 'deliver' | 'cancel' | null>(null);
   const [returnQtyByAsset, setReturnQtyByAsset] = useState<Record<number, number>>({});
   const [returnNoteByAsset, setReturnNoteByAsset] = useState<Record<number, string>>({});
   const consignedAllocations = allocations.filter((a) => a.is_consigned === 1);
   const canManageReturns = ['delivered', 'invoiced', 'paid'].includes(order.status);
+  const lifecycleInfo = computeOrderLifecycleStages(
+    order.status,
+    order.approval_status,
+    remainingToPay
+  );
 
   return (
     <div className="space-y-4">
@@ -73,6 +144,61 @@ export function OrderStepConfirm({
         </p>
       </div>
 
+      {/* Frise explicite d'états et transitions de la commande */}
+      <div
+        aria-label="Étapes du cycle de vie de la commande"
+        className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-3 space-y-2"
+      >
+        {lifecycleInfo.isCancelled ? (
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#BE123C]">
+            <Ban className="h-4 w-4 shrink-0" />
+            <span>{lifecycleInfo.nextActionHint}</span>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+              {lifecycleInfo.stages.map((stage) => (
+                <div
+                  key={stage.id}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                    stage.state === 'done'
+                      ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300'
+                      : stage.state === 'current'
+                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 text-[#1D4ED8] dark:text-[#60A5FA]'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-[#667085] dark:text-[#94A3B8]'
+                  }`}
+                >
+                  {stage.state === 'done' ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  <span className="font-semibold truncate">{stage.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#667085] dark:text-slate-400">
+              {lifecycleInfo.nextActionHint}
+            </p>
+          </>
+        )}
+      </div>
+
+      {!hasOpenCashSession &&
+        remainingToPay > 0 &&
+        order.status !== 'cancelled' &&
+        order.status !== 'draft' && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              Aucune session de caisse ouverte : ouvrez la caisse avant d’enregistrer un encaissement sur cette commande.
+            </span>
+          </div>
+        )}
+
       {order.approval_status === 'pending_owner_approval' && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
           En attente de validation du propriétaire. Aucun mouvement de stock n’a encore été enregistré.
@@ -89,8 +215,11 @@ export function OrderStepConfirm({
             <button
               type="button"
               disabled={isBusy}
-              onClick={isOwner ? onConfirm : onSubmitForApproval}
-              className="rounded-lg bg-[#2563EB] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 whitespace-nowrap shrink-0"
+              onClick={() => {
+                if (isOwner) setPendingAction('confirm');
+                else onSubmitForApproval();
+              }}
+              className="rounded-lg bg-[#2563EB] px-3 py-2 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
             >
               {isOwner ? 'Confirmer (déduire stock)' : 'Soumettre au propriétaire'}
             </button>
@@ -109,8 +238,8 @@ export function OrderStepConfirm({
           <button
             type="button"
             disabled={isBusy}
-            onClick={onDeliver}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A36A] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 whitespace-nowrap shrink-0"
+            onClick={() => setPendingAction('deliver')}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D7A4C] px-3 py-2 text-xs font-semibold text-white disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100 whitespace-nowrap shrink-0"
           >
             <Truck className="h-3.5 w-3.5" />
             Livrer (imputer consignes client)
@@ -130,20 +259,29 @@ export function OrderStepConfirm({
           <>
             <button
               type="button"
-              disabled={isBusy}
-              onClick={onPayFull}
-              className="rounded-lg bg-slate-900 dark:bg-slate-100 dark:text-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 whitespace-nowrap shrink-0"
+              disabled={isBusy || !hasOpenCashSession}
+              onClick={() => {
+                const sig = `full:${order.id}:${remainingToPay}:${defaultSettlementMethod}`;
+                const effectiveKey =
+                  effectivePayKeyState.fingerprint !== null &&
+                  effectivePayKeyState.fingerprint !== sig
+                    ? newRequestKey('ordpay')
+                    : effectivePayKeyState.key;
+                setPayKeyState({ sig: settlementSig, key: effectiveKey, fingerprint: sig });
+                onPayFull(effectiveKey, defaultSettlementMethod);
+              }}
+              className="rounded-lg bg-slate-900 dark:bg-slate-100 dark:text-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
             >
               Encaisser solde ({formatFcfa(remainingToPay)})
             </button>
             <button
               type="button"
-              disabled={isBusy}
+              disabled={isBusy || !hasOpenCashSession}
               onClick={() => {
                 setPayAmount(remainingToPay);
                 setShowCustomPay((v) => !v);
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-blue-300 dark:border-blue-800 px-3 py-2 text-xs font-medium text-[#2563EB] whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1 rounded-lg border border-blue-300 dark:border-blue-800 px-3 py-2 text-xs font-medium text-[#1D4ED8] dark:text-[#60A5FA] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
             >
               <Banknote className="h-3.5 w-3.5" />
               Acompte / Mobile Money
@@ -154,8 +292,8 @@ export function OrderStepConfirm({
           <button
             type="button"
             disabled={isBusy}
-            onClick={onCancel}
-            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-[#DC4545] whitespace-nowrap shrink-0"
+            onClick={() => setPendingAction('cancel')}
+            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-[#BE123C] disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
           >
             <XCircle className="h-3.5 w-3.5" />
             Annuler commande
@@ -166,7 +304,7 @@ export function OrderStepConfirm({
           disabled={isBusy || order.status === 'draft' || order.status === 'cancelled' || order.approval_status === 'pending_owner_approval'}
           onClick={onPrintReceipt}
           title={order.status === 'draft' || order.approval_status === 'pending_owner_approval' ? 'Disponible après confirmation de la commande.' : order.status === 'cancelled' ? 'Une commande annulée ne peut pas émettre un reçu.' : undefined}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:opacity-40 whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
         >
           <Printer className="h-3.5 w-3.5" />
           Imprimer reçu de commande
@@ -175,7 +313,7 @@ export function OrderStepConfirm({
           type="button"
           disabled={order.status === 'draft'}
           onClick={onViewReceiptHistory}
-          className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:opacity-40 whitespace-nowrap shrink-0"
+          className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100 whitespace-nowrap shrink-0"
         >
           Historique / révisions du reçu
         </button>
@@ -282,7 +420,7 @@ export function OrderStepConfirm({
                             return next;
                           });
                         }}
-                        className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white hover:bg-amber-700 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Restituer ({clampedQty})
@@ -298,7 +436,7 @@ export function OrderStepConfirm({
                               noteVal.trim() || undefined
                             )
                           }
-                          className="rounded-lg border border-amber-400 dark:border-amber-700 px-2.5 py-1.5 font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 disabled:opacity-40"
+                          className="rounded-lg border border-amber-400 dark:border-amber-700 px-2.5 py-1.5 font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                         >
                           Tout solder ({remaining})
                         </button>
@@ -312,7 +450,7 @@ export function OrderStepConfirm({
         </div>
       )}
 
-      {showCustomPay && remainingToPay > 0 && order.status !== 'cancelled' && (
+      {customPayOpen && remainingToPay > 0 && order.status !== 'cancelled' && (
         <div className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/40 dark:bg-blue-950/20 p-4 space-y-3 text-xs">
           <div className="font-semibold text-[#182230] dark:text-slate-100">
             Enregistrer un versement (acompte partiel ou Mobile Money)
@@ -331,7 +469,7 @@ export function OrderStepConfirm({
             </div>
             <div>
               <label className="block font-medium">Moyen de paiement</label>
-              <select
+              <select aria-label="Moyen de paiement"
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2"
@@ -341,6 +479,8 @@ export function OrderStepConfirm({
                 <option value="orange_money">Orange Money</option>
                 <option value="mtn_money">MTN Money</option>
                 <option value="moov_money">Moov Money</option>
+                <option value="transfer">Virement bancaire</option>
+                <option value="cheque">Chèque</option>
               </select>
             </div>
             <div>
@@ -364,17 +504,28 @@ export function OrderStepConfirm({
             </button>
             <button
               type="button"
-              disabled={isBusy || payAmount <= 0}
+              disabled={isBusy || payAmount <= 0 || !hasOpenCashSession}
               onClick={() => {
+                const effectiveAmount = Math.min(remainingToPay, payAmount);
+                const cleanMethod = normalizeOrderSettlementMethod(payMethod, 'cash');
+                const cleanRef = externalRef.trim() || undefined;
+                const sig = `custom:${order.id}:${effectiveAmount}:${cleanMethod}:${cleanRef ?? ''}`;
+                const effectiveKey =
+                  effectivePayKeyState.fingerprint !== null &&
+                  effectivePayKeyState.fingerprint !== sig
+                    ? newRequestKey('ordpay')
+                    : effectivePayKeyState.key;
+                setPayKeyState({ sig: settlementSig, key: effectiveKey, fingerprint: sig });
                 onPayCustom({
-                  amount_xof: Math.min(remainingToPay, payAmount),
-                  method: payMethod,
-                  external_reference: externalRef.trim() || undefined,
+                  amount_xof: effectiveAmount,
+                  method: cleanMethod,
+                  external_reference: cleanRef,
+                  request_key: effectiveKey,
                 });
                 setShowCustomPay(false);
                 setExternalRef('');
               }}
-              className="rounded-lg bg-[#16A36A] px-3 py-1.5 font-semibold text-white disabled:opacity-40"
+              className="rounded-lg bg-[#0D7A4C] px-3 py-1.5 font-semibold text-white disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100"
             >
               Enregistrer ce versement
             </button>
@@ -392,7 +543,7 @@ export function OrderStepConfirm({
                   <span className="font-mono-num font-semibold">{p.reference}</span> · {p.method_label}
                   {p.external_reference ? ` · Réf. Txn ${p.external_reference}` : ''}
                   {p.recorded_by_name ? ` · Par ${p.recorded_by_name}` : ''}
-                  <span className="ml-2 text-[11px] text-[#667085]">{formatDateTime(p.created_at)}</span>
+                  <span className="ml-2 text-[11px] text-[#667085] dark:text-[#94A3B8]">{formatDateTime(p.created_at)}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-mono-num font-semibold text-[#16A36A]">{formatFcfa(p.amount_xof)}</span>
@@ -410,6 +561,66 @@ export function OrderStepConfirm({
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        open={pendingAction !== null}
+        onOpenChange={(next) => {
+          if (!next && !isBusy) setPendingAction(null);
+        }}
+        title={
+          pendingAction === 'confirm'
+            ? `Confirmer la commande #${order.order_number} ?`
+            : pendingAction === 'deliver'
+              ? `Confirmer la remise / livraison de #${order.order_number} ?`
+              : `Annuler la commande #${order.order_number} ?`
+        }
+        description={
+          pendingAction === 'confirm'
+            ? 'Cette validation réserve et déduit immédiatement le stock liquide requis pour préparer la commande.'
+            : pendingAction === 'deliver'
+              ? 'Cette opération acte la remise effective des marchandises et inscrit les emballages consignés au compte du client.'
+              : order.status === 'confirmed'
+                ? 'Cette commande repassera son stock réservé en rayon et sera verrouillée en statut Annulée.'
+                : 'Le brouillon de commande sera définitivement classé sans suite.'
+        }
+        consequences={
+          pendingAction === 'confirm'
+            ? [
+                `Lignes préparées : ${lines.map((l) => `${l.product_name} (${l.base_quantity} ${l.base_unit})`).join(', ')}`,
+                `Net à percevoir : ${formatFcfa(order.total_to_collect_xof)}`,
+              ]
+            : pendingAction === 'deliver'
+              ? [
+                  `Client : ${order.customer_name || `#${order.customer_id}`}`,
+                  ...(consignedAllocations.length > 0
+                    ? [
+                        `Consignes imputées au client : ${consignedAllocations.map((a) => `${a.quantity} × ${a.packaging_name}`).join(', ')} (${formatFcfa(order.deposit_due_xof)})`,
+                      ]
+                    : ['Aucun emballage consigné à imputer.']),
+                  `Solde restant à encaisser : ${formatFcfa(remainingToPay)}`,
+                ]
+              : [
+                  `Commande : #${order.order_number}`,
+                  `Montant annulé : ${formatFcfa(order.total_to_collect_xof)}`,
+                ]
+        }
+        confirmLabel={
+          pendingAction === 'confirm'
+            ? 'Confirmer et déduire le stock'
+            : pendingAction === 'deliver'
+              ? 'Valider la livraison'
+              : 'Annuler définitivement'
+        }
+        destructive={pendingAction === 'cancel'}
+        loading={isBusy}
+        onConfirm={() => {
+          const act = pendingAction;
+          setPendingAction(null);
+          if (act === 'confirm') onConfirm();
+          else if (act === 'deliver') onDeliver();
+          else if (act === 'cancel') onCancel();
+        }}
+      />
     </div>
   );
 }

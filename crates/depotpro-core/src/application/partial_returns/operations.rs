@@ -134,9 +134,8 @@ pub async fn create_partial_return(
         .fetch_optional(&mut *tx)
         .await?;
 
-        let (stock_before, deposit_value) = comp_row
-            .map(|(_id, sq, dv)| (sq, dv))
-            .unwrap_or((0, 0));
+        let (stock_before, deposit_value) =
+            comp_row.map(|(_id, sq, dv)| (sq, dv)).unwrap_or((0, 0));
 
         let refund_multiplier = match item.condition_state.as_str() {
             "good" => 100,

@@ -172,12 +172,12 @@ export function PrintableDocumentSheet({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-orange-300 bg-orange-50 text-orange-800 uppercase text-xs font-bold">
-                <th className="p-2 text-left">N°</th>
-                <th className="p-2 text-left">Désignation Boisson & Format</th>
-                <th className="p-2 text-center">Conditionnement</th>
-                <th className="p-2 text-center">Qté</th>
-                <th className="p-2 text-right">P.U. (FCFA)</th>
-                <th className="p-2 text-right">Total (FCFA)</th>
+                <th scope="col" className="p-2 text-left">N°</th>
+                <th scope="col" className="p-2 text-left">Désignation Boisson & Format</th>
+                <th scope="col" className="p-2 text-center">Conditionnement</th>
+                <th scope="col" className="p-2 text-center">Qté</th>
+                <th scope="col" className="p-2 text-right">P.U. (FCFA)</th>
+                <th scope="col" className="p-2 text-right">Total (FCFA)</th>
               </tr>
             </thead>
             <tbody>
@@ -435,10 +435,10 @@ export function PrintableDocumentSheet({
           <table className="w-full border-collapse text-left text-xs">
             <thead className="bg-black text-white">
               <tr>
-                <th className="w-[15%] px-2 py-2 text-center font-bold uppercase">Qté</th>
-                <th className="px-2 py-2 font-bold uppercase">Description</th>
-                <th className="w-[18%] px-2 py-2 text-right font-bold uppercase">Prix unitaire</th>
-                <th className="w-[19%] px-2 py-2 text-right font-bold uppercase">Total</th>
+                <th scope="col" className="w-[15%] px-2 py-2 text-center font-bold uppercase">Qté</th>
+                <th scope="col" className="px-2 py-2 font-bold uppercase">Description</th>
+                <th scope="col" className="w-[18%] px-2 py-2 text-right font-bold uppercase">Prix unitaire</th>
+                <th scope="col" className="w-[19%] px-2 py-2 text-right font-bold uppercase">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -581,7 +581,7 @@ export function PrintableDocumentSheet({
         {doc.docType === 'REÇU DE VENTE'
           ? 'Reçu de vente détaillé ; les marchandises, emballages remis, règlements et solde sont indiqués séparément.'
           : isPaymentReceipt
-            ? 'Reçu de paiement officiel ; seul ce justificatif atteste de la somme encaissée en caisse ou via Mobile Money.'
+            ? 'Reçu de paiement officiel ; seul ce justificatif atteste de la somme encaissée. La référence interne du paiement ne correspond pas à la référence de transaction du prestataire Mobile Money.'
             : isPurchaseOrder
               ? 'Bon de commande fournisseur émis sous réserve de validation et de contrôle quantitatif à la réception.'
               : isPurchaseReceipt

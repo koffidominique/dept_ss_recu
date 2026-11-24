@@ -78,7 +78,7 @@ export function BusinessTipsModal() {
           {/* En-tête + barre de recherche */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 px-6 py-4 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-[#2563EB] dark:text-[#60A5FA] shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-[#1D4ED8] dark:text-[#60A5FA] shrink-0">
                 <BookOpen className="h-4 w-4" />
               </div>
               <div className="min-w-0">

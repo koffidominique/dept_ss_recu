@@ -4,20 +4,71 @@ import { motion } from 'motion/react';
 import { Sidebar } from './Sidebar.tsx';
 import { Header } from './Header.tsx';
 import { BusinessTipsModal } from '../components/common/BusinessTipsModal.tsx';
+import { LoadingState } from '../components/common/States.tsx';
 import { DP_EASE } from '../components/motion/MotionPrimitives.tsx';
 import { useUiStore } from '../stores/uiStore.ts';
+import type { SessionUser } from '../types/erp.ts';
 import { useSettingsQueries } from '../features/settings/hooks/useSettingsData.ts';
+import { apiClient } from '../services/api/createApiClient.ts';
+import { accessDecision } from '../features/quality/utils/permissions.ts';
 
 export function AppLayout() {
   const location = useLocation();
   const token = useUiStore((s) => s.token);
   const setToken = useUiStore((s) => s.setToken);
+  const currentUser = useUiStore((s) => s.currentUser);
+  const setCurrentUser = useUiStore((s) => s.setCurrentUser);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const lastActivityRef = useRef<number>(0);
   useEffect(() => {
     lastActivityRef.current = Date.now();
   }, []);
   const { settingsQuery } = useSettingsQueries();
+
+  // Garde d'acces generique : s'applique a tout ecran declare dans
+  // ROUTE_PERMISSIONS, y compris ceux auxquels on accede par un lien direct.
+  // Le serveur reste l'autorite (require_perm + 403 sur chaque ecriture).
+  const access = accessDecision(currentUser, location.pathname);
+
+
+  // Une session absente juste apres un rechargement est normale (le temps que
+  // /api/auth/me reponde). On ne devine pas avec une minuterie : on retient un
+  // echec explicite de verification, pour distinguer « en cours » de « serveur
+  // muet ». L'etat est pose dans un callback de promesse, jamais en rendu.
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
+
+  /**
+   * Hydratation de la session apres un rechargement (LOT 8).
+   *
+   * `token` est restaure depuis `sessionStorage`, mais `currentUser` ne l'etait
+   * pas : la navigation et les gardes d'acces restaient donc sans information
+   * de role jusqu'a une reconnexion manuelle. On revalide le jeton aupres du
+   * serveur (source d'autorite) et on ne remplit l'etat qu'avec sa reponse.
+   * Un 401 revoque la session : le jeton restaure n'est plus valide.
+   */
+  useEffect(() => {
+    if (!token || currentUser) return;
+    let cancelled = false;
+    apiClient
+      .getMe()
+      .then((res: { user?: SessionUser | null }) => {
+        if (!cancelled && res.user) setCurrentUser(res.user);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const status = (err as { status?: number } | null)?.status;
+        if (status === 401) {
+          // Jeton restaure mais revoque : retour a l'ecran de connexion.
+          setToken(null);
+          return;
+        }
+        // Serveur injoignable ou erreur inattendue : la session reste inconnue.
+        setSessionCheckFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, currentUser, setCurrentUser, setToken]);
 
   const inactivityTimeoutMinutes = settingsQuery.data?.settings.inactivity_timeout_minutes ?? 10;
   const inactivityTimeoutMs = inactivityTimeoutMinutes * 60 * 1000;
@@ -73,7 +124,29 @@ export function AppLayout() {
             transition={{ duration: 0.22, ease: DP_EASE }}
             className="mx-auto max-w-[1400px]"
           >
-            <Outlet />
+            {access === 'unknown' ? (
+              sessionCheckFailed ? (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-6 text-center">
+                  <h2 className="font-display text-base font-semibold">Session indisponible</h2>
+                  <p className="mt-2 text-sm text-[#667085] dark:text-[#94A3B8]">
+                    Le serveur local n’a pas confirmé votre session. Vérifiez qu’il est démarré,
+                    puis rechargez la page.
+                  </p>
+                </div>
+              ) : (
+                <LoadingState />
+              )
+            ) : access === 'deny' ? (
+              <div className="mx-auto max-w-lg rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/20 p-6 text-center">
+                <h2 className="font-display text-base font-semibold">Accès non autorisé</h2>
+                <p className="mt-2 text-sm text-[#667085] dark:text-[#94A3B8]">
+                  Votre rôle « {currentUser?.roleLabel} » ne dispose pas de la permission requise
+                  pour cet écran. Demandez à un administrateur de vous l’accorder.
+                </p>
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </motion.div>
         </main>
       </div>

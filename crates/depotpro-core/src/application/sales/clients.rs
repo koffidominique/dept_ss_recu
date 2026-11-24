@@ -94,7 +94,11 @@ pub async fn create_client(db: &DepotDb, input: CreateClientInput) -> CoreResult
     let (_guard, mut tx) = db.begin_write().await?;
     let code = DepotDb::next_sequence(&mut tx, "CLI").await?;
 
-    let opt_trim = |v: Option<&str>| v.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+    let opt_trim = |v: Option<&str>| {
+        v.map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
     let client_id: i64 = sqlx::query(
         "INSERT INTO clients (code, name, client_type, establishment_name, category, phone, address, city, commune, quartier, landmark, email, contact_person)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

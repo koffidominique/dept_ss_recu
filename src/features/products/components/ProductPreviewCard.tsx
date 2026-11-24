@@ -50,7 +50,7 @@ export function ProductPreviewCard({
   return (
     <aside className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/70 p-4 space-y-3 text-xs">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-        <span className="font-semibold uppercase tracking-wide text-[11px] text-[#667085]">
+        <span className="font-semibold uppercase tracking-wide text-[11px] text-[#667085] dark:text-[#94A3B8]">
           Aperçu fiche produit
         </span>
         <span
@@ -67,7 +67,7 @@ export function ProductPreviewCard({
       <div>
         <div className="font-display text-sm font-semibold text-[#182230] dark:text-slate-100">
           {v.name.trim() || 'Nouvelle référence'}{' '}
-          {volBadge && <span className="text-[#2563EB]">— {volBadge}</span>}
+          {volBadge && <span className="text-[#1D4ED8] dark:text-[#60A5FA]">— {volBadge}</span>}
         </div>
         <div className="mt-0.5 text-[#667085] dark:text-slate-400">
           {[breweryName || v.brand.trim(), catName, v.beverage_color.trim() || v.variant_label.trim()]
@@ -78,48 +78,48 @@ export function ProductPreviewCard({
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-200 dark:border-slate-800 pt-2">
         <div>
-          <dt className="text-[11px] text-[#667085]">Contenant</dt>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Contenant</dt>
           <dd className="font-medium text-[#182230] dark:text-slate-200">
             {formatContainerSummary(v)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] text-[#667085]">Conditionnement</dt>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Conditionnement</dt>
           <dd className="font-medium capitalize text-[#182230] dark:text-slate-200">
             {v.packaging_name} × {coeff}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] text-[#667085]">Prix d&apos;achat</dt>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Prix d&apos;achat</dt>
           <dd className="font-mono-num font-medium">{formatFcfa(purchase)}</dd>
         </div>
         <div>
-          <dt className="text-[11px] text-[#667085]">Prix de vente</dt>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Prix de vente</dt>
           <dd className="font-mono-num font-semibold text-[#182230] dark:text-slate-100">
             {formatFcfa(retail)}
           </dd>
         </div>
         <div>
-          <dt className="text-[11px] text-[#667085]">Consigne emballage</dt>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Consigne emballage</dt>
           <dd className="font-mono-num">{formatFcfa(pkgDeposit)}</dd>
         </div>
         <div>
-          <dt className="text-[11px] text-[#667085]">Marge brute estimée</dt>
-          <dd className={`font-mono-num font-semibold ${margin >= 0 ? 'text-[#16A36A]' : 'text-[#DC4545]'}`}>
+          <dt className="text-[11px] text-[#667085] dark:text-[#94A3B8]">Marge brute estimée</dt>
+          <dd className={`font-mono-num font-semibold ${margin >= 0 ? 'text-[#16A36A]' : 'text-[#BE123C]'}`}>
             {formatFcfa(margin)}
           </dd>
         </div>
       </dl>
 
       <div className="flex items-center justify-between rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-2">
-        <span className="text-[11px] font-medium text-[#667085]">Total client avec consigne</span>
-        <span className="font-mono-num text-sm font-bold text-[#2563EB]">
+        <span className="text-[11px] font-medium text-[#667085] dark:text-[#94A3B8]">Total client avec consigne</span>
+        <span className="font-mono-num text-sm font-bold text-[#1D4ED8] dark:text-[#60A5FA]">
           {formatFcfa(totalWithDeposit)}
         </span>
       </div>
 
       {v.sales_units.length > 0 && (
-        <div className="text-[11px] text-[#667085]">
+        <div className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
           Unités : {v.sales_units.map((u) => `${u.label} (×${u.conversion_factor})`).join(', ')}
         </div>
       )}

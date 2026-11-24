@@ -70,14 +70,45 @@ Exécutés dans `happy-dom` avec `@testing-library/react` :
 - `CashPage`, `PurchasesPage` & `ConsignmentsPage` : validation Zod/RHF de l'écart de clôture caisse et de l'annulation PO, plus exports CSV (`exportCashMovementsCsv`, `exportCashSessionsCsv`, `exportPurchasesCsv`, `exportConsignmentBalancesCsv`).
 - `LoginPage` : saisie clavier rapide sans perte de chiffres, blocage des doubles déclenchements sur `Entrée`, bouton **Réessayer** sur erreur serveur et reprise automatique sur session cookie.
 
+## Tests TypeScript `node:test` exécutés via `tsx --test` (hors navigateur)
+
+Suites `src/**/*.test.ts(x)` exécutées par `npx tsx --test <fichiers>` ; elles n'utilisent ni Jest ni Vitest et n'ont pas besoin de `@happy-dom/global-registrator`.
+
+- `src/features/sales/utils/posWorkflowLot1.test.ts` (6 tests) : brouillon de vente, empreinte anti-double-soumission, calculs de panier et normalisation des erreurs réseau.
+- `src/features/sales/components/PosComponentsLot1.test.tsx` (2 tests) : panneaux catalogue et paiement du POS.
+- `src/features/sales/utils/posReturnablesAndReceipts.test.ts` (13 tests) : consignes, retours d'emballages et reçus.
+- `src/features/inventory/utils/phase2OperationsGuards.test.ts` (7 tests) : idempotence (`createIdempotentRequestTracker`), écarts de caisse (seuil 1 000 FCFA), parseur milli-unités acceptant `0`, évaluation d'inventaire, canal de règlement des commandes, frise de cycle de vie, réception fournisseur (reliquat et motif obligatoire).
+- `src/features/inventory/components/Phase2WorkflowsLot2.test.tsx` (3 tests) : `CloseCashModal` (motif puis confirmation puis `request_key` stable), `InventoryCountModal` (blocage d'un écart non motivé, confirmation irréversible), `OrderStepConfirm` (encaissement impossible sans session de caisse, `credit` jamais transmis, confirmation avant livraison).
+
+- `src/features/dashboard/utils/workQueue.test.ts` (12 tests) : anciennetés, absence d'alerte quand tout est à jour, caisse fermée et session trop ancienne, reprise **telle quelle** des montants échus calculés par Rust, ruptures vs seuils, cycle des commandes avec restant dû exact, consignes partiellement restituées, fraîcheur des sauvegardes, priorisation sans mutation, résumé, filtres commandes et créances.
+- `src/features/dashboard/components/WorkQueuePanel.test.tsx` (4 tests) : cartes d'action avec badge textuel et liens profonds, annonce explicite d'une file partielle, bandeau hors ligne qui n'annonce jamais une réussite, note de portée des KPI.
+
+- `src/features/quality/utils/operationalSafety.test.ts` (8 tests) : masquage des secrets (Bearer, passphrase, JWT, `sk_live_`, empreinte SHA-256) avec conservation du libellé, erreur affichable et non confirmée, distinction « poste hors ligne » / « serveur local arrêté » / « en ligne », fraîcheur des sauvegardes, protection de saisie non enregistrée, `headerScope`.
+- `src/features/quality/components/QualityLot4.test.tsx` (4 tests) : fermeture directe d'une clôture vierge, interception avec avertissement de perte + « Continuer la clôture », interception du comptage d'inventaire avec confirmation destructive, affichage des trois états de sauvegarde.
+
+- `src/features/quality/a11y/axeAudit.test.tsx` (24 tests) : audit axe-core WCAG 2.0/2.1 A+AA sur 5 composants transversaux et les 19 écrans, client API neutralisé (états d'erreur/vide réels). Nécessite `--import ./src/test/registerVirtualModules.ts` pour résoudre `virtual:pwa-register`.
+- `src/features/quality/components/backupRestoreFlow.test.tsx` (3 tests) : parcours de restauration — aucune restauration sur simple clic, refus serveur affiché sans faux succès, phrase secrète exigée avant tout appel pour une archive chiffrée.
+
+- `src/features/auth/components/LoginShowcasePanel.test.tsx` (3 tests) : garde-fou responsive — le panneau de présentation doit rester `hidden lg:block`, sans quoi la carte de connexion sort de l'écran sur mobile (défaut réel corrigé au Lot 6).
+
+- `src/features/dashboard/hooks/useConnectionState.test.tsx` (4 tests) : transitions réelles de l'état de connexion — aucun succès ⇒ jamais « en ligne », succès puis panne réseau, erreur métier ≠ serveur mort, rejeu des requêtes en échec au retour du réseau.
+
+Total : **93/93** tests.
+
+Le harnais DOM partagé est `src/test/setupDom.ts` (qui appelle `src/test/domEnvironment.ts`). Il doit être importé **avant** `@testing-library/react` : `react-dom` détecte l'environnement au chargement du module, et les portails Radix ne se montent pas si le DOM est installé après. Il neutralise également `Element.prototype.animate` (l'API Web Animations de `happy-dom` rejette les animations `motion/react` avec `AbortError` au démontage des dialogues).
+
 ## Tests navigateur E2E (`tests/e2e/app.spec.ts` / `playwright.config.ts`, via `npm run test:e2e`)
 
 Suite Playwright couvrant la configuration PIN initiale, la bascule thème Clair/Sombre, le parcours complet des 17 écrans, la création produit, les 6 onglets Rapports et le contrôle d'absence d'erreurs console/JS.
 
+## Vérification visuelle et de contraste (`scripts/visual/audit.mjs`, via `npm run test:visual`)
+
+Repli exécutable quand les CDN Playwright sont inaccessibles : Chromium moderne piloté par `puppeteer-core`, bibliothèques NSS fournies par l'archive `al2023` de `@sparticuz/chromium`. Charge la SPA compilée servie par `vite preview`, mesure le contraste WCAG 1.4.3 sur les couleurs réellement calculées (avec échantillonnage des pixels du PNG lorsque le texte repose sur une photo), capture les vues à 360 / 768 / 1440 px en thème clair et sombre, et signale débordements horizontaux et erreurs console. Voir `scripts/visual/README.md`. `npm run test:screens` vérifie que les 19 écrans authentifiés se montent (coquille, route, titre, aucune exception JS) **et** que le garde d'accès par rôle se comporte correctement : avec une session propriétaire factice, `/catalogue-admin` doit exposer son entrée de menu ; avec une session caissier, `/catalogue-admin` et `/backups` doivent afficher « Accès non autorisé » alors que `/cash` reste accessible (22 contrôles). `/api/auth/me` et `/api/auth/status` sont interceptés et le service worker est neutralisé (`setBypassServiceWorker`) : sans cela il rejoue ses fetch hors de la portée de l'interception et les écrans sont mesurés avec une session vide.
+
 ## Intégration continue (`.github/workflows/ci.yml`)
 
 Pipeline GitHub Actions orchestrant :
-- Web (`typecheck`, `lint` ESLint, `test` 59/59, `build`, `benchmark`, `migrate_v2_to_v3.py --strict`)
+- Web (`typecheck`, `lint` ESLint, `test:web` 93/93, `build`, `benchmark`, `migrate_v2_to_v3.py --strict`)
 - Playwright E2E Chromium (`npm run test:e2e`)
 - Rust (`cargo fmt --all -- --check`, `cargo clippy -- -D warnings`, `cargo test`)
 - Tauri 2 (`windows-latest` & `macos-latest`)

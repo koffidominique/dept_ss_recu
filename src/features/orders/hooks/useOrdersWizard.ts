@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import type {
@@ -37,12 +37,14 @@ export function useOrdersWizard() {
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [activeOrder, setActiveOrder] = useState<CustomerOrderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inFlightLockRef = useRef(false);
 
   useEffect(() => {
     saveOrderDraft(draft);
   }, [draft]);
 
   const clientsQuery = useQuery({ queryKey: ['clients'], queryFn: () => apiClient.listClients() });
+  const cashQuery = useQuery({ queryKey: ['cash'], queryFn: () => apiClient.getCashStatus() });
   const productsQuery = useQuery({
     queryKey: ['products-orders'],
     queryFn: () => apiClient.listProducts({ page: 1, pageSize: 200 }),
@@ -164,35 +166,43 @@ export function useOrdersWizard() {
   };
 
   const createMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      if (inFlightLockRef.current) {
+        throw new Error('Une opération est déjà en cours de traitement.');
+      }
       if (!draft.customer_id) throw new Error('Veuillez sélectionner un client.');
       if (validLineInputs.length === 0) throw new Error('Ajoutez au moins une ligne produit.');
-      const payload = {
-        customer_id: draft.customer_id,
-        order_type: (validLineInputs.length > 1 ? 'mixte' : 'vente') as 'mixte' | 'vente',
-        payment_method: draft.payment_method,
-        planned_payment_channel: draft.planned_payment_channel || draft.payment_method,
-        discount_xof: Math.max(0, draft.discount_xof),
-        delivery_mode: draft.delivery_mode,
-        courier_name: draft.courier_name.trim() || null,
-        planned_delivery_time: draft.planned_delivery_time.trim() || null,
-        delivery_fee_xof: draft.delivery_mode === 'delivery' ? Math.max(0, draft.delivery_fee_xof) : 0,
-        delivery_address: draft.delivery_address.trim() || null,
-        delivery_landmark: draft.delivery_landmark.trim() || null,
-        notes: draft.notes.trim() || null,
-        lines: validLineInputs,
-        allocations: draft.custom_allocations
-          ? draft.custom_allocations.map((a) => ({
-              packaging_asset_id: a.packaging_asset_id,
-              quantity: a.quantity,
-              is_consigned: a.is_consigned,
-              deposit_amount_xof: a.deposit_amount_xof,
-            }))
-          : null,
-      };
-      return editingOrderId
-        ? apiClient.updateCustomerOrder(editingOrderId, payload)
-        : apiClient.createCustomerOrder(payload);
+      inFlightLockRef.current = true;
+      try {
+        const payload = {
+          customer_id: draft.customer_id,
+          order_type: (validLineInputs.length > 1 ? 'mixte' : 'vente') as 'mixte' | 'vente',
+          payment_method: draft.payment_method,
+          planned_payment_channel: draft.planned_payment_channel || draft.payment_method,
+          discount_xof: Math.max(0, draft.discount_xof),
+          delivery_mode: draft.delivery_mode,
+          courier_name: draft.courier_name.trim() || null,
+          planned_delivery_time: draft.planned_delivery_time.trim() || null,
+          delivery_fee_xof: draft.delivery_mode === 'delivery' ? Math.max(0, draft.delivery_fee_xof) : 0,
+          delivery_address: draft.delivery_address.trim() || null,
+          delivery_landmark: draft.delivery_landmark.trim() || null,
+          notes: draft.notes.trim() || null,
+          lines: validLineInputs,
+          allocations: draft.custom_allocations
+            ? draft.custom_allocations.map((a) => ({
+                packaging_asset_id: a.packaging_asset_id,
+                quantity: a.quantity,
+                is_consigned: a.is_consigned,
+                deposit_amount_xof: a.deposit_amount_xof,
+              }))
+            : null,
+        };
+        return await (editingOrderId
+          ? apiClient.updateCustomerOrder(editingOrderId, payload)
+          : apiClient.createCustomerOrder(payload));
+      } finally {
+        inFlightLockRef.current = false;
+      }
     },
     onSuccess: (detail) => {
       setError(null);
@@ -206,7 +216,17 @@ export function useOrdersWizard() {
   });
 
   const actionMutation = useMutation({
-    mutationFn: async (fn: () => Promise<CustomerOrderDetail>) => fn(),
+    mutationFn: async (fn: () => Promise<CustomerOrderDetail>) => {
+      if (inFlightLockRef.current) {
+        throw new Error('Une opération est déjà en cours de traitement.');
+      }
+      inFlightLockRef.current = true;
+      try {
+        return await fn();
+      } finally {
+        inFlightLockRef.current = false;
+      }
+    },
     onSuccess: (detail) => {
       setError(null);
       refreshAll(detail);
@@ -263,5 +283,6 @@ export function useOrdersWizard() {
     createMutation,
     actionMutation,
     startEditingDraft,
+    hasOpenCashSession: Boolean(cashQuery.data?.activeSession),
   };
 }

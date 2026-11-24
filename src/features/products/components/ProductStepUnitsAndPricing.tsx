@@ -111,24 +111,24 @@ export function ProductStepUnitsAndPricing({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span>
             Marge brute estimée (hors consigne) :{' '}
-            <strong className={marginRetail >= 0 ? 'text-[#16A36A]' : 'text-[#DC4545]'}>
+            <strong className={marginRetail >= 0 ? 'text-[#16A36A]' : 'text-[#BE123C]'}>
               {formatFcfa(marginRetail)}
             </strong>
           </span>
           {wholesale > 0 && (
             <span>
               Marge gros :{' '}
-              <strong className={marginWholesale >= 0 ? 'text-[#16A36A]' : 'text-[#DC4545]'}>
+              <strong className={marginWholesale >= 0 ? 'text-[#16A36A]' : 'text-[#BE123C]'}>
                 {formatFcfa(marginWholesale)}
               </strong>
             </span>
           )}
           <span>
             Total client avec consigne :{' '}
-            <strong className="text-[#2563EB]">{formatFcfa(clientTotal)}</strong>
+            <strong className="text-[#1D4ED8] dark:text-[#60A5FA]">{formatFcfa(clientTotal)}</strong>
           </span>
         </div>
-        <p className="text-[11px] text-[#667085]">
+        <p className="text-[11px] text-[#667085] dark:text-[#94A3B8]">
           La consigne est comptabilisée séparément comme dépôt récupérable et n&apos;est pas
           incorporée à la marge commerciale.
         </p>

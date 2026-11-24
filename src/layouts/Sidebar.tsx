@@ -18,6 +18,7 @@ import {
   BarChart3,
   Settings,
   DatabaseBackup,
+  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
   X,
@@ -25,6 +26,7 @@ import {
 import { Logo } from '../components/common/Logo.tsx';
 import { DP_EASE, DP_SPRING } from '../components/motion/MotionPrimitives.tsx';
 import { useUiStore } from '../stores/uiStore.ts';
+import { ROUTE_PERMISSIONS, hasPermission } from '../features/quality/utils/permissions.ts';
 import { cn } from '../utils/format.ts';
 
 interface NavGroup {
@@ -52,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Stocks & Retour emballages',
     items: [
       { to: '/products', label: 'Produits', icon: Package },
+      { to: '/catalogue-admin', label: 'Admin catalogue', icon: SlidersHorizontal },
       { to: '/stock', label: 'Stocks', icon: Boxes },
       { to: '/inventories', label: 'Inventaires', icon: ClipboardCheck },
       { to: '/consignments', label: 'Retour emballages', icon: Repeat },
@@ -94,6 +97,22 @@ export function Sidebar({
 }) {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const currentUser = useUiStore((s) => s.currentUser);
+
+  // Filtrer la navigation selon les permissions reelles du role (le serveur
+  // reste l'autorite : chaque handler appelle require_perm et renvoie 403).
+  // Le mapping route -> permission vient de ROUTE_PERMISSIONS, la meme table
+  // que celle utilisee par les gardes d'acces : impossible de les desync.
+  // Tant que la session n'est pas hydratee, les entrees protegees restent
+  // masquees : mieux vaut une entree absente qu'une promesse d'acces refusee.
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const needed = ROUTE_PERMISSIONS[item.to];
+      if (!needed) return true;
+      return !!currentUser && hasPermission(currentUser, needed);
+    }),
+  })).filter((group) => group.items.length > 0);
 
   const navContent = (isDrawer: boolean) => (
     <>
@@ -121,7 +140,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2.5 py-4 space-y-5" aria-label="Navigation principale">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.label}>
             {(isDrawer || !collapsed) && (
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold tracking-wide text-[#667085] dark:text-slate-500">
@@ -144,7 +163,7 @@ export function Sidebar({
                       cn(
                         'relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200 whitespace-nowrap group',
                         isActive
-                          ? 'text-[#2563EB] dark:text-[#60A5FA]'
+                          ? 'text-[#1D4ED8] dark:text-[#60A5FA]'
                           : 'text-[#182230] dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 hover:translate-x-0.5'
                       )
                     }

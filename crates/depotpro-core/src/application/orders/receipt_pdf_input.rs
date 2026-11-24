@@ -23,7 +23,7 @@ fn format_fcfa(value: i64) -> String {
     let digits = value.abs().to_string();
     let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
     for (index, ch) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             grouped.push(' ');
         }
         grouped.push(ch);
@@ -100,6 +100,7 @@ fn make_line(line: &OrderLineDto, order: &OrderDetailDto) -> DocumentPdfLine {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn build_receipt_pdf_input(
     order: &OrderDetailDto,
     customer: &CustomerReceiptProfile<'_>,
@@ -138,10 +139,17 @@ pub(super) fn build_receipt_pdf_input(
     let customer_location = if !loc_parts.is_empty() {
         Some(loc_parts.join(" / "))
     } else {
-        customer.address.filter(|v| !v.trim().is_empty()).map(|s| s.trim().to_string())
+        customer
+            .address
+            .filter(|v| !v.trim().is_empty())
+            .map(|s| s.trim().to_string())
     };
 
-    let lines = order.lines.iter().map(|line| make_line(line, order)).collect();
+    let lines = order
+        .lines
+        .iter()
+        .map(|line| make_line(line, order))
+        .collect();
     let issued = matches!(
         order_summary.status.as_str(),
         "delivered" | "invoiced" | "paid"
@@ -166,7 +174,8 @@ pub(super) fn build_receipt_pdf_input(
             expected_quantity: allocation.quantity,
             issued_quantity: issued.then_some(allocation.quantity),
             returned_quantity: Some(allocation.returned_quantity),
-            unit_deposit_xof: (allocation.is_consigned == 1).then_some(allocation.deposit_amount_xof),
+            unit_deposit_xof: (allocation.is_consigned == 1)
+                .then_some(allocation.deposit_amount_xof),
             status_label: if allocation.is_consigned == 1 {
                 "Consigné — retour sous 15 jours".to_string()
             } else {
@@ -230,7 +239,9 @@ pub(super) fn build_receipt_pdf_input(
         },
         DocumentPdfSummaryRow {
             label: "RESTE À PAYER".to_string(),
-            value: format_fcfa((order_summary.total_to_collect_xof - order_summary.paid_xof).max(0)),
+            value: format_fcfa(
+                (order_summary.total_to_collect_xof - order_summary.paid_xof).max(0),
+            ),
             bold: true,
             tone: Some("danger".to_string()),
         },
@@ -297,14 +308,20 @@ pub(super) fn build_receipt_pdf_input(
         .links
         .iter()
         .filter_map(|link| {
-            let line = order.lines.iter().find(|line| line.id == link.order_line_id)?;
+            let line = order
+                .lines
+                .iter()
+                .find(|line| line.id == link.order_line_id)?;
             let allocation = order
                 .allocations
                 .iter()
                 .find(|allocation| allocation.id == link.order_packaging_allocation_id)?;
             Some(format!(
                 "{} {} : {} unité(s) dans {}",
-                line.product_name, line.variant_name, link.units_in_packaging, allocation.packaging_name
+                line.product_name,
+                line.variant_name,
+                link.units_in_packaging,
+                allocation.packaging_name
             ))
         })
         .collect::<Vec<_>>();

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUiStore } from '../stores/uiStore.ts';
 import {
   DocumentPrintModal,
@@ -13,11 +14,18 @@ import { OrderStepPackaging } from '../features/orders/components/OrderStepPacka
 import { OrderStepReview } from '../features/orders/components/OrderStepReview.tsx';
 import { OrderStepConfirm } from '../features/orders/components/OrderStepConfirm.tsx';
 import { OrdersListTable } from '../features/orders/components/OrdersListTable.tsx';
+import { SearchInput } from '../components/forms/SearchInput.tsx';
+import {
+  filterCustomerOrders,
+  type OrderListFilter,
+} from '../features/dashboard/utils/workQueue.ts';
 import { useOrdersWizard } from '../features/orders/hooks/useOrdersWizard.ts';
 import {
   buildOrderReceiptFromSnapshot,
   buildPaymentReceiptDoc,
 } from '../features/orders/utils/orderPrintDocument.ts';
+import { OfflineWorkBanner } from '../features/dashboard/components/WorkQueuePanel.tsx';
+import { useConnectionState } from '../features/dashboard/hooks/useConnectionState.ts';
 
 const STEPS = [
   { id: 1, label: '1. Client' },
@@ -51,8 +59,41 @@ export function OrdersPage() {
     createMutation,
     actionMutation,
     startEditingDraft,
+    hasOpenCashSession,
   } = useOrdersWizard();
 
+  // Filtres de liste conservés dans l'URL : le retour depuis une fiche commande
+  // retrouve exactement la même vue (cf. Phase 3, point « conserver les filtres »).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawStatut = searchParams.get('statut');
+  const validStatuts: OrderListFilter['statut'][] = [
+    'tous',
+    'a_approuver',
+    'a_livrer',
+    'solde_du',
+    'en_cours',
+  ];
+  const statut: OrderListFilter['statut'] =
+    rawStatut && (validStatuts as string[]).includes(rawStatut)
+      ? (rawStatut as OrderListFilter['statut'])
+      : 'tous';
+  const search = searchParams.get('q') ?? '';
+
+  const updateListFilter = (next: { statut?: OrderListFilter['statut']; q?: string }) => {
+    const params: Record<string, string> = {};
+    const nextStatut = next.statut ?? statut;
+    const nextSearch = next.q ?? search;
+    if (nextStatut !== 'tous') params.statut = nextStatut;
+    if (nextSearch.trim()) params.q = nextSearch;
+    setSearchParams(params, { replace: true });
+  };
+
+  const filteredOrders = useMemo(
+    () => filterCustomerOrders(orders, { statut, search }),
+    [orders, statut, search]
+  );
+
+  const { isOnline, offlineSince, serverState } = useConnectionState();
   const [printDoc, setPrintDoc] = useState<PrintableDocumentData | null>(null);
   const [receiptHistory, setReceiptHistory] = useState<CustomerOrderReceiptSnapshot[] | null>(null);
   const [revisionReason, setRevisionReason] = useState('');
@@ -115,13 +156,18 @@ export function OrdersPage() {
 
   return (
     <div className="space-y-6">
+      <OfflineWorkBanner
+        isOnline={isOnline}
+        offlineSince={offlineSince}
+        serverState={serverState}
+      />
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
           <div>
             <h1 className="font-display text-lg font-semibold">
               Prise de commande clientèle &amp; casiers mixtes
             </h1>
-            <p className="text-xs text-[#667085]">
+            <p className="text-xs text-[#667085] dark:text-[#94A3B8]">
               Brouillon sauvegardé hors-ligne ·{' '}
               {isServerPreview ? 'Prévisualisation serveur synchronisée' : 'Calcul local'} ·
               Consignes séparées du CA.
@@ -137,7 +183,7 @@ export function OrdersPage() {
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-medium ${
                   step === s.id
                     ? 'bg-[#2563EB] text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-[#667085] dark:text-slate-300 disabled:opacity-40'
+                    : 'bg-slate-100 dark:bg-slate-800 text-[#667085] dark:text-slate-300 disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100'
                 }`}
               >
                 {s.label}
@@ -223,6 +269,7 @@ export function OrdersPage() {
               orderDetail={activeOrder}
               isBusy={actionMutation.isPending}
               isOwner={isOwner}
+              hasOpenCashSession={hasOpenCashSession}
               onSubmitForApproval={() =>
                 actionMutation.mutate(async () => {
                   await apiClient.submitCommercialDocument('customer_order', activeOrder.order.id);
@@ -238,14 +285,15 @@ export function OrdersPage() {
               onInvoice={() =>
                 actionMutation.mutate(() => apiClient.invoiceCustomerOrder(activeOrder.order.id))
               }
-              onPayFull={() =>
+              onPayFull={(requestKey, method) =>
                 actionMutation.mutate(() =>
                   apiClient.payCustomerOrder(activeOrder.order.id, {
                     amount_xof: Math.max(
                       1,
                       activeOrder.order.total_to_collect_xof - activeOrder.order.paid_xof,
                     ),
-                    method: activeOrder.order.planned_payment_channel ?? activeOrder.order.payment_method ?? 'cash',
+                    method,
+                    request_key: requestKey,
                   }),
                 )
               }
@@ -285,7 +333,7 @@ export function OrdersPage() {
               type="button"
               disabled={step === 1}
               onClick={() => setStep((s) => Math.max(1, s - 1))}
-              className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:opacity-40"
+              className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-medium disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
             >
               Précédent
             </button>
@@ -303,7 +351,7 @@ export function OrdersPage() {
                   type="button"
                   disabled={createMutation.isPending}
                   onClick={() => createMutation.mutate()}
-                  className="rounded-lg bg-[#16A36A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                  className="rounded-lg bg-[#0D7A4C] px-4 py-2 text-xs font-semibold text-white disabled:bg-[#B7DACB] disabled:text-[#0A3F28] disabled:opacity-100"
                 >
                   {editingOrderId ? 'Mettre à jour le brouillon' : 'Valider la commande'}
                 </button>
@@ -314,9 +362,58 @@ export function OrdersPage() {
       </div>
 
       <div className="space-y-3">
-        <h2 className="font-display text-sm font-semibold">Commandes récentes</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-sm font-semibold">
+            Commandes récentes
+            <span className="ml-2 font-mono-num text-xs font-normal text-[#667085] dark:text-slate-400">
+              {filteredOrders.length} / {orders.length}
+            </span>
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={search}
+              onChange={(q) => updateListFilter({ q })}
+              placeholder="N° commande ou client..."
+              ariaLabel="Rechercher une commande par numéro ou client"
+              clearable
+              className="w-56"
+              inputClassName="py-1.5 text-xs"
+            />
+            <label className="sr-only" htmlFor="orders-status-filter">
+              Filtrer les commandes par statut
+            </label>
+            <select
+              id="orders-status-filter"
+              value={statut}
+              onChange={(e) =>
+                updateListFilter({ statut: e.target.value as OrderListFilter['statut'] })
+              }
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-2.5 py-1.5 text-xs text-[#182230] dark:text-slate-100"
+            >
+              <option value="tous">Tous les statuts</option>
+              <option value="a_approuver">À approuver</option>
+              <option value="a_livrer">À livrer</option>
+              <option value="solde_du">Solde dû</option>
+              <option value="en_cours">Cycle en cours</option>
+            </select>
+            {(statut !== 'tous' || search.trim()) && (
+              <button
+                type="button"
+                onClick={() => updateListFilter({ statut: 'tous', q: '' })}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-medium text-[#667085] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        </div>
         <OrdersListTable
-          orders={orders}
+          orders={filteredOrders}
+          emptyMessage={
+            statut !== 'tous' || search.trim()
+              ? 'Aucune commande ne correspond aux filtres actifs. Réinitialisez pour retrouver la liste complète.'
+              : undefined
+          }
           onOpenOrder={(id) =>
             actionMutation.mutate(async () => {
               const detail = await apiClient.getCustomerOrder(id);
@@ -375,7 +472,7 @@ export function OrdersPage() {
                   type="button"
                   disabled={isRevisingReceipt || revisionReason.trim().length < 8}
                   onClick={() => void reviseReceipt()}
-                  className="mt-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                  className="mt-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:text-[#6B7280] dark:disabled:text-[#9CA3AF] disabled:opacity-100"
                 >
                   {isRevisingReceipt ? 'Émission…' : 'Créer et imprimer la nouvelle version'}
                 </button>

@@ -101,7 +101,7 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
       </div>
 
       {lines.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-xs text-[#667085]">
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-xs text-[#667085] dark:text-[#94A3B8]">
           Aucune ligne produit ajoutée. Cliquez sur « + Ajouter une ligne produit » ou « + Ajouter
           un casier mixte ».
         </div>
@@ -118,8 +118,8 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
                 className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 dark:border-slate-800 p-3 sm:grid-cols-12 items-end"
               >
                 <div className="sm:col-span-4">
-                  <label className="block text-[11px] font-medium text-[#667085]">Variante boisson</label>
-                  <select
+                  <label className="block text-[11px] font-medium text-[#667085] dark:text-[#94A3B8]">Variante boisson</label>
+                  <select aria-label="Variante boisson"
                     value={ln.variant_id ?? ''}
                     onChange={(e) => {
                       const vid = e.target.value ? Number(e.target.value) : null;
@@ -141,8 +141,8 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-medium text-[#667085]">Unité</label>
-                  <select
+                  <label className="block text-[11px] font-medium text-[#667085] dark:text-[#94A3B8]">Unité</label>
+                  <select aria-label="Unité"
                     value={ln.requested_unit}
                     onChange={(e) =>
                       updateLine(ln.key, { requested_unit: e.target.value as OrderRequestedUnit })
@@ -160,7 +160,7 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
                   </p>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-medium text-[#667085]">
+                  <label className="block text-[11px] font-medium text-[#667085] dark:text-[#94A3B8]">
                     Qté ({baseQty} {pluralBaseUnit(opt?.base_unit ?? 'bouteille')})
                   </label>
                   <input
@@ -174,7 +174,7 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-medium text-[#667085]">PU base (FCFA)</label>
+                  <label className="block text-[11px] font-medium text-[#667085] dark:text-[#94A3B8]">PU base (FCFA)</label>
                   <input
                     type="number"
                     min={0}
@@ -190,7 +190,7 @@ export function OrderStepLines({ lines, options, onChangeLines }: OrderStepLines
                   <button
                     type="button"
                     onClick={() => onChangeLines(lines.filter((x) => x.key !== ln.key))}
-                    className="rounded p-1 text-[#DC4545] hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                    className="rounded p-1 text-[#BE123C] hover:bg-rose-50 dark:hover:bg-rose-950/30"
                     title="Supprimer ligne"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
