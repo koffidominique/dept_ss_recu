@@ -8,9 +8,7 @@
 //! - une tournee revenue ne peut plus etre annulee.
 
 use depotpro_core::application::auth::{self, Role, SessionIdentity};
-use depotpro_core::application::delivery_runs::{
-    self, AddStopInput, CreateRunInput,
-};
+use depotpro_core::application::delivery_runs::{self, AddStopInput, CreateRunInput};
 use depotpro_core::infrastructure::db::DepotDb;
 
 fn owner() -> SessionIdentity {
@@ -50,19 +48,24 @@ async fn seed(db: &DepotDb) -> (i64, i64, i64, i64) {
         .unwrap();
 
     for (username, role) in [("chauffeur1", "driver"), ("chauffeur2", "driver")] {
-        sqlx::query("INSERT INTO users (username, display_name, role, pin_hash) VALUES (?, ?, ?, 'x')")
-            .bind(username)
-            .bind(username)
-            .bind(role)
-            .execute(&mut *tx)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO users (username, display_name, role, pin_hash) VALUES (?, ?, ?, 'x')",
+        )
+        .bind(username)
+        .bind(username)
+        .bind(role)
+        .execute(&mut *tx)
+    .await
+    .unwrap();
     }
     // Un caissier, pour verifier qu'il ne peut PAS etre livreur.
-    sqlx::query("INSERT INTO users (username, display_name, role, pin_hash) VALUES ('caissier','Caissier','cashier','x')")
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO users (username, display_name, role, pin_hash) \
+         VALUES ('caissier','Caissier','cashier','x')",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
 
     let d1: i64 = sqlx::query_scalar("SELECT id FROM users WHERE username = 'chauffeur1'")
         .fetch_one(&mut *tx)
@@ -314,7 +317,7 @@ async fn load_freezes_expected_amounts_and_status_flow_is_guarded() {
 #[tokio::test]
 async fn cancel_is_refused_once_the_run_has_returned() {
     let db = fresh_db("cancel_guard").await;
-    let (client_a, _b, d1, _d2) = seed(&db).await;
+    let (_a, _b, d1, _d2) = seed(&db).await;
 
     let run = auth::with_actor(
         owner(),
@@ -406,10 +409,11 @@ async fn expected_empty_pieces_follow_open_deposit_issues() {
     .execute(&mut *tx)
     .await
     .unwrap();
-    let rid: i64 = sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-L13'")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+    let rid: i64 =
+        sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-L13'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
     sqlx::query(
         "INSERT INTO sales (reference, request_key, sale_type, subtotal_merchandise,
             total_merchandise, total_amount) VALUES ('VTE-L13','rk-l13','cash',12000,12000,12000)",
@@ -434,8 +438,8 @@ async fn expected_empty_pieces_follow_open_deposit_issues() {
         .bind(pieces * 1000)
         .bind(status)
         .execute(&mut *tx)
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     }
     tx.commit().await.unwrap();
 

@@ -94,12 +94,11 @@ pub async fn create_run(db: &DepotDb, input: CreateRunInput) -> CoreResult<Deliv
     let (_guard, mut tx) = db.begin_write().await?;
 
     // Idempotence : rejouer la meme requete renvoie la tournee existante.
-    if let Some(existing) = sqlx::query_scalar::<_, i64>(
-        "SELECT id FROM delivery_runs WHERE opened_key = ?",
-    )
-    .bind(&request_key)
-    .fetch_optional(&mut *tx)
-    .await?
+    if let Some(existing) =
+        sqlx::query_scalar::<_, i64>("SELECT id FROM delivery_runs WHERE opened_key = ?")
+            .bind(&request_key)
+            .fetch_optional(&mut *tx)
+            .await?
     {
         let dto = load_run_tx(&mut tx, existing).await?;
         tx.commit().await?;
@@ -113,9 +112,8 @@ pub async fn create_run(db: &DepotDb, input: CreateRunInput) -> CoreResult<Deliv
             .bind(input.driver_user_id)
             .fetch_optional(&mut *tx)
             .await?;
-    let driver_role = driver_role.ok_or_else(|| {
-        CoreError::Validation("Livreur introuvable ou inactif.".to_string())
-    })?;
+    let driver_role = driver_role
+        .ok_or_else(|| CoreError::Validation("Livreur introuvable ou inactif.".to_string()))?;
     if driver_role != "driver" {
         return Err(CoreError::Validation(format!(
             "L'utilisateur designe n'a pas le role livreur (role actuel : {driver_role})."
@@ -346,7 +344,11 @@ pub async fn start_run(db: &DepotDb, run_id: i64) -> CoreResult<DeliveryRunDto> 
 
 /// Annule une tournee. Refuse si elle est deja revenue : une tournee revenue
 /// porte des montants constates, l'annulation effacerait une realite.
-pub async fn cancel_run(db: &DepotDb, run_id: i64, closed_key: Option<String>) -> CoreResult<DeliveryRunDto> {
+pub async fn cancel_run(
+    db: &DepotDb,
+    run_id: i64,
+    closed_key: Option<String>,
+) -> CoreResult<DeliveryRunDto> {
     require_current_actor_permission(Permission::DeliveryRunsManage)?;
     let (_guard, mut tx) = db.begin_write().await?;
     let status = run_status_tx(&mut tx, run_id).await?;
@@ -397,7 +399,10 @@ pub async fn list_runs(db: &DepotDb) -> CoreResult<Vec<DeliveryRunDto>> {
     )
     .fetch_all(&mut *tx)
     .await?;
-    let out = rows.iter().map(run_from_row).collect::<Result<Vec<_>, _>>()?;
+    let out = rows
+        .iter()
+        .map(run_from_row)
+        .collect::<Result<Vec<_>, _>>()?;
     tx.commit().await?;
     Ok(out)
 }
@@ -438,18 +443,15 @@ async fn run_status_tx(tx: &mut Transaction<'_, Sqlite>, run_id: i64) -> CoreRes
 }
 
 async fn stop_ids_tx(tx: &mut Transaction<'_, Sqlite>, run_id: i64) -> CoreResult<Vec<i64>> {
-    Ok(sqlx::query_scalar(
-        "SELECT id FROM delivery_run_stops WHERE run_id = ? ORDER BY sequence",
+    Ok(
+        sqlx::query_scalar("SELECT id FROM delivery_run_stops WHERE run_id = ? ORDER BY sequence")
+            .bind(run_id)
+            .fetch_all(&mut **tx)
+            .await?,
     )
-    .bind(run_id)
-    .fetch_all(&mut **tx)
-    .await?)
 }
 
-async fn load_run_tx(
-    tx: &mut Transaction<'_, Sqlite>,
-    run_id: i64,
-) -> CoreResult<DeliveryRunDto> {
+async fn load_run_tx(tx: &mut Transaction<'_, Sqlite>, run_id: i64) -> CoreResult<DeliveryRunDto> {
     let row = sqlx::query(
         "SELECT dr.id, dr.reference, dr.run_date, dr.driver_user_id, u.display_name AS driver_name,
                 dr.vehicle_label, dr.status, dr.planned_stops, dr.opened_at, dr.closed_at, dr.notes
