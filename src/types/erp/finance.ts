@@ -15,6 +15,25 @@ export interface CashSession {
   closing_notes: string | null;
 }
 
+/**
+ * Une tournée dont l'argent est encore dans le sac du livreur.
+ *
+ * Cet argent n'est PAS en caisse : il est en transit. Il est affiché dans
+ * l'état de caisse pour répondre à « où est passé l'argent encaissé ce
+ * matin ? », et délibérément exclu du théorique du tiroir.
+ */
+export interface RunInTransit {
+  runId: number;
+  reference: string;
+  runDate: string;
+  driverName: string;
+  status: string;
+  declaredAmount: number;
+  expectedAmount: number;
+  declaredStops: number;
+  plannedStops: number;
+}
+
 export interface CashStatus {
   activeSession: CashSession | null;
   summary: {
@@ -40,6 +59,8 @@ export interface CashStatus {
     }>;
   } | null;
   history: CashSession[];
+  /** Argent en transit, hors caisse. Vide s'il n'y a pas de tournée partie. */
+  runsInTransit?: RunInTransit[];
 }
 
 export interface PaymentMethodConfig {

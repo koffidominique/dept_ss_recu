@@ -11,6 +11,7 @@ import { useConnectionState } from '../features/dashboard/hooks/useConnectionSta
 import { formatDateTime, formatFcfa } from '../utils/format.ts';
 import { useCashMutations, useCashQuery } from '../features/cash/hooks/useCashData.ts';
 import { CashSummaryCards } from '../features/cash/components/CashSummaryCards.tsx';
+import { CashInTransitPanel } from '../features/cash/components/CashInTransitPanel.tsx';
 import { CashMovementsTable } from '../features/cash/components/CashMovementsTable.tsx';
 import { CashSessionsTable } from '../features/cash/components/CashSessionsTable.tsx';
 import { OpenCashModal } from '../features/cash/components/OpenCashModal.tsx';
@@ -152,6 +153,11 @@ export function CashPage() {
           </button>
         )}
       </div>
+
+      {/* Hors caisse, et volontairement avant les cartes de synthèse : si un
+          livreur est sur la route, c'est la première question que se pose le
+          gérant en ouvrant cet écran. */}
+      <CashInTransitPanel runs={data?.runsInTransit} />
 
       {activeSession && summary && (
         <>
