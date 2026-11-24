@@ -605,18 +605,20 @@ pub async fn reconcile_run(
                 run_id,
                 returnable_id,
                 good,
-                "entry",
                 &format!("Retour tournée {reference} : {good} pièces en bon état"),
             )
             .await?;
         }
         if damaged > 0 {
-            add_returnable_stock_tx(
+            // Une piece abimee n'entre PAS dans le stock reutilisable : elle est
+            // constatee en casse, avec un avant/apres identique puisque le stock
+            // ne bouge pas. Compter la casse comme une entree ferait apparaitre
+            // des casiers utilisables qui n'existent pas.
+            record_breakage_tx(
                 &mut tx,
                 run_id,
                 returnable_id,
                 damaged,
-                "breakage",
                 &format!("Retour tournée {reference} : {damaged} pièces abîmées"),
             )
             .await?;
@@ -701,13 +703,60 @@ async fn ensure_stop_in_run_tx(
     Ok(())
 }
 
+/// Constate une casse : journalise le mouvement SANS toucher au stock.
+///
+/// `returnable_stock_movements.quantity` doit être > 0, et `stock_after` porte
+/// l'état réel du stock. Une pièce cassée ne rentre donc nulle part : elle est
+/// seulement tracée, ce qui est exactement ce qu'on veut savoir.
+async fn record_breakage_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    run_id: i64,
+    returnable_id: i64,
+    pieces: i64,
+    reason: &str,
+) -> CoreResult<()> {
+    let stock: i64 = sqlx::query_scalar(
+        "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances
+                          WHERE packaging_id = ?), 0)",
+    )
+    .bind(returnable_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let unit_value: i64 =
+        sqlx::query_scalar("SELECT deposit_value FROM returnable_packaging_types WHERE id = ?")
+            .bind(returnable_id)
+            .fetch_one(&mut **tx)
+            .await?;
+
+    sqlx::query(
+        "INSERT INTO returnable_stock_movements
+            (request_key, packaging_id, movement_type, quantity, stock_before, stock_after,
+             reason, reference_document, unit_deposit_value, total_value)
+         VALUES (?, ?, 'breakage', ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(request_key) DO NOTHING",
+    )
+    .bind(format!("dr-brk:{run_id}:{returnable_id}"))
+    .bind(returnable_id)
+    .bind(pieces)
+    .bind(stock)
+    .bind(stock)
+    .bind(reason)
+    .bind(format!("TRN-{run_id}"))
+    .bind(unit_value)
+    .bind(pieces * unit_value)
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(())
+}
+
 /// Ajoute des pièces au stock de vides et journalise le mouvement.
 async fn add_returnable_stock_tx(
     tx: &mut Transaction<'_, Sqlite>,
     run_id: i64,
     returnable_id: i64,
     pieces: i64,
-    movement_type: &str,
     reason: &str,
 ) -> CoreResult<()> {
     let before: i64 = sqlx::query_scalar(
@@ -734,22 +783,17 @@ async fn add_returnable_stock_tx(
             .fetch_one(&mut **tx)
             .await?;
 
-    let movement_key = if movement_type == "breakage" {
-        format!("dr-brk:{run_id}:{returnable_id}")
-    } else {
-        format!("dr-ret:{run_id}:{returnable_id}")
-    };
+    let movement_key = format!("dr-ret:{run_id}:{returnable_id}");
 
     sqlx::query(
         "INSERT INTO returnable_stock_movements
             (request_key, packaging_id, movement_type, quantity, stock_before, stock_after,
              reason, reference_document, unit_deposit_value, total_value)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, 'entry', ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(request_key) DO NOTHING",
     )
     .bind(&movement_key)
     .bind(returnable_id)
-    .bind(movement_type)
     .bind(pieces)
     .bind(before)
     .bind(after)

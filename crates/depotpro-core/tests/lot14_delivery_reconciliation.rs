@@ -547,8 +547,8 @@ async fn reconciliation_is_idempotent_and_terminal() {
     assert_eq!(first.declared_gap, 0);
     assert_eq!(first.cash_gap, 0);
 
-    // Rejouer ne doit pas ecrire un second mouvement.
-    mark_returned(&db, run_id).await;
+    // Rejouer ne doit pas ecrire un second mouvement. Pas de mark_returned :
+    // la tournee est deja reconciliee, statut terminal.
     let second = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -808,6 +808,30 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
         .await
         .unwrap();
     mark_delivered(&db, run_id, stop_id).await;
+    // L'arret du client B n'est pas livre, mais il doit porter un constat :
+    // on ne rentre pas d'une tournee dont un arret est reste 'planned'.
+    let stop_b: i64 = sqlx::query_scalar(
+        "SELECT id FROM delivery_run_stops WHERE run_id = ? AND client_id = ?",
+    )
+    .bind(run_id)
+    .bind(client_b)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    auth::with_actor(
+        owner(),
+        delivery_reconciliation::record_stop_outcome(
+            &db,
+            run_id,
+            RecordStopOutcomeInput {
+                stop_id: stop_b,
+                status: "skipped".into(),
+                failure_reason: Some("Pas de vide à reprendre".into()),
+            },
+        ),
+    )
+    .await
+    .unwrap();
     open_session(&db).await;
 
     // Le livreur rapporte 2 vides, repris chez A uniquement.
