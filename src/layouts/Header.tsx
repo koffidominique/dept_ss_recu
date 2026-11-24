@@ -10,6 +10,7 @@ import { useUiStore } from '../stores/uiStore.ts';
 import { resolveTopicIdFromPath } from '../data/businessTips.ts';
 import { GlobalSearchModal } from '../components/common/GlobalSearchModal.tsx';
 import { HeaderActions } from './HeaderActions.tsx';
+import { hasPermission, PERMISSIONS } from '../features/quality/utils/permissions.ts';
 
 /* ============================================================================
  * En-tête applicatif principal (fil d'Ariane, raccourcis clavier & état global)
@@ -80,9 +81,20 @@ export function Header({ onOpenMobileMenu }: { onOpenMobileMenu?: () => void } =
   const title = PAGE_TITLES[location.pathname] ?? 'DEPOTPRO ERP';
   const topicId = resolveTopicIdFromPath(location.pathname);
 
+  // Le bandeau ne doit demander que ce que l'utilisateur a le droit de lire.
+  //
+  // Un livreur ne porte que `DeliveryRunsRead` et `DeliveryRunsExecute` : ni
+  // `CashRead`, ni `ReportsRead`. L'en-tête appelait pourtant `/api/cash` et
+  // `/api/dashboard` toutes les trente secondes pour lui, et encaissait deux
+  // 403 à répétition — dans la console, à chaque écran, indéfiniment. Les deux
+  // pastilles concernées ne s'affichent déjà que pour qui peut les lire.
+  const canReadCash = hasPermission(currentUser, PERMISSIONS.cashRead);
+  const canReadReports = hasPermission(currentUser, PERMISSIONS.reportsRead);
+
   const { data: cash } = useQuery({
     queryKey: ['cash'],
     queryFn: () => apiClient.getCashStatus(),
+    enabled: canReadCash,
     refetchInterval: 30000,
   });
 
@@ -92,6 +104,7 @@ export function Header({ onOpenMobileMenu }: { onOpenMobileMenu?: () => void } =
       typeof apiClient.getDashboard === 'function'
         ? apiClient.getDashboard().catch(() => null)
         : Promise.resolve(null),
+    enabled: canReadReports,
     refetchInterval: 60000,
   });
 

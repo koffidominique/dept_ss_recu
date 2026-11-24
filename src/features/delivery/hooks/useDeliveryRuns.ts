@@ -1,4 +1,6 @@
 import { useMemo, useRef } from 'react';
+import { useUiStore } from '../../../stores/uiStore.ts';
+import { hasPermission, PERMISSIONS } from '../../quality/utils/permissions.ts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../services/api/createApiClient.ts';
 import { createIdempotentRequestTracker } from '../../inventory/utils/phase2OperationsGuards.ts';
@@ -29,6 +31,12 @@ const KEYS = {
 };
 
 export function useDeliveryRunsQueries(selectedId: number | null) {
+  const currentUser = useUiStore((s) => s.currentUser);
+  // `/api/settings` exige `SettingsRead`, que le livreur n'a pas : la liste des
+  // moyens de paiement ne lui est pas ouverte. La modale retombe alors sur
+  // « Espèces », ce qu'il utilise de toute façon.
+  const canReadSettings = hasPermission(currentUser, PERMISSIONS.settingsRead);
+
   const runsQuery = useQuery({
     queryKey: KEYS.runs,
     queryFn: () => apiClient.listDeliveryRuns(),
@@ -52,9 +60,14 @@ export function useDeliveryRunsQueries(selectedId: number | null) {
     enabled: selectedId !== null && isReconcilableForReading(detailQuery.data?.run.status),
   });
 
+  // Les moyens de paiement actifs ne servent qu'à déclarer un encaissement,
+  // donc à qui peut exécuter. Le livreur y a droit ; en revanche un compte qui
+  // ne pourrait ni déclarer ni préparer n'a rien à faire de cette lecture — et
+  // `/api/settings` est refusé sans `CashRead`, qu'il n'a pas forcément.
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: () => apiClient.getSettings(),
+    enabled: canReadSettings,
   });
 
   const activeMethods = useMemo(

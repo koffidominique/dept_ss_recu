@@ -89,10 +89,13 @@ export function DeliveryRunsPage() {
   // lui produisait huit 403 dans la console à chaque ouverture de l'écran,
   // pour des données qu'il ne peut pas voir. L'écran s'affiche sans elles.
   const canPrepare = canManage;
+  // La liste des utilisateurs est réservée à `SecurityManageUsers` : seul
+  // l'écran de création en a besoin, et il n'est déjà montré qu'à qui prépare.
+  const canListUsers = hasPermission(currentUser, PERMISSIONS.securityManageUsers);
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: () => apiClient.listUsers(),
-    enabled: canPrepare,
+    enabled: canListUsers,
   });
   const clientsQuery = useQuery({
     queryKey: ['clients'],
