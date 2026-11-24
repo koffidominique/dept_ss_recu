@@ -44,6 +44,7 @@ import type {
   DeliveryRunStatus,
   DeliveryRunStop,
 } from '../types/erp.ts';
+import type { CustomerOrderSummary } from '../types/erp/orders.ts';
 
 /* ============================================================================
  * Écran Tournées de livraison
@@ -85,6 +86,12 @@ export function DeliveryRunsPage() {
   const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.listClients(),
+  });
+  // Commandes à rattacher à un arrêt. La modale ne garde que celles du client
+  // choisi qui restent à encaisser : c'est cette somme qui devient l'attendu.
+  const ordersQuery = useQuery({
+    queryKey: ['customer-orders-for-runs'],
+    queryFn: () => apiClient.listCustomerOrders(),
   });
   const returnablesQuery = useQuery({
     queryKey: ['consignments'],
@@ -144,6 +151,8 @@ export function DeliveryRunsPage() {
           canExecute={canExecute}
           canReconcile={canReconcile}
           clients={clientsQuery.data ?? []}
+          orders={ordersQuery.data ?? []}
+          ordersPending={ordersQuery.isLoading}
           returnables={
             ((returnablesQuery.data?.types ?? []) as unknown as ReturnableType[]).map((t) => ({
               id: t.id,
@@ -335,6 +344,8 @@ function RunDetail({
   canExecute,
   canReconcile,
   clients,
+  orders,
+  ordersPending,
   returnables,
   activeMethods,
   setError,
@@ -348,6 +359,8 @@ function RunDetail({
   canExecute: boolean;
   canReconcile: boolean;
   clients: Client[];
+  orders: CustomerOrderSummary[];
+  ordersPending: boolean;
   returnables: Array<{ id: number; name: string }>;
   activeMethods: Array<{ code: string; label: string }>;
   setError: (msg: string | null) => void;
@@ -566,6 +579,8 @@ function RunDetail({
         onOpenChange={setStopModalOpen}
         clients={clients}
         existingStops={stops}
+        orders={orders}
+        ordersPending={ordersPending}
         error={null}
         isPending={mutations.addStopMut.isPending}
         onSubmit={(payload) => {

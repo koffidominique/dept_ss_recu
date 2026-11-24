@@ -125,6 +125,59 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     expect(clientRes.ok(), `création client : ${await clientRes.text()}`).toBeTruthy();
     const client = (await clientRes.json()) as { id: number; name: string };
 
+    // --- Une vraie commande à livrer ---------------------------------------
+    //
+    // Découverte en exécution : un arrêt sans commande a un attendu de 0, donc
+    // rien à déclarer — `register_collection` refuse un montant nul. Le
+    // parcours n'aurait alors plus rien à prouver. L'attendu d'un arrêt est
+    // `orders.total_to_collect_xof - orders.paid_xof` : il faut une commande.
+    const catsRes = await page.request.get('/api/categories', { headers: auth });
+    expect(catsRes.ok()).toBeTruthy();
+    const cats = (await catsRes.json()) as Array<{ id: number }>;
+
+    const productRes = await page.request.post('/api/products', {
+      headers: auth,
+      data: {
+        name: 'Bock Tournée E2E',
+        category_id: cats[0].id,
+        base_unit: 'bouteille',
+        initial_stock: 200,
+        purchase_price: 300,
+        wholesale_price: 400,
+        retail_price: 400,
+        sku: 'BOCK-TRN-E2E',
+        variant: {
+          name: 'Bock Tournée E2E',
+          sku: 'BOCK-TRN-E2E-VAR',
+          volume_ml: 330,
+          container_type: 'glass_returnable',
+          container_returnable: true,
+        },
+      },
+    });
+    expect(productRes.ok(), `création produit : ${await productRes.text()}`).toBeTruthy();
+    const { variant_id: variantId } = (await productRes.json()) as { variant_id: number };
+
+    const orderRes = await page.request.post('/api/orders', {
+      headers: auth,
+      data: {
+        customer_id: client.id,
+        order_type: 'mixte',
+        // 12 bouteilles à 400 FCFA = 4 800, rien de payé d'avance : le livreur
+        // a donc 4 800 à encaisser chez le client.
+        lines: [
+          {
+            variant_id: variantId,
+            requested_unit: 'bouteille',
+            requested_quantity: 12,
+          },
+        ],
+      },
+    });
+    expect(orderRes.ok(), `création commande : ${await orderRes.text()}`).toBeTruthy();
+    const order = (await orderRes.json()) as { id: number; total_to_collect_xof: number };
+    expect(order.total_to_collect_xof).toBeGreaterThan(0);
+
     // --- L'écran des tournées est joignable --------------------------------
     await page.goto('/delivery-runs');
     await expect(
@@ -149,6 +202,10 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     await page.getByRole('button', { name: 'Arrêt', exact: true }).click();
     const stopDialog = page.getByRole('dialog');
     await stopDialog.getByLabel('Client *').selectOption(String(client.id));
+    // Le rattachement de la commande est ce qui donne un attendu à l'arrêt.
+    // Il manquait à l'écran : une tournée entière pouvait donc n'avoir rien
+    // à encaisser, et la déclaration était refusée côté cœur.
+    await stopDialog.getByLabel('Commande à livrer').selectOption(String(order.id));
     // L'apostrophe de l'interface est typographique (’) : une expression
     // régulière évite de dépendre du caractère exact.
     await stopDialog.getByRole('button', { name: /Ajouter l.arrêt/ }).click();
