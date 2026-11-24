@@ -466,6 +466,17 @@ async fn load_run_tx(tx: &mut Transaction<'_, Sqlite>, run_id: i64) -> CoreResul
     run_from_row(&row)
 }
 
+/// Relecture d'une tournee dans une transaction existante.
+///
+/// Expose pour le module de reconciliation, qui change le statut puis doit
+/// renvoyer le meme DTO sans ouvrir une seconde transaction.
+pub(crate) async fn get_run_dto_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    run_id: i64,
+) -> CoreResult<DeliveryRunDto> {
+    load_run_tx(tx, run_id).await
+}
+
 async fn load_run_detail_tx(
     tx: &mut Transaction<'_, Sqlite>,
     run_id: i64,

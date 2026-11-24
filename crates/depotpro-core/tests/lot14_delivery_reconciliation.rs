@@ -231,6 +231,13 @@ async fn mark_delivered(db: &DepotDb, run_id: i64, stop_id: i64) {
     .unwrap();
 }
 
+/// Declare la tournee revenue : prerequis de toute reconciliation.
+async fn mark_returned(db: &DepotDb, run_id: i64) {
+    auth::with_actor(owner(), delivery_reconciliation::return_run(db, run_id))
+        .await
+        .unwrap();
+}
+
 async fn open_session(db: &DepotDb) {
     cash::open_cash_session(
         db,
@@ -414,6 +421,7 @@ async fn reconciliation_writes_the_counted_amount_not_the_declared_one() {
     .await
     .unwrap();
 
+    mark_returned(&db, run_id).await;
     let result = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -469,6 +477,7 @@ async fn a_gap_without_a_reason_is_refused() {
     open_session(&db).await;
 
     // Rien n'est declare : ecart declare − attendu = −4 600.
+    mark_returned(&db, run_id).await;
     let err = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -490,7 +499,10 @@ async fn a_gap_without_a_reason_is_refused() {
         .fetch_one(&db.pool)
         .await
         .unwrap();
-    assert_eq!(status, "in_progress", "le refus n'écrit rien");
+    assert_eq!(
+        status, "returned",
+        "le refus laisse la tournée revenue, prête dès que le motif est donné"
+    );
 }
 
 #[tokio::test]
@@ -516,6 +528,7 @@ async fn reconciliation_is_idempotent_and_terminal() {
     .await
     .unwrap();
 
+    mark_returned(&db, run_id).await;
     let first = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -535,6 +548,7 @@ async fn reconciliation_is_idempotent_and_terminal() {
     assert_eq!(first.cash_gap, 0);
 
     // Rejouer ne doit pas ecrire un second mouvement.
+    mark_returned(&db, run_id).await;
     let second = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -586,6 +600,7 @@ async fn reconciliation_requires_an_open_cash_session() {
     let (run_id, stop_id) = started_run(&db, client_a, driver_id, "nosess", 10_600, 6_000).await;
     mark_delivered(&db, run_id, stop_id).await;
 
+    mark_returned(&db, run_id).await;
     let err = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -610,14 +625,46 @@ async fn expected_ignores_stops_that_were_not_delivered() {
     let db = fresh_db("not_delivered").await;
     let (client_a, _b, driver_id, _r) = seed(&db).await;
 
-    // Deux arrets : un livre a 4 600, un en echec a 3 000.
-    let first = started_run(&db, client_a, driver_id, "multi", 10_600, 6_000).await;
+    // Deux arrets construits AVANT le depart : un livre a 4 600, un en echec.
+    // Ajouter un arret apres le depart est refuse par conception, donc la
+    // tournee se prepare en entier puis part.
+    let order_one = make_order(&db, client_a, "ORD-multi-1", 10_600, 6_000).await;
     let order_two = make_order(&db, client_a, "ORD-multi-2", 3_000, 0).await;
+    let run = auth::with_actor(
+        owner(),
+        delivery_runs::create_run(
+            &db,
+            CreateRunInput {
+                run_date: "2026-11-24".into(),
+                driver_user_id: driver_id,
+                vehicle_label: None,
+                request_key: Some("k-multi".into()),
+                notes: None,
+            },
+        ),
+    )
+    .await
+    .unwrap();
+    let detail = auth::with_actor(
+        owner(),
+        delivery_runs::add_stop(
+            &db,
+            run.id,
+            AddStopInput {
+                client_id: client_a,
+                order_id: Some(order_one),
+                sequence: None,
+            },
+        ),
+    )
+    .await
+    .unwrap();
+    let first = (run.id, detail.stops[0].id);
     auth::with_actor(
         owner(),
         delivery_runs::add_stop(
             &db,
-            first.0,
+            run.id,
             AddStopInput {
                 client_id: client_a,
                 order_id: Some(order_two),
@@ -627,22 +674,15 @@ async fn expected_ignores_stops_that_were_not_delivered() {
     )
     .await
     .unwrap();
-
-    // Le deuxieme arret est ajoute apres le chargement : on recharge pour figer
-    // son attendu et on repart (load_run est idempotent, start_run aussi).
-    auth::with_actor(owner(), delivery_runs::load_run(&db, first.0))
+    let stop_two: i64 = {
+        let d = auth::with_actor(owner(), delivery_runs::load_run(&db, run.id))
+            .await
+            .unwrap();
+        d.stops.last().unwrap().id
+    };
+    auth::with_actor(owner(), delivery_runs::start_run(&db, run.id))
         .await
         .unwrap();
-    auth::with_actor(owner(), delivery_runs::start_run(&db, first.0))
-        .await
-        .unwrap();
-    let stop_two: i64 = sqlx::query_scalar(
-        "SELECT id FROM delivery_run_stops WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
-    )
-    .bind(first.0)
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
 
     mark_delivered(&db, first.0, first.1).await;
     auth::with_actor(
@@ -676,6 +716,7 @@ async fn expected_ignores_stops_that_were_not_delivered() {
     .await
     .unwrap();
 
+    mark_returned(&db, first.0).await;
     let result = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -711,14 +752,46 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
     let issue_a = make_issue(&db, client_a, returnable_id, 2).await;
     let issue_b = make_issue(&db, client_b, returnable_id, 5).await;
 
-    let (run_id, stop_id) = started_run(&db, client_a, driver_id, "empt", 10_600, 6_000).await;
-    // Client B doit aussi figurer dans la tournee pour pouvoir y rapporter ses vides.
+    // Les deux clients figurent dans la tournee : un arret apres le depart
+    // serait refuse, donc on construit tout avant.
+    let order_a = make_order(&db, client_a, "ORD-empt-A", 10_600, 6_000).await;
     let order_b = make_order(&db, client_b, "ORD-empt-B", 2_000, 0).await;
+    let run = auth::with_actor(
+        owner(),
+        delivery_runs::create_run(
+            &db,
+            CreateRunInput {
+                run_date: "2026-11-24".into(),
+                driver_user_id: driver_id,
+                vehicle_label: None,
+                request_key: Some("k-empt".into()),
+                notes: None,
+            },
+        ),
+    )
+    .await
+    .unwrap();
+    let detail = auth::with_actor(
+        owner(),
+        delivery_runs::add_stop(
+            &db,
+            run.id,
+            AddStopInput {
+                client_id: client_a,
+                order_id: Some(order_a),
+                sequence: None,
+            },
+        ),
+    )
+    .await
+    .unwrap();
+    let run_id = run.id;
+    let stop_id = detail.stops[0].id;
     auth::with_actor(
         owner(),
         delivery_runs::add_stop(
             &db,
-            run_id,
+            run.id,
             AddStopInput {
                 client_id: client_b,
                 order_id: Some(order_b),
@@ -729,6 +802,9 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
     .await
     .unwrap();
     auth::with_actor(owner(), delivery_runs::load_run(&db, run_id))
+        .await
+        .unwrap();
+    auth::with_actor(owner(), delivery_runs::start_run(&db, run_id))
         .await
         .unwrap();
     mark_delivered(&db, run_id, stop_id).await;
@@ -773,6 +849,7 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
     .await
     .unwrap();
 
+    mark_returned(&db, run_id).await;
     let result = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -857,6 +934,7 @@ async fn damaged_empties_are_recorded_as_breakage_not_stock() {
     .await
     .unwrap();
 
+    mark_returned(&db, run_id).await;
     let result = auth::with_actor(
         owner(),
         delivery_reconciliation::reconcile_run(
@@ -946,6 +1024,7 @@ async fn a_driver_cannot_reconcile() {
     mark_delivered(&db, run_id, stop_id).await;
     open_session(&db).await;
 
+    mark_returned(&db, run_id).await;
     let err = auth::with_actor(
         driver(),
         delivery_reconciliation::reconcile_run(

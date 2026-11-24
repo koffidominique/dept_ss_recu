@@ -38,6 +38,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Row, Sqlite, Transaction};
 
 use crate::application::auth::{require_current_actor_permission, Permission};
+use crate::application::delivery_runs::{self, DeliveryRunDto};
 use crate::application::packaging_returns::settle_deposit_issues_tx;
 use crate::application::sales::require_open_session_tx;
 use crate::error::{CoreError, CoreResult};
@@ -397,6 +398,57 @@ pub async fn record_run_return(
 
     tx.commit().await?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ② bis — Retour de la tournée
+// ---------------------------------------------------------------------------
+
+/// Clôt le retour : `in_progress` -> `returned`.
+///
+/// Refuse si un arrêt est encore `planned` : on ne rentre pas d'une tournée dont
+/// on ne sait pas ce qui s'est passé à chaque arrêt. C'est la seule garde qui
+/// empêche un écart inexplicable le soir.
+///
+/// Le passage est idempotent : rappeler `return_run` sur une tournée déjà
+/// revenue renvoie le DTO sans rien changer.
+pub async fn return_run(db: &DepotDb, run_id: i64) -> CoreResult<DeliveryRunDto> {
+    require_current_actor_permission(Permission::DeliveryRunsManage)?;
+    let (_guard, mut tx) = db.begin_write().await?;
+
+    let status = run_status_tx(&mut tx, run_id).await?;
+    if status == "returned" {
+        let dto = delivery_runs::get_run_dto_tx(&mut tx, run_id).await?;
+        tx.commit().await?;
+        return Ok(dto);
+    }
+    if status != "in_progress" {
+        return Err(CoreError::Validation(format!(
+            "Seule une tournée en cours peut être déclarée revenue (statut actuel : {status})."
+        )));
+    }
+
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM delivery_run_stops WHERE run_id = ? AND status = 'planned'",
+    )
+    .bind(run_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if pending > 0 {
+        return Err(CoreError::Validation(format!(
+            "{pending} arrêt(s) sans constat : indiquez pour chacun s'il a été livré, \
+             manqué ou sauté. Sans cela, l'écart du soir serait inexplicable."
+        )));
+    }
+
+    sqlx::query("UPDATE delivery_runs SET status = 'returned' WHERE id = ?")
+        .bind(run_id)
+        .execute(&mut *tx)
+        .await?;
+
+    let dto = delivery_runs::get_run_dto_tx(&mut tx, run_id).await?;
+    tx.commit().await?;
+    Ok(dto)
 }
 
 // ---------------------------------------------------------------------------
