@@ -277,12 +277,16 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     ).toBeVisible();
     await expect(recDialog.getByLabel('Montant compté dans le sac *')).toBeVisible();
 
-    // Le champ est pré-rempli avec le déclaré par le livreur (4 800) : on ne
-    // le touche pas, et on vérifie que la modale l'a bien repris. C'est ce qui
-    // garantit « aucun écart, donc aucun motif à saisir » — mettre 0 aurait
-    // créé un manquant de 4 800 et exigé un motif, que ce scénario ne saisit
-    // pas.
-    await expect(recDialog.getByLabel('Montant compté dans le sac *')).toHaveValue('4800');
+    // Le champ est pré-rempli avec le déclaré par le livreur, et on ne le
+    // touche pas : aucun écart, donc aucun motif à saisir.
+    //
+    // On ne fige surtout pas le montant. Il vaut 5 800 et non 4 800 : la
+    // commande de 12 bouteilles a alloué un casier, dont la consigne de
+    // 1 000 FCFA entre aussi dans le reste à encaisser. Un nombre écrit à la
+    // main dans le test aurait été faux pour la deuxième fois.
+    const countedField = recDialog.getByLabel('Montant compté dans le sac *');
+    const countedAmount = Number(await countedField.inputValue());
+    expect(countedAmount, 'le compté reprend le déclaré, donc il est positif').toBeGreaterThan(0);
     await recDialog.getByRole('button', { name: 'Réconcilier et encaisser' }).click();
     await expect(page.getByText('Réconciliée').first()).toBeVisible();
 
@@ -293,6 +297,18 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
     const ourRun = runs.find((r) => r.reference.startsWith('TRN-'));
     expect(ourRun, 'la tournée doit être listée').toBeTruthy();
     expect(ourRun!.status).toBe('reconciled');
+
+    // Et l'écart constaté est nul : le compté saisi était le déclaré.
+    const recRes = await page.request.get(`/api/delivery-runs/${ourRun!.id}/reconciliation`, {
+      headers: auth,
+    });
+    expect(recRes.ok()).toBeTruthy();
+    const reconciliation = (await recRes.json()) as {
+      counted_amount: number;
+      cash_gap: number;
+    };
+    expect(reconciliation.counted_amount).toBe(countedAmount);
+    expect(reconciliation.cash_gap).toBe(0);
 
     // --- Le livreur voit l'écran, et seulement en lecture ------------------
     await page.evaluate(() => sessionStorage.clear());
