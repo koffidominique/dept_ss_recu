@@ -365,6 +365,15 @@ pub async fn cancel_run(
         tx.commit().await?;
         return Ok(dto);
     }
+    // Trois statuts sont terminaux ou porteurs de constats : ils ont une sortie
+    // propre et ne s'annulent pas. Ce refus existait avant ce lot ; en
+    // réécrivant la garde ci-dessous, je l'avais supprimé, et le test de
+    // `lot13` l'a rattrapé.
+    if !matches!(status.as_str(), "draft" | "loaded" | "in_progress") {
+        return Err(CoreError::Validation(format!(
+            "Une tournee au statut {status} ne peut pas etre annulee : elle porte deja des constats."
+        )));
+    }
     if status != "draft" {
         // Une tournée chargée ou partie peut encore être annulée — mais pas si
         // le livreur a déjà déclaré de l'argent.

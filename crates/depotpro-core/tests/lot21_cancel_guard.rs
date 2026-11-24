@@ -31,7 +31,8 @@ fn owner() -> SessionIdentity {
 }
 
 async fn fresh_db(tag: &str) -> DepotDb {
-    let path = std::env::temp_dir().join(format!("depotpro_lot21_{tag}_{}.db", uuid::Uuid::new_v4()));
+    let path =
+        std::env::temp_dir().join(format!("depotpro_lot21_{tag}_{}.db", uuid::Uuid::new_v4()));
     DepotDb::connect(&path).await.expect("connect")
 }
 
@@ -41,7 +42,8 @@ async fn seed(tag: &str) -> (DepotDb, i64) {
     let db = fresh_db(tag).await;
     let (_g, mut tx) = db.begin_write().await.unwrap();
     sqlx::query(
-        "INSERT INTO clients (code, name, client_type) VALUES ('CLI-21', 'Maquis Lot 21', 'professionnel')",
+        "INSERT INTO clients (code, name, client_type) \
+         VALUES ('CLI-21', 'Maquis Lot 21', 'professionnel')",
     )
     .execute(&mut *tx)
     .await
@@ -167,6 +169,30 @@ async fn an_in_progress_run_still_cancels_while_the_sack_is_empty() {
         .await
         .unwrap();
     assert_eq!(cancelled.status, "cancelled");
+}
+
+/// Une tournée revenue ne s'annule pas, même si le livreur n'a rien déclaré.
+///
+/// Ce refus existait avant ce lot. En réécrivant la garde sur les
+/// déclarations, je l'avais supprimé : une tournée `returned` sans
+/// encaissement redevenait annulable, alors qu'elle porte des constats que
+/// l'annulation rendrait invisibles. C'est le test de `lot13` qui l'a
+/// rattrapé ; celui-ci le fige ici, à côté de la règle qui l'avait cassé.
+#[tokio::test]
+async fn a_returned_run_never_cancels_even_without_any_declaration() {
+    let (db, run_id) = seed("returned").await;
+
+    sqlx::query("UPDATE delivery_runs SET status = 'returned' WHERE id = ?")
+        .bind(run_id)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+    let refused = auth::with_actor(owner(), delivery_runs::cancel_run(&db, run_id, None)).await;
+    assert!(
+        refused.is_err(),
+        "une tournée revenue porte des constats : elle ne s'annule pas"
+    );
 }
 
 /// Le cœur du trou, de bout en bout.

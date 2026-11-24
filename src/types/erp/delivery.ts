@@ -10,15 +10,11 @@
 
 /** Statuts d'une tournée, dans l'ordre du cycle de vie. */
 export type DeliveryRunStatus =
-  | "draft"
-  | "loaded"
-  | "in_progress"
-  | "returned"
-  | "reconciled"
-  | "cancelled";
+  "draft" | "loaded" | "in_progress" | "returned" | "reconciled" | "cancelled";
 
 /** Statut d'un arrêt. */
-export type DeliveryRunStopStatus = "planned" | "delivered" | "failed" | "skipped";
+export type DeliveryRunStopStatus =
+  "planned" | "delivered" | "failed" | "skipped";
 
 export interface DeliveryRun {
   id: number;

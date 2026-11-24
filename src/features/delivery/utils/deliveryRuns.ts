@@ -55,7 +55,7 @@ export interface RunActions {
 export function runActions(
   status: DeliveryRunStatus,
   stopCount: number,
-  declaredTotal = 0
+  declaredTotal = 0,
 ): RunActions {
   const editable = status === "draft" || status === "loaded";
   return {
@@ -95,8 +95,10 @@ export function runActions(
  * écarts. La restreindre à `reconciled` ouvrait une modale vide au moment
  * précis où le gérant en a besoin.
  */
-export function isReconcilableForReading(status: DeliveryRunStatus | undefined): boolean {
-  return status === 'returned' || status === 'reconciled';
+export function isReconcilableForReading(
+  status: DeliveryRunStatus | undefined,
+): boolean {
+  return status === "returned" || status === "reconciled";
 }
 
 /** Une tournée close ne se modifie plus : `reconciled` et `cancelled` sont terminaux. */
@@ -115,7 +117,9 @@ export function isTerminal(status: DeliveryRunStatus): boolean {
  * `skipped` — un arrêt non livré n'encaisse rien. On suit cette règle-là, pas
  * une plus stricte inventée côté écran.
  */
-export function canDeclareCollectionOn(stopStatus: DeliveryRunStop["status"]): boolean {
+export function canDeclareCollectionOn(
+  stopStatus: DeliveryRunStop["status"],
+): boolean {
   return stopStatus !== "failed" && stopStatus !== "skipped";
 }
 
@@ -134,7 +138,10 @@ export function canDeclareCollectionOn(stopStatus: DeliveryRunStop["status"]): b
  */
 export type RunActionPermission = "read" | "manage" | "execute" | "reconcile";
 
-export const RUN_ACTION_PERMISSION: Record<keyof RunActions, RunActionPermission> = {
+export const RUN_ACTION_PERMISSION: Record<
+  keyof RunActions,
+  RunActionPermission
+> = {
   canAddStop: "manage",
   canLoad: "manage",
   canStart: "manage", // et non "execute" : voir start_run
@@ -162,7 +169,8 @@ export function runBrief(run: DeliveryRun, stops: DeliveryRunStop[]): string {
   ];
   if (run.status === "in_progress" || run.status === "returned") {
     parts.push(`${delivered} livré${delivered > 1 ? "s" : ""}`);
-    if (pending > 0) parts.push(`${pending} non constaté${pending > 1 ? "s" : ""}`);
+    if (pending > 0)
+      parts.push(`${pending} non constaté${pending > 1 ? "s" : ""}`);
   }
   return parts.join(" · ");
 }
@@ -192,7 +200,12 @@ export function reconciliationGaps(rec: DeliveryReconciliation): GapLine[] {
     {
       label: "Écart de déclaration",
       value: rec.declared_gap,
-      tone: rec.declared_gap === 0 ? null : rec.declared_gap < 0 ? "danger" : "warning",
+      tone:
+        rec.declared_gap === 0
+          ? null
+          : rec.declared_gap < 0
+            ? "danger"
+            : "warning",
       explanation:
         rec.declared_gap === 0
           ? "Le livreur a déclaré exactement l'attendu."
@@ -271,19 +284,28 @@ export function allocationBlocker(
     byReturnable.set(r.returnable_id, cur);
   }
 
-  const allocatedByReturnable = new Map<number, { good: number; damaged: number }>();
+  const allocatedByReturnable = new Map<
+    number,
+    { good: number; damaged: number }
+  >();
   for (const a of allocated) {
     if (a.good_pieces < 0 || a.damaged_pieces < 0) {
       return "Les quantités réparties ne peuvent pas être négatives.";
     }
-    const cur = allocatedByReturnable.get(a.returnable_id) ?? { good: 0, damaged: 0 };
+    const cur = allocatedByReturnable.get(a.returnable_id) ?? {
+      good: 0,
+      damaged: 0,
+    };
     cur.good += a.good_pieces;
     cur.damaged += a.damaged_pieces;
     allocatedByReturnable.set(a.returnable_id, cur);
   }
 
   for (const [returnableId, got] of byReturnable) {
-    const given = allocatedByReturnable.get(returnableId) ?? { good: 0, damaged: 0 };
+    const given = allocatedByReturnable.get(returnableId) ?? {
+      good: 0,
+      damaged: 0,
+    };
     if (got.good !== given.good) {
       return `Vides en bon état : ${got.good} rapportés, ${given.good} répartis. Les deux doivent être égaux.`;
     }
@@ -336,6 +358,9 @@ export function buildCreateRunInput(
  * C'était confondre « peut exécuter un geste » et « peut être désigné comme
  * livreur d'une tournée ». Le cœur tranche : seul `driver`.
  */
-export function isDriverAccount(user: { active: boolean; role: string }): boolean {
+export function isDriverAccount(user: {
+  active: boolean;
+  role: string;
+}): boolean {
   return user.active && user.role === "driver";
 }
