@@ -125,10 +125,11 @@ async fn seed(db: &DepotDb) -> Fixture {
     .execute(&mut *tx)
     .await
     .unwrap();
-    let asset_id: i64 = sqlx::query_scalar("SELECT id FROM packaging_assets WHERE code = 'AST-RET'")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+    let asset_id: i64 =
+        sqlx::query_scalar("SELECT id FROM packaging_assets WHERE code = 'AST-RET'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
 
     sqlx::query(
         "INSERT INTO customer_deposit_balances
@@ -251,13 +252,12 @@ async fn returned_empties_settle_open_consignments_during_order_creation() {
     .await
     .unwrap();
 
-    let (status, returned): (String, i64) = sqlx::query_as(
-        "SELECT status, returned_pieces FROM deposit_issues WHERE client_id = ?",
-    )
-    .bind(fx.client_id)
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
+    let (status, returned): (String, i64) =
+        sqlx::query_as("SELECT status, returned_pieces FROM deposit_issues WHERE client_id = ?")
+            .bind(fx.client_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
 
     assert_eq!(returned, 3, "la consigne est soldée des 3 casiers rendus");
     assert_eq!(status, "settled");
@@ -330,12 +330,11 @@ async fn the_stock_of_empties_increases_by_what_was_returned() {
     .await
     .unwrap();
 
-    let stock: i64 =
-        sqlx::query_scalar("SELECT stock_empty FROM packaging_assets WHERE id = ?")
-            .bind(fx.asset_id)
-            .fetch_one(&db.pool)
-            .await
-            .unwrap();
+    let stock: i64 = sqlx::query_scalar("SELECT stock_empty FROM packaging_assets WHERE id = ?")
+        .bind(fx.asset_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
     assert_eq!(stock, 4, "les casiers rendus reviennent dans le parc vide");
 }
 

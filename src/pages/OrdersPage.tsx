@@ -52,6 +52,7 @@ export function OrdersPage() {
     setError,
     clients,
     deposits,
+    customerObligations,
     depositHistory,
     orders,
     variantOptions,

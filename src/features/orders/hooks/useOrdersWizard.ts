@@ -270,6 +270,9 @@ export function useOrdersWizard() {
         unit_price_xof: l.unit_price_xof,
       })),
       custom_allocations: null,
+      // On repart d'un brouillon propre : un retour saisi sur une commande
+      // precedente ne doit pas etre reapplique silencieusement a celle-ci.
+      returned_empties: [],
     });
     setStep(2);
   };

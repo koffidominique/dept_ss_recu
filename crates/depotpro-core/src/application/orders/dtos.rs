@@ -77,7 +77,7 @@ pub struct CreateOrderInput {
 }
 
 /// Un retour d'emballage vide saisi au comptoir pendant la commande.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReturnedEmptyInput {
     pub packaging_asset_id: i64,
     pub quantity: i64,
