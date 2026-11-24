@@ -173,7 +173,7 @@ async fn reconciling_without_a_stop_or_session_is_refused_over_http() {
         .unwrap();
 
     // Charger une tournée vide est refusé par le cœur, et le refus remonte en
-    // 422 (validation), pas en 500.
+    // 400 (VALIDATION_ERROR), pas en 500 : une erreur métier n'est pas une panne.
     let (st, msg) = send_http(
         addr,
         "POST",
@@ -182,7 +182,7 @@ async fn reconciling_without_a_stop_or_session_is_refused_over_http() {
         None,
     )
     .await;
-    assert_eq!(st, 422, "tournée vide refusée : {msg}");
+    assert_eq!(st, 400, "tournée vide refusée : {msg}");
 
     // Réconcilier une tournée au statut draft est refusé.
     let (st_rec, msg_rec) = send_http(
@@ -194,9 +194,12 @@ async fn reconciling_without_a_stop_or_session_is_refused_over_http() {
     )
     .await;
     assert_eq!(
-        st_rec, 422,
+        st_rec, 400,
         "réconciliation impossible en draft : {msg_rec}"
     );
+    // Le code applicatif reste distinct, c'est lui que le front lit.
+    let corps = serde_json::from_str::<serde_json::Value>(&msg_rec).unwrap();
+    assert_eq!(corps["code"], "VALIDATION_ERROR");
 }
 
 #[tokio::test]
