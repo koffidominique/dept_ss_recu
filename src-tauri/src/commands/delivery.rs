@@ -201,9 +201,12 @@ pub async fn reconcile_delivery_run(
 ) -> Result<serde_json::Value, String> {
     let actor = verify_desktop_perm(&state, &token, Permission::DeliveryRunsReconcile).await?;
     let db = state.db().await;
-    let res = auth::with_actor(actor, delivery_reconciliation::reconcile_run(&db, id, payload))
-        .await
-        .map_err(|e| e.to_string())?;
+    let res = auth::with_actor(
+        actor,
+        delivery_reconciliation::reconcile_run(&db, id, payload),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     serde_json::to_value(res).map_err(|e| e.to_string())
 }
 
