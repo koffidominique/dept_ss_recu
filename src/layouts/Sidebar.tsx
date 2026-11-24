@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   Repeat,
   Truck,
+  MapPinned,
   PackagePlus,
   Landmark,
   Receipt,
@@ -58,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/stock', label: 'Stocks', icon: Boxes },
       { to: '/inventories', label: 'Inventaires', icon: ClipboardCheck },
       { to: '/consignments', label: 'Retour emballages', icon: Repeat },
+      { to: '/delivery-runs', label: 'Tournées de livraison', icon: MapPinned },
     ],
   },
   {

@@ -72,6 +72,41 @@ export async function httpRequest<T>(path: string, init: RequestInit = {}): Prom
   return (await res.json()) as T;
 }
 
+/**
+ * Requête dont on n'attend aucun corps (statut 204).
+ *
+ * `httpRequest` termine par `res.json()`. Sur une réponse 204 sans corps, cela
+ * lève « Unexpected end of JSON input » : le transport le traduit alors en
+ * NETWORK_ERROR et l'écran affirme que l'écriture n'a pas été validée, alors
+ * que le serveur l'a bien enregistrée. Une fausse panne sur une opération
+ * réussie est pire qu'une vraie : l'utilisateur la rejoue.
+ *
+ * Les en-têtes, le jeton et la révocation sur 401 restent centralisés ici.
+ */
+export async function httpRequestVoid(path: string, init: RequestInit = {}): Promise<void> {
+  const headers = buildHeaders(init);
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+  } catch (err) {
+    throw normalizeFetchError(err);
+  }
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    useUiStore.getState().setToken(null);
+  }
+  if (res.ok) return;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const err = (await res.json()) as { code?: string; message?: string };
+    throw new ApiError(
+      err.code || 'API_ERROR',
+      redactSecrets(err.message || '') || 'Erreur lors de la requête.',
+      res.status
+    );
+  }
+  throw new ApiError('HTTP_ERROR', `Erreur HTTP ${res.status}`, res.status);
+}
+
 export async function httpRequestBytes(path: string, init: RequestInit = {}): Promise<Uint8Array> {
   const headers = buildHeaders(init);
   let res: Response;
