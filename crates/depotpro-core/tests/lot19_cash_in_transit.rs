@@ -132,6 +132,28 @@ async fn started_run(
     (run.id, stop_id)
 }
 
+/// Constate l'arrêt comme livré.
+///
+/// Le flux réel est : le gérant constate (arrêt -> `delivered`), puis le
+/// livreur déclare ce qu'il a encaissé. Déclarer sans constat laisse l'arrêt
+/// `planned`, et un arrêt `planned` ne compte pas dans l'attendu.
+async fn mark_delivered(db: &DepotDb, run_id: i64, stop_id: i64) {
+    auth::with_actor(
+        owner(),
+        delivery_reconciliation::record_stop_outcome(
+            db,
+            run_id,
+            RecordStopOutcomeInput {
+                stop_id,
+                status: "delivered".into(),
+                failure_reason: None,
+            },
+        ),
+    )
+    .await
+    .unwrap();
+}
+
 async fn declare(db: &DepotDb, run_id: i64, stop_id: i64, amount: i64) {
     auth::with_actor(
         driver(),
@@ -159,6 +181,7 @@ async fn declared_money_shows_up_in_transit() {
     let (client_id, driver_id) = seed(&db).await;
     let (run_id, stop_id) = started_run(&db, client_id, driver_id, 4_600, "show").await;
 
+    mark_delivered(&db, run_id, stop_id).await;
     declare(&db, run_id, stop_id, 4_600).await;
 
     let status = auth::with_actor(owner(), cash::get_cash_status(&db))
@@ -202,6 +225,7 @@ async fn transit_money_never_enters_the_theoretical_cash() {
         .unwrap();
     let theoretical_before = before.summary.as_ref().map(|s| s.theoretical_cash).unwrap();
 
+    mark_delivered(&db, run_id, stop_id).await;
     declare(&db, run_id, stop_id, 4_600).await;
 
     let after = auth::with_actor(owner(), cash::get_cash_status(&db))
@@ -224,6 +248,7 @@ async fn a_returned_run_leaves_the_transit_list() {
     let db = fresh_db("retour").await;
     let (client_id, driver_id) = seed(&db).await;
     let (run_id, stop_id) = started_run(&db, client_id, driver_id, 4_600, "retour").await;
+    mark_delivered(&db, run_id, stop_id).await;
     declare(&db, run_id, stop_id, 4_600).await;
 
     auth::with_actor(
@@ -304,6 +329,7 @@ async fn a_failed_stop_counts_in_neither_expected_nor_declared() {
         .await
         .unwrap();
 
+    mark_delivered(&db, run_id, stop_a).await;
     declare(&db, run_id, stop_a, 4_600).await;
     auth::with_actor(
         owner(),
@@ -343,6 +369,7 @@ async fn transit_is_readable_without_an_open_cash_session() {
     let db = fresh_db("sanssession").await;
     let (client_id, driver_id) = seed(&db).await;
     let (run_id, stop_id) = started_run(&db, client_id, driver_id, 4_600, "sanssession").await;
+    mark_delivered(&db, run_id, stop_id).await;
     declare(&db, run_id, stop_id, 4_600).await;
 
     let status = auth::with_actor(owner(), cash::get_cash_status(&db))
