@@ -23,6 +23,13 @@ function trackRuntimeErrors(page: Page): string[] {
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
   });
+  // Le message de console dit « 403 » sans dire sur quoi. Sans l'URL, on ne
+  // peut que deviner quelle requête est refusée — ce qui a déjà coûté deux
+  // itérations. On enregistre donc l'URL à côté du refus, lisible dans le
+  // rapport d'échec.
+  page.on('response', (res) => {
+    if (res.status() === 403) errors.push(`403 ${res.request().method()} ${res.url()}`);
+  });
   return errors;
 }
 
