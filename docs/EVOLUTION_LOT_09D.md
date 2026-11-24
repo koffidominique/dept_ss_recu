@@ -109,58 +109,43 @@ chantier déjà livré.
 
 ---
 
-## 4. Le vrai problème du retour d'emballages, lui, est réel
+## 4. RECTIFICATION : le défaut que j'avais annoncé n'existe pas
 
-En cherchant la dépendance livrer/facturer, j'ai trouvé un défaut plus grave.
+J'ai écrit que `return_order_packaging` ne mettait pas à jour `deposit_issues`,
+et j'ai présenté cela comme une double facturation potentielle. **C'est faux.**
 
-`return_order_packaging` (`orders/packaging_and_returns.rs:358`) met à jour :
+Le bloc existe, dans `apply_customer_empty_return_tx`
+(`orders/packaging_and_returns.rs:270-318`), et il est **plus complet** que ce que
+j'aurais écrit :
 
-- `order_packaging_allocations.returned_quantity` ;
-- `customer_deposit_balances` (via `load_customer_deposits`).
-
-Il **ne touche pas** :
-
-- `deposit_issues` ;
-- `customer_packaging_accounts`.
-
-Vérification :
-
+```rust
+"SELECT id, pieces, returned_pieces, lost_pieces + destroyed_pieces + converted_pieces
+ FROM deposit_issues
+ WHERE client_id = ? AND returnable_id = ?
+   AND status IN ('pending', 'partially_returned')
+ ORDER BY CASE WHEN ? IS NOT NULL AND sale_id = ? THEN 0 ELSE 1 END ASC,
+          COALESCE(due_date, '9999-12-31') ASC,
+          id ASC"
 ```
-grep "deposit_issues" orders/packaging_and_returns.rs  -> 0 occurrence dans return_order_packaging
-```
 
-**Conséquence concrète.** Un client rend 1 casier via la commande :
+Il fait exactement ce qu'il faut :
 
-| Table | Effet | Visible où |
-| --- | --- | --- |
-| `customer_deposit_balances` | −1 ✅ | **nulle part** (aucun écran ne la lit) |
-| `deposit_issues.returned_pieces` | inchangé ❌ | onglet « Consignes ouvertes » |
-| `customer_packaging_accounts` | inchangé ❌ | onglet « Soldes par client » |
+| Point | Traitement correct |
+| --- | --- |
+| Priorité à la vente de la commande | `CASE WHEN sale_id = ? THEN 0 ELSE 1` |
+| Exclut les pièces déjà sorties | `lost_pieces + destroyed_pieces + converted_pieces` |
+| Restant borné | `(pieces - returned - other_out).max(0)` |
+| Statut cohérent | `next_returned + other_out >= pieces` → `settled` |
 
-Le gérant rend le casier, et **les deux écrans qu'il consulte affichent encore
-la dette**. La dette ne diminue jamais. Au bout de 15 jours, l'échéance passée,
-la consigne est convertie en créance financière — pour un casier **déjà rendu**.
+**Pourquoi j'ai manqué ce bloc.** J'ai cherché `deposit_issues` dans
+`packaging_and_returns.rs` et j'ai restreint ma recherche à la plage de lignes de
+`return_order_packaging` (358+). Or le bloc vit dans la fonction utilitaire
+`apply_customer_empty_return_tx` (ligne 177), que `return_order_packaging` appelle.
+Chercher par numéro de ligne au lieu de chercher par nom de fonction : c'est
+exactement l'erreur que j'avais déjà consignée sur ce dépôt.
 
-C'est plus grave que la dépendance livrer/facturer : c'est une **double
-facturation** potentielle, à chaque retour par commande.
-
-### Pourquoi les tests ne le voient pas
-
-`orders_mixed.rs` vérifie `after_ret.customer_deposits[0].quantity_held == 0`.
-C'est la table que le retour met à jour, et celle qu'aucun écran ne lit. Le test
-valide la seule partie du retour qui n'a pas d'effet visible.
-
-### Ce que je recommande
-
-Faire de `return_order_packaging` un **appelant de `return_client_empties`**
-(ou de sa logique) au lieu d'une seconde implémentation. Aujourd'hui il y a deux
-codes de retour d'emballages qui écrivent dans des tables différentes — c'est
-exactement le problème « plusieurs sources de vérité » que le Lot 9a doit
-supprimer.
-
-**Ordre recommandé : 9a d'abord, puis ce correctif.** Corriger `return_order_packaging`
-avant 9a reviendrait à écrire une troisième adaptation dans un système déjà
-incohérent.
+Le commit `git log -S "FROM deposit_issues"` confirme que le bloc date de
+`0cff48b`, donc du socle, pas de mes travaux.
 
 ---
 
@@ -171,15 +156,10 @@ Le Lot 13 (tournées) **n'est pas bloqué** par la dépendance livrer/facturer :
 - livrer puis facturer fonctionne ;
 - facturer puis livrer fonctionne.
 
-Il est en revanche **exposé** au défaut de `return_order_packaging` : une
-tournée dont le livreur récupère des casiers produira un retour qu'il faudra
-enregistrer, et le chemin actuel ne soldera pas la dette.
-
-**Piste la plus économique** : ne pas réutiliser `return_order_packaging` dans
-les tournées. Le retour de tournée du Lot 14 doit alimenter directement
-`deposit_issues` (répartition FIFO par échéance, déjà prévue dans
-`DECISIONS_TOURNEES_ET_CONSIGNES.md` §6). Ainsi la tournée contourne le défaut
-au lieu d'en hériter.
+Comme établi en §4, `return_order_packaging` solde bien `deposit_issues`. Le
+retour de tournée du Lot 14 peut donc réutiliser `apply_customer_empty_return_tx`
+plutôt que réimplémenter la répartition FIFO : la logique est déjà écrite, testée
+et plus complète qu'une réécriture.
 
 ---
 
@@ -199,4 +179,6 @@ concernée.**
 grep -rn "INSERT INTO deposit_issues" crates/  ->  4 sites
 ```
 
-Quatre sites d'écriture, donc quatre chemins à examiner avant de conclure.
+Quatre sites d'écriture, donc quatre chemins à examiner avant de conclure — et
+surtout : **chercher par nom de fonction, jamais par plage de lignes**. C'est la
+deuxième fois que cette erreur me coûte une conclusion fausse sur ce dépôt.

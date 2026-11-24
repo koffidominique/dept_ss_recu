@@ -108,11 +108,13 @@ directe (`sales/create_persistence.rs`) alimente correctement les deux.
 | Table | Granularité | Alimentée par | Affichée |
 | --- | --- | --- | --- |
 | `customer_packaging_accounts` | par consignable | ventes directes + `deliver_order` (qui n'écrit rien) | Oui, onglet « Soldes par client » |
-| `customer_deposit_balances` | par actif | `deliver_order`, retours de commande | **Jamais** (ni API ni UI) |
+| `customer_deposit_balances` | par actif | `deliver_order`, retours de commande | Écran de commande (`OrderStepClient`, via `customer_deposits`) |
 | `deposit_issues` | par ligne de vente | les deux chemins | Oui, onglet « Consignes ouvertes » |
 
-`customer_deposit_balances` n'est jamais lu par le frontend. C'est un
-**troisième solde mort**, alimenté sans jamais être consulté.
+`customer_deposit_balances` **n'est pas mort** : `OrderStepClient.tsx:67` le lit
+pour afficher les emballages détenus avant de prendre une commande. Il est
+seulement absent du module consignes. Mesure : 4 écritures dans 3 fichiers, et
+7 assertions dans `orders_mixed.rs`.
 
 ---
 
@@ -124,7 +126,7 @@ directe (`sales/create_persistence.rs`) alimente correctement les deux.
 | --- | --- |
 | `deposit_issues` | ✅ **Retenue.** C'est la seule déjà écrite par **tous** les chemins (vente directe, commande, retour, conversion, perte, annulation), avec `pieces`, `returned_pieces`, `converted_pieces`, `lost_pieces`, `unit_value` figé, `due_date`, `policy_id` et un statut contraint par le schéma. |
 | `customer_packaging_accounts` | ❌ Agrégat dénormalisé, maintenu par **11 fichiers**. Chaque oubli crée un solde faux, silencieusement. |
-| `customer_deposit_balances` | ❌ Troisième solde, mort, à deux granularités incompatibles avec les deux autres. |
+| `customer_deposit_balances` | ❌ Granularité **par actif**, affichée par l'écran de commande. 4 écritures, 3 fichiers. Ne peut pas être supprimée sans réécrire cet écran. |
 
 **Règle unique à inscrire dans le code :**
 
@@ -155,7 +157,7 @@ plus de dérive possible entre trois compteurs.
 ### Le coût, assumé
 
 Il faut retoucher les 11 fichiers qui écrivent `customer_packaging_accounts` et
-les 3 qui écrivent `customer_deposit_balances`. C'est un chantier de refactor,
+les 3 fichiers qui écrivent `customer_deposit_balances` (4 écritures). C'est un chantier de refactor,
 pas une fonctionnalité — donc **invisible pour l'utilisateur** et difficile à
 justifier auprès d'un commanditaire pressé. C'est précisément le genre de dette
 qu'il faut payer tôt, avant que les tournées n'ajoutent un quatrième écrivain.
@@ -263,7 +265,7 @@ plus lourd et plus urgent.
 
 | Lot | Contenu | Effort | Pourquoi ce rang |
 | --- | --- | --- | --- |
-| **9a** | **Un seul solde** : `deposit_issues` fait foi. `customer_packaging_accounts` et `customer_deposit_balances` passent en lecture. | 3 j | Sans ça, tout plafond est contournable et tout chiffre contestable. |
+| **9a** | **Une seule référence pour les décisions** : `deposit_issues` fait foi pour le plafond. Les deux tables de soldes restent des caches d'affichage (elles alimentent des écrans à granularités différentes). | 1 j | Réalisable tout de suite, sans réécrire 15 écritures. `EVOLUTION_LOT_09A_PLAN.md` |
 | **9b** | **Un seul délai** : réglage `app_settings`, suppression de la cascade, 22 textes UI et 4 retombées Rust alimentés par le DTO | 2 j | Le délai faux est visible par les clients, sur du papier signé. |
 | **9c** | **Remplir `packaging_assets.returnable_id`** par migration + contrainte `NOT NULL` sur les actifs `returnable = 1` | 1 j | Sans ça, la consigne par commande ne naît jamais. |
 | **9d** | **Plafond de consignes** : `warn` / `block` / dérogation tracée | 2 j | C'est la question 1 que vous avez tranchée. |
