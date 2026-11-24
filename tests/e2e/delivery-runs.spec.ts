@@ -168,7 +168,9 @@ test.describe('DEPOTPRO — Tournées de livraison, parcours complet', () => {
         lines: [
           {
             variant_id: variantId,
-            requested_unit: 'bouteille',
+            // Vocabulaire fermé côté schéma : unit, bottle, can, crate…
+            // `base_unit` du produit est en français, `requested_unit` non.
+            requested_unit: 'bottle',
             requested_quantity: 12,
           },
         ],
