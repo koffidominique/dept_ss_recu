@@ -264,59 +264,10 @@ async fn apply_customer_empty_return_tx(
         .execute(&mut **tx)
         .await?;
 
-        let order_sale_id: Option<i64> = if let Some(oid) = order_id {
-            sqlx::query_scalar("SELECT id FROM sales WHERE order_id = ?")
-                .bind(oid)
-                .fetch_optional(&mut **tx)
-                .await?
-        } else {
-            None
-        };
-
-        let mut remaining_to_settle = quantity;
-        let open_issues: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
-            "SELECT id, pieces, returned_pieces, lost_pieces + destroyed_pieces + converted_pieces
-             FROM deposit_issues
-             WHERE client_id = ? AND returnable_id = ?
-               AND status IN ('pending', 'partially_returned')
-             ORDER BY CASE WHEN ? IS NOT NULL AND sale_id = ? THEN 0 ELSE 1 END ASC,
-                      COALESCE(due_date, '9999-12-31') ASC,
-                      id ASC",
+        crate::application::packaging_returns::settle_deposit_issues_tx(
+            tx, customer_id, rid, order_id, quantity,
         )
-        .bind(customer_id)
-        .bind(rid)
-        .bind(order_sale_id)
-        .bind(order_sale_id)
-        .fetch_all(&mut **tx)
         .await?;
-
-        for (issue_id, iss_pieces, iss_returned, iss_other_out) in open_issues {
-            if remaining_to_settle <= 0 {
-                break;
-            }
-            let iss_pending = (iss_pieces - iss_returned - iss_other_out).max(0);
-            if iss_pending <= 0 {
-                continue;
-            }
-            let applied = remaining_to_settle.min(iss_pending);
-            let next_returned = iss_returned + applied;
-            let next_status = if next_returned + iss_other_out >= iss_pieces {
-                "settled"
-            } else {
-                "partially_returned"
-            };
-            sqlx::query(
-                "UPDATE deposit_issues
-                 SET returned_pieces = ?, status = ?, updated_at = datetime('now')
-                 WHERE id = ?",
-            )
-            .bind(next_returned)
-            .bind(next_status)
-            .bind(issue_id)
-            .execute(&mut **tx)
-            .await?;
-            remaining_to_settle -= applied;
-        }
 
         let before_stock: i64 = sqlx::query_scalar(
             "SELECT COALESCE((SELECT quantity FROM returnable_stock_balances WHERE packaging_id = ?), 0)",

@@ -59,6 +59,9 @@ pub const V3_MIGRATION_0026_SQL: &str =
 pub const V3_MIGRATION_0027_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0027_delivery_runs.sql");
 
+pub const V3_MIGRATION_0028_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0028_delivery_run_reconciliation.sql");
+
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {
     pub version: i64,
@@ -202,10 +205,15 @@ pub const MIGRATIONS: &[MigrationDef] = &[
         name: "0027_delivery_runs",
         sql: V3_MIGRATION_0027_SQL,
     },
+    MigrationDef {
+        version: 28,
+        name: "0028_delivery_run_reconciliation",
+        sql: V3_MIGRATION_0028_SQL,
+    },
 ];
 
 pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = 1;
-pub const CURRENT_SCHEMA_VERSION: i64 = 27;
+pub const CURRENT_SCHEMA_VERSION: i64 = 28;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationRunReport {
