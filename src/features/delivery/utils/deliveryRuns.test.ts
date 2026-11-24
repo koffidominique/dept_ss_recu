@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   allocationBlocker,
   buildCreateRunInput,
+  canDeclareCollectionOn,
   isDriverAccount,
   isReconcilableForReading,
   isTerminal,
@@ -268,4 +269,18 @@ test('chaque statut où l’on peut réconcilier est aussi un statut lisible', (
       assert.equal(isReconcilableForReading(st), true, `réconciliable mais illisible : ${st}`);
     }
   }
+});
+
+/* --- Déclaration d'encaissement ------------------------------------------ */
+
+test('le livreur déclare un encaissement sur la route, avant le constat', () => {
+  // Défaut réel : l'écran exigeait `delivered`, donc attendait le constat du
+  // gérant le soir. Or le livreur encaisse le matin. Le cœur accepte `planned`.
+  assert.equal(canDeclareCollectionOn('planned'), true, 'arrêt pas encore constaté');
+  assert.equal(canDeclareCollectionOn('delivered'), true);
+});
+
+test('un arrêt en échec ou ignoré n’encaisse rien', () => {
+  assert.equal(canDeclareCollectionOn('failed'), false);
+  assert.equal(canDeclareCollectionOn('skipped'), false);
 });

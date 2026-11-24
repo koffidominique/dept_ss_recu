@@ -89,6 +89,21 @@ export function isTerminal(status: DeliveryRunStatus): boolean {
 }
 
 /**
+ * Peut-on déclarer un encaissement sur cet arrêt ?
+ *
+ * Le livreur déclare **sur la route**, avant le constat du gérant : exiger
+ * `delivered` inversait l'ordre réel des gestes et l'obligeait à attendre le
+ * soir pour saisir ce qu'il avait encaissé le matin.
+ *
+ * Le cœur (`register_collection`) refuse seulement un arrêt `failed` ou
+ * `skipped` — un arrêt non livré n'encaisse rien. On suit cette règle-là, pas
+ * une plus stricte inventée côté écran.
+ */
+export function canDeclareCollectionOn(stopStatus: DeliveryRunStop["status"]): boolean {
+  return stopStatus !== "failed" && stopStatus !== "skipped";
+}
+
+/**
  * Ce que le livreur doit savoir avant de partir, en une phrase.
  *
  * `expected_amount` est figé au chargement : c'est l'attendu de la tournée, pas

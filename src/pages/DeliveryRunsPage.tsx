@@ -32,6 +32,7 @@ import {
   RUN_STATUS_LABELS,
   STOP_STATUS_LABELS,
   isTerminal,
+  canDeclareCollectionOn,
   runActions,
   runBrief,
 } from '../features/delivery/utils/deliveryRuns.ts';
@@ -512,7 +513,15 @@ function RunDetail({
                               Constater
                             </button>
                           )}
-                          {actions.canDeclareCollection && canExecute && s.status === 'delivered' && (
+                          {/* Le livreur déclare SUR LA ROUTE, avant que le gérant
+                              constate. Exiger `delivered` ici inversait l'ordre
+                              réel : le livreur aurait attendu le soir pour saisir
+                              ce qu'il a encaissé le matin. Le cœur accepte un
+                              arrêt `planned` ; seuls `failed` et `skipped` sont
+                              exclus, parce qu'ils n'encaissent rien. */}
+                          {actions.canDeclareCollection &&
+                            canExecute &&
+                            canDeclareCollectionOn(s.status) && (
                             <button
                               type="button"
                               onClick={() => {
