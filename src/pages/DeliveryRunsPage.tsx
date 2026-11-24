@@ -79,28 +79,38 @@ export function DeliveryRunsPage() {
     onDone: () => setErrorMsg(null),
   });
 
+  const canManage = hasPermission(currentUser, PERMISSIONS.deliveryRunsManage);
+  const canExecute = hasPermission(currentUser, PERMISSIONS.deliveryRunsExecute);
+  const canReconcile = hasPermission(currentUser, PERMISSIONS.deliveryRunsReconcile);
+
+  // Ces quatre lectures ne servent QUE la préparation d'une tournée (choisir un
+  // livreur, un client, une commande, un emballage) — donc à qui peut
+  // préparer. Le livreur, lui, n'a que `DeliveryRunsExecute`. Les lancer pour
+  // lui produisait huit 403 dans la console à chaque ouverture de l'écran,
+  // pour des données qu'il ne peut pas voir. L'écran s'affiche sans elles.
+  const canPrepare = canManage;
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: () => apiClient.listUsers(),
+    enabled: canPrepare,
   });
   const clientsQuery = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.listClients(),
+    enabled: canPrepare,
   });
   // Commandes à rattacher à un arrêt. La modale ne garde que celles du client
   // choisi qui restent à encaisser : c'est cette somme qui devient l'attendu.
   const ordersQuery = useQuery({
     queryKey: ['customer-orders-for-runs'],
     queryFn: () => apiClient.listCustomerOrders(),
+    enabled: canPrepare,
   });
   const returnablesQuery = useQuery({
     queryKey: ['consignments'],
     queryFn: () => apiClient.getConsignmentsOverview(),
+    enabled: canPrepare,
   });
-
-  const canManage = hasPermission(currentUser, PERMISSIONS.deliveryRunsManage);
-  const canExecute = hasPermission(currentUser, PERMISSIONS.deliveryRunsExecute);
-  const canReconcile = hasPermission(currentUser, PERMISSIONS.deliveryRunsReconcile);
 
   if (runsQuery.isLoading) return <LoadingState rows={5} />;
   if (runsQuery.error || !runsQuery.data) {
