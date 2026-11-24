@@ -60,7 +60,12 @@ export function runActions(status: DeliveryRunStatus, stopCount: number): RunAct
     // geste, on ne le laisse pas échouer.
     canLoad: editable && stopCount > 0,
     canStart: status === "loaded",
-    canCancel: status === "draft" || status === "loaded",
+    // Le cœur accepte d'annuler une tournée qui roule déjà (`cancel_run` :
+    // draft, loaded, in_progress) : elle porte alors des constats, mais
+    // l'annulation reste la seule sortie si le véhicule ne part pas. Mon
+    // premier filtre l'interdisait, donc le gérant ne pouvait plus annuler une
+    // tournée partie par erreur.
+    canCancel: status === "draft" || status === "loaded" || status === "in_progress",
     // Les constats d'arrêt se posent pendant la tournée et au retour : le
     // gérant peut encore corriger un statut resté « prévu » après coup.
     canRecordOutcome: status === "in_progress" || status === "returned",
@@ -102,6 +107,33 @@ export function isTerminal(status: DeliveryRunStatus): boolean {
 export function canDeclareCollectionOn(stopStatus: DeliveryRunStop["status"]): boolean {
   return stopStatus !== "failed" && stopStatus !== "skipped";
 }
+
+/**
+ * Permission exigée par chaque geste, **alignée sur le cœur**.
+ *
+ * `delivery_runs.rs` et `delivery_reconciliation.rs` sont l'autorité ; cette
+ * table n'est que leur reflet côté écran. Elle a une raison d'être : deux
+ * gestes (`start_run`, `cancel_run`) exigent `Manage` alors qu'on les croit
+ * volontiers réservés au livreur. Un écran qui se fie à l'intuition montre un
+ * bouton qui rend 403.
+ *
+ * Défaut réel trouvé en comparant ligne à ligne : l'écran autorisait le départ
+ * avec `Execute`, alors que `start_run` exige `Manage`. Le livreur voyait un
+ * bouton Départ qui échouait.
+ */
+export type RunActionPermission = "read" | "manage" | "execute" | "reconcile";
+
+export const RUN_ACTION_PERMISSION: Record<keyof RunActions, RunActionPermission> = {
+  canAddStop: "manage",
+  canLoad: "manage",
+  canStart: "manage", // et non "execute" : voir start_run
+  canCancel: "manage",
+  canRecordOutcome: "manage",
+  canDeclareCollection: "execute", // le seul geste que le livreur peut faire
+  canRecordReturn: "manage",
+  canReturnRun: "manage",
+  canReconcile: "reconcile",
+};
 
 /**
  * Ce que le livreur doit savoir avant de partir, en une phrase.
@@ -284,18 +316,15 @@ export function buildCreateRunInput(
 /**
  * Ce compte peut-il se voir attribuer une tournée ?
  *
- * Il faut un compte actif **et** un rôle qui porte `delivery_runs:execute`.
- * Dans `rbac.rs`, seuls `Owner` et `Driver` portent cette permission : un
- * admin ou un gérant prépare et réconcilie, il ne part pas en tournée. Filtrer
- * sur le seul champ `active` ferait donc proposer un caissier pour un départ
- * qu'il ne pourrait jamais déclencher.
+ * `create_run` est strict : il exige `role == "driver"` sur un compte actif,
+ * et refuse tout autre rôle avec « L'utilisateur désigné n'a pas le rôle
+ * livreur ». Avoir `delivery_runs:execute` ne suffit donc pas — `Owner` le
+ * porte et se verrait pourtant refuser.
  *
- * `UserAccount` ne renvoie pas les permissions du compte (seul `/api/auth/me`
- * le fait pour la session courante) : on s'appuie sur le rôle, dont la matrice
- * est fixée côté serveur.
+ * Mon premier filtre acceptait `owner` au motif qu'il porte la permission.
+ * C'était confondre « peut exécuter un geste » et « peut être désigné comme
+ * livreur d'une tournée ». Le cœur tranche : seul `driver`.
  */
-const DRIVER_CAPABLE_ROLES = new Set(["driver", "owner"]);
-
 export function isDriverAccount(user: { active: boolean; role: string }): boolean {
-  return user.active && DRIVER_CAPABLE_ROLES.has(user.role);
+  return user.active && user.role === "driver";
 }

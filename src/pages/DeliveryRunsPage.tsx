@@ -55,6 +55,13 @@ import type {
  * Règle d'affichage : un bouton n'apparaît que si l'action est à la fois
  * permise par le rôle ET valide pour le statut. Proposer un geste que le cœur
  * refuse oblige l'utilisateur à découvrir la règle par un message d'erreur.
+ *
+ * MODÈLE D'USAGE (docs/DECISIONS_TOURNEES_ET_CONSIGNES.md §7) : le terminal
+ * livreur est explicitement différé. Le livreur part avec un bon papier ; il
+ * n'ouvre l'application qu'une fois rentré, sur le poste du dépôt, pour
+ * déclarer ce qu'il a encaissé. Tous les gestes de préparation, de départ et
+ * de constat sont donc des gestes de comptoir (`DeliveryRunsManage`), et
+ * l'écran ne montre le départ qu'à qui peut réellement le faire.
  */
 
 export function DeliveryRunsPage() {
@@ -408,7 +415,7 @@ function RunDetail({
               Charger
             </ActionButton>
           )}
-          {actions.canStart && canExecute && (
+          {actions.canStart && canManage && (
             <ActionButton
               icon={Play}
               variant="primary"

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   allocationBlocker,
   buildCreateRunInput,
+  RUN_ACTION_PERMISSION,
   canDeclareCollectionOn,
   isDriverAccount,
   isReconcilableForReading,
@@ -228,11 +229,14 @@ test('le payload de création met un véhicule vide à null, pas à chaîne vide
 
 /* --- Comptes attribuables ------------------------------------------------ */
 
-test('seuls les rôles qui portent delivery_runs:execute sont proposés comme livreur', () => {
-  // Vérifié contre rbac.rs : Owner et Driver portent Execute. Admin et Manager
-  // préparent et réconcilient, mais ne partent pas en tournée.
+test('seul le rôle driver est proposé comme livreur, pas owner', () => {
+  // `create_run` exige role == "driver" sur un compte actif. Porter
+  // delivery_runs:execute ne suffit pas : Owner le porte et serait refusé.
+  // Mon premier filtre l'acceptait — confondre « peut exécuter un geste » et
+  // « peut être désigné comme livreur » produit une tournée que le cœur refuse
+  // à la création.
   assert.equal(isDriverAccount({ active: true, role: 'driver' }), true);
-  assert.equal(isDriverAccount({ active: true, role: 'owner' }), true);
+  assert.equal(isDriverAccount({ active: true, role: 'owner' }), false);
   assert.equal(isDriverAccount({ active: true, role: 'manager' }), false);
   assert.equal(isDriverAccount({ active: true, role: 'admin' }), false);
   assert.equal(isDriverAccount({ active: true, role: 'cashier' }), false);
@@ -283,4 +287,51 @@ test('le livreur déclare un encaissement sur la route, avant le constat', () =>
 test('un arrêt en échec ou ignoré n’encaisse rien', () => {
   assert.equal(canDeclareCollectionOn('failed'), false);
   assert.equal(canDeclareCollectionOn('skipped'), false);
+});
+
+/* --- Alignement écran / cœur --------------------------------------------- */
+
+test('annuler reste possible sur une tournée qui roule', () => {
+  // `cancel_run` accepte draft, loaded et in_progress. Mon premier filtre
+  // s'arrêtait à loaded : le gérant ne pouvait plus annuler une tournée partie
+  // par erreur, alors que c'est précisément le cas où on en a besoin.
+  assert.equal(runActions('draft', 2).canCancel, true);
+  assert.equal(runActions('loaded', 2).canCancel, true);
+  assert.equal(runActions('in_progress', 2).canCancel, true);
+  assert.equal(runActions('returned', 2).canCancel, false, 'rentrée = constats posés');
+  assert.equal(runActions('reconciled', 2).canCancel, false);
+});
+
+test('le départ exige Manage, pas Execute', () => {
+  // `start_run` appelle require_current_actor_permission(DeliveryRunsManage).
+  // L'écran affichait le bouton Départ sur Execute : le livreur cliquait et
+  // recevait un 403.
+  assert.equal(RUN_ACTION_PERMISSION.canStart, 'manage');
+});
+
+test('déclarer un encaissement est le seul geste de niveau Execute', () => {
+  // Conséquence de la décision « terminal livreur différé » : le livreur ne
+  // prépare rien, ne part pas, ne constate rien. Il déclare, et c'est tout.
+  const executeActions = Object.entries(RUN_ACTION_PERMISSION)
+    .filter(([, perm]) => perm === 'execute')
+    .map(([action]) => action);
+  assert.deepEqual(executeActions, ['canDeclareCollection']);
+});
+
+test('chaque action déclarée possède une permission associée', () => {
+  // Si une action est ajoutée à RunActions sans entrée dans la table, l'écran
+  // déciderait sans permission connue. Le typage l'interdit déjà ; ce test
+  // verrouille aussi le contenu à l'exécution.
+  const actions = Object.keys(runActions('draft', 1)).sort();
+  const mapped = Object.keys(RUN_ACTION_PERMISSION).sort();
+  assert.deepEqual(actions, mapped);
+});
+
+test('aucune action n’est ouverte à un rôle qui n’a que Read', () => {
+  // Le comptable et le stock-manager portent DeliveryRunsRead et rien d'autre
+  // sur les tournées : leur écran doit être en lecture seule.
+  const readOnly = Object.entries(RUN_ACTION_PERMISSION).filter(
+    ([, perm]) => perm === 'read'
+  );
+  assert.equal(readOnly.length, 0, 'aucun geste ne se contente de Read');
 });
