@@ -370,8 +370,13 @@ pub async fn cancel_run(
     // réécrivant la garde ci-dessous, je l'avais supprimé, et le test de
     // `lot13` l'a rattrapé.
     if !matches!(status.as_str(), "draft" | "loaded" | "in_progress") {
+        // Meme raison que plus bas : refermer avant de rendre la main. Le pool
+        // d'ecriture n'a qu'une connexion, et un appelant qui enchaine sur une
+        // lecture ne doit pas attendre le ramassage.
+        tx.rollback().await?;
         return Err(CoreError::Validation(format!(
-            "Une tournee au statut {status} ne peut pas etre annulee : elle porte deja des constats."
+            "Une tournee au statut {status} ne peut pas etre annulee : \
+             elle porte deja des constats."
         )));
     }
     if status != "draft" {
@@ -405,6 +410,19 @@ pub async fn cancel_run(
         .await?;
 
         if declared > 0 {
+            // Refermer la transaction AVANT de retourner l'erreur.
+            //
+            // Le pool lecture-écriture n'a qu'une seule connexion
+            // (`max_connections(1)`). Abandonner la transaction sans la fermer
+            // laisse sqlx la défaire en tâche de fond, pendant que l'unique
+            // connexion et le mutex d'écriture restent tenus. Les lectures qui
+            // suivent — `get_cash_status`, par exemple — attendent alors une
+            // ressource qui ne se libérera qu'au hasard de l'ordonnanceur.
+            //
+            // C'est exactement le chemin qu'emprunte un test qui vérifie ce
+            // refus puis relit l'état de caisse. Autant ne pas laisser au
+            // ramasse-miettes quelque chose qui décide d'un blocage.
+            tx.rollback().await?;
             return Err(CoreError::Validation(
                 "Impossible d'annuler : le livreur a déjà déclaré des encaissements. \
                  Les annuler ferait disparaître cet argent de la caisse. \
