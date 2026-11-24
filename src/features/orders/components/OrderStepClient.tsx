@@ -41,6 +41,13 @@ export function OrderStepClient({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [establishmentName, setEstablishmentName] = useState('');
+  const [category, setCategory] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [commune, setCommune] = useState('');
+  const [quartier, setQuartier] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [clientType, setClientType] = useState<'particulier' | 'professionnel'>('particulier');
   const [allowCredit, setAllowCredit] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +75,13 @@ export function OrderStepClient({
         name: name.trim(),
         client_type: clientType,
         phone: phone.trim() || undefined,
+        establishment_name: establishmentName.trim() || null,
+        category: category.trim() || null,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        commune: commune.trim() || null,
+        quartier: quartier.trim() || null,
+        landmark: landmark.trim() || null,
         credit_policy: allowCredit ? 'limited' : 'forbidden',
         credit_limit: allowCredit ? 100_000 : null,
       });
@@ -76,6 +90,13 @@ export function OrderStepClient({
       setCreating(false);
       setName('');
       setPhone('');
+      setEstablishmentName('');
+      setCategory('');
+      setAddress('');
+      setCity('');
+      setCommune('');
+      setQuartier('');
+      setLandmark('');
     } finally {
       setSaving(false);
     }
@@ -102,31 +123,103 @@ export function OrderStepClient({
       </div>
 
       {creating && (
-        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-3 sm:grid-cols-4">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nom client *"
-            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
-          />
-          <input
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Téléphone"
-            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
-          />
-          <select
-            aria-label="Type de client"
-            value={clientType}
-            onChange={(e) => setClientType(e.target.value as 'particulier' | 'professionnel')}
-            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
-          >
-            <option value="particulier">Particulier</option>
-            <option value="professionnel">Revendeur / Bar</option>
-          </select>
-          <div className="flex items-center justify-between gap-2">
+        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium">Nom du client *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="organization"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Téléphone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Établissement</label>
+            <input
+              type="text"
+              value={establishmentName}
+              onChange={(e) => setEstablishmentName(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Catégorie client</label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Maquis, bar, particulier…"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Adresse</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              autoComplete="street-address"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Ville</label>
+            <input
+              type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              autoComplete="address-level2"
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Commune</label>
+            <input
+              type="text"
+              value={commune}
+              onChange={(e) => setCommune(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Quartier</label>
+            <input
+              type="text"
+              value={quartier}
+              onChange={(e) => setQuartier(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium">Point de repère</label>
+            <input
+              type="text"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <select
+              aria-label="Type de client"
+              value={clientType}
+              onChange={(e) => setClientType(e.target.value as 'particulier' | 'professionnel')}
+              className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm"
+            >
+              <option value="particulier">Particulier</option>
+              <option value="professionnel">Revendeur / Bar</option>
+            </select>
             <label className="flex items-center gap-1.5 text-xs">
               <input
                 type="checkbox"
@@ -232,6 +325,24 @@ export function OrderStepClient({
                 </strong>
               </p>
             )}
+          </div>
+
+          <div className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/60 dark:bg-blue-950/20 p-3 text-xs space-y-1 sm:col-span-2">
+            <div className="font-semibold text-blue-900 dark:text-blue-200">
+              Informations client reprises sur le reçu
+            </div>
+            <p className="text-[#475467] dark:text-slate-300">
+              Établissement : {activeClient.establishment_name || '—'} · Catégorie : {activeClient.category || '—'} · Téléphone : {activeClient.phone || '—'}
+            </p>
+            <p className="text-[#475467] dark:text-slate-300">
+              Adresse : {[activeClient.commune, activeClient.quartier, activeClient.city]
+                .filter(Boolean)
+                .join(' / ') || activeClient.address || '—'}
+              {activeClient.landmark ? ` · Repère : ${activeClient.landmark}` : ''}
+            </p>
+            <p className="text-[11px] text-[#667085] dark:text-slate-400">
+              Ces valeurs proviennent de la fiche client et seront imprimées avec le reçu de commande.
+            </p>
           </div>
         </div>
       )}

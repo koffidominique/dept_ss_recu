@@ -196,15 +196,6 @@ export function buildOrderReceiptDocument(
         bold: true,
         tone: "success",
       },
-      ...(hasConsignedAllocations || returnedPackagingAmount > 0
-        ? [
-            {
-              label: "Retour emballages (hors total)",
-              value: formatFcfa(returnedPackagingAmount),
-              tone: returnedPackagingAmount > 0 ? ("success" as const) : ("default" as const),
-            },
-          ]
-        : []),
       {
         label: "Montant Versé (Avance / Cash)",
         value: `- ${formatFcfa(o.paid_xof)}`,
@@ -215,6 +206,15 @@ export function buildOrderReceiptDocument(
         bold: true,
         tone: "danger",
       },
+      ...(hasConsignedAllocations || returnedPackagingAmount > 0
+        ? [
+            {
+              label: "Retour emballages (hors total)",
+              value: formatFcfa(returnedPackagingAmount),
+              tone: returnedPackagingAmount > 0 ? ("success" as const) : ("default" as const),
+            },
+          ]
+        : []),
     ],
     notes:
       [

@@ -166,6 +166,8 @@
 .order-receipt-products th:nth-child(5),.order-receipt-products td:nth-child(5),.order-receipt-products th:nth-child(6),.order-receipt-products td:nth-child(6) { text-align: right; }
 .order-receipt-products td,.order-receipt-packaging td { padding: 3.5px 4px; border: 1px solid #cbd5e1; vertical-align: top; }
 .order-receipt-products tbody tr:nth-child(even),.order-receipt-packaging tbody tr:nth-child(even) { background: #f8fafc; }
+.order-receipt-products .order-receipt-empty-row td { height: 20px; }
+.order-receipt-packaging th:nth-child(n+2),.order-receipt-packaging td:nth-child(n+2) { text-align: center; }
 .order-receipt-bottom-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 10px; margin-top: 8px; align-items: start; }
 .order-receipt-packaging { margin-top: 0; }
 .order-receipt-packaging th { padding: 4px; background: #fef3c7; color: #92400e; text-align: left; font-size: 7.5px; text-transform: uppercase; border: 1px solid #cbd5e1; }

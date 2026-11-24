@@ -27,7 +27,6 @@ pub(crate) const VALID_DOC_TYPES: &[&str] = &[
     "AVOIR CLIENT",
     "BON DE COMMANDE",
     "BON DE COMMANDE FOURNISSEUR",
-    "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION",
     "BON DE RÉCEPTION",
     "BON DE RÉCEPTION FOURNISSEUR",
     "REÇU RETOUR EMBALLAGES",
@@ -233,10 +232,7 @@ pub async fn generate_document_pdf(
         })
         .collect();
 
-    if matches!(
-        input.doc_type.as_str(),
-        "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION" | "REÇU DE COMMANDE"
-    ) {
+    if input.doc_type == "REÇU DE COMMANDE" {
         if let Some(bytes) = try_render_snapshot_pdf(
             db,
             "customer_order_receipt_snapshots",
@@ -428,7 +424,7 @@ mod tests {
         company.rccm = None;
         company.ncc = None;
         let doc = DocumentPdfInput {
-            doc_type: "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION".to_string(),
+            doc_type: "REÇU DE COMMANDE".to_string(),
             reference: "REC-CMD-2026-0001".to_string(),
             order_reference: Some("CMD-2026-0001".to_string()),
             date: "2026-11-22T10:30:00Z".to_string(),
@@ -540,7 +536,7 @@ mod tests {
             assert!(text.contains("/Count 2"));
             assert!(text.contains("DEPOT SOLIBRA ABIDJAN"));
             assert!(text.contains("DOC-2026-0001"));
-            if *doc_type == "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION" {
+            if *doc_type == "REÇU DE COMMANDE" {
                 assert!(text.contains("INFORMATIONS DU CLIENT"));
                 assert!(text.contains("MONTANT TOTAL"));
                 assert!(text.contains("Signature"));

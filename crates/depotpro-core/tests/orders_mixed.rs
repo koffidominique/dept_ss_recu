@@ -620,7 +620,7 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         pdf::generate_document_pdf(
             &db,
             pdf::DocumentPdfInput {
-                doc_type: "BON DE COMMANDE CLIENT – ACCUSÉ DE RÉCEPTION".into(),
+                doc_type: "REÇU DE COMMANDE".into(),
                 reference: first_receipt.receipt_number.clone(),
                 order_reference: None,
                 date: "2000-01-01".into(),
