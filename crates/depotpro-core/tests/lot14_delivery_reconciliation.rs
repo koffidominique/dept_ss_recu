@@ -810,14 +810,13 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
     mark_delivered(&db, run_id, stop_id).await;
     // L'arret du client B n'est pas livre, mais il doit porter un constat :
     // on ne rentre pas d'une tournee dont un arret est reste 'planned'.
-    let stop_b: i64 = sqlx::query_scalar(
-        "SELECT id FROM delivery_run_stops WHERE run_id = ? AND client_id = ?",
-    )
-    .bind(run_id)
-    .bind(client_b)
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
+    let stop_b: i64 =
+        sqlx::query_scalar("SELECT id FROM delivery_run_stops WHERE run_id = ? AND client_id = ?")
+            .bind(run_id)
+            .bind(client_b)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
     auth::with_actor(
         owner(),
         delivery_reconciliation::record_stop_outcome(
@@ -908,7 +907,10 @@ async fn empties_settle_the_right_client_and_not_the_oldest_debt() {
             .await
             .unwrap();
 
-    assert_eq!(returned_a, 2, "les casiers repris chez A soldent la consigne de A");
+    assert_eq!(
+        returned_a, 2,
+        "les casiers repris chez A soldent la consigne de A"
+    );
     assert_eq!(status_a, "settled");
     assert_eq!(
         returned_b, 0,
