@@ -40,10 +40,31 @@ comptable du cycle était vide.
 
 ## 2. Correction apportée
 
-### 2.1 Migration `0026_link_packaging_assets_to_returnables.sql`
+### 2.1 Résolution à la volée dans `deliver_order` (le vrai correctif)
 
-Rattachement **déterministe** des actifs existants aux consignables, par trois
-critères cumulatifs :
+`deliver_order` rattache désormais lui-même les actifs consignables qui n'ont
+pas de consignable, en trois requêtes :
+
+1. créer le consignable manquant depuis l'actif (`code = 'EMB-AUTO-' || code`,
+   `producer = 'DEPOT'`, `deposit_value` reprise de l'actif) ;
+2. initialiser son stock à 0 dans `returnable_stock_balances` ;
+3. renseigner `packaging_assets.returnable_id`.
+
+C'est **exactement le mécanisme déjà utilisé par `apply_catalog_presets`**, qui
+crée les consignables à la volée quand un preset les référence. Le code dérivé
+de l'actif rend l'opération idempotente : rejouer la livraison ne duplique rien.
+
+**Pourquoi pas dans la migration ?** Un test d'architecture
+(`lot4_fresh_db_neutral_defaults_and_schema_parity_with_node`) impose que
+`returnable_packaging_types` reste **vide** sur une base neuve : aucune donnée
+commerciale fictive. Une migration ne peut donc pas créer de consignable. La
+création doit être un **acte métier**, pas une étape de schéma.
+
+### 2.2 Migration `0026_link_packaging_assets_to_returnables.sql`
+
+Rattachement des actifs existants aux consignables **déjà présents**, par trois
+critères cumulatifs — utile sur un dépôt existant dont le catalogue de brasseries
+a créé les consignables :
 
 | Critère | Source | Exemple |
 | --- | --- | --- |
@@ -60,18 +81,16 @@ La migration **aligne aussi la politique globale à 15 jours** : `0015` la créa
 début du Lot 9b, sans lequel la consigne nouvellement créée serait incohérente
 avec le bon remis au client.
 
-### 2.2 Garde dans `deliver_order`
+### 2.3 Ce que j'ai d'abord fait de faux
 
-Un actif consignable non rattaché produit désormais une **erreur explicite**
-plutôt qu'une dette silencieusement absente :
+Ma première version bloquait la livraison quand l'actif n'était pas rattaché, avec
+un message demandant de créer le consignable manuellement. **C'était pire que le
+bug** : sur une base neuve, aucun consignable n'existe, donc *toute* livraison de
+consigne devenait impossible. Le scénario E2E l'a révélé immédiatement.
 
-```
-L'emballage consigné de cette commande n'est rattaché à aucun consignable
-(packaging_assets.returnable_id est vide). Renseignez le rattachement dans
-le catalogue des emballages avant de livrer, sinon la consigne ne sera pas tracée.
-```
-
-Le test ne rejette pas la livraison pour un motif obscur : il dit quoi faire.
+C'est le genre d'erreur que seule l'exécution révèle : le raisonnement « refuser
+plutôt que perdre en silence » est juste, mais il supposait que le consignable
+existait déjà. La résolution à la volée rend la garde inutile.
 
 ---
 

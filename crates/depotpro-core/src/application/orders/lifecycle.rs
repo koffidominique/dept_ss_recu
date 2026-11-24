@@ -199,6 +199,59 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
             .fetch_optional(&mut *tx)
             .await?;
 
+    // Rattachement a la volee des actifs consignables qui n'ont pas encore de
+    // consignable. Sur une base neuve, `returnable_packaging_types` est vide
+    // (un test d'architecture impose qu'aucune donnee commerciale fictive ne
+    // soit creee par migration) : sans cette resolution, la dette d'emballages
+    // d'une commande livree ne serait tracee nulle part.
+    //
+    // On procede comme `apply_catalog_presets` : creation du consignable
+    // manquant a partir de l'actif, puis initialisation de son stock. Le code
+    // est derive du code d'actif, donc stable et rejouable.
+    sqlx::query(
+        "INSERT INTO returnable_packaging_types (code, name, producer, kind, description, deposit_value)
+         SELECT 'EMB-AUTO-' || pa.code, pa.name, 'DEPOT', 'crate',
+                'Consignable deduce de l''actif ' || pa.code || ' (' || pa.compatibility_class || ')',
+                pa.deposit_value
+         FROM packaging_assets pa
+         JOIN order_packaging_allocations opa ON opa.packaging_asset_id = pa.id
+         WHERE opa.order_id = ?1
+           AND opa.is_consigned = 1
+           AND pa.returnable = 1
+           AND pa.returnable_id IS NULL
+           AND pa.code IS NOT NULL AND pa.code <> ''
+           AND NOT EXISTS (SELECT 1 FROM returnable_packaging_types r
+                           WHERE r.code = 'EMB-AUTO-' || pa.code)",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Stock initial pour les consignables crees par cette commande uniquement
+    sqlx::query(
+        "INSERT OR IGNORE INTO returnable_stock_balances (packaging_id, quantity)
+         SELECT r.id, 0 FROM returnable_packaging_types r
+         JOIN packaging_assets pa ON r.code = 'EMB-AUTO-' || pa.code
+         JOIN order_packaging_allocations opa ON opa.packaging_asset_id = pa.id
+         WHERE opa.order_id = ?1
+           AND NOT EXISTS (SELECT 1 FROM returnable_stock_balances b WHERE b.packaging_id = r.id)",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "UPDATE packaging_assets
+         SET returnable_id = (SELECT r.id FROM returnable_packaging_types r
+                              WHERE r.code = 'EMB-AUTO-' || packaging_assets.code)
+         WHERE returnable_id IS NULL
+           AND code IS NOT NULL AND code <> ''
+           AND EXISTS (SELECT 1 FROM returnable_packaging_types r
+                       WHERE r.code = 'EMB-AUTO-' || packaging_assets.code)",
+    )
+    .execute(&mut *tx)
+    .await?;
+
     let allocs: Vec<(i64, i64, i64, i64, i64, Option<i64>)> = sqlx::query_as(
         "SELECT opa.id, opa.packaging_asset_id, opa.quantity, opa.is_consigned,
                 opa.deposit_amount_xof, pa.returnable_id
@@ -238,20 +291,6 @@ pub async fn deliver_order(db: &DepotDb, id: i64) -> CoreResult<OrderDetailDto> 
         .await?;
 
         if is_consigned == 1 {
-            // Une consigne sans consignable rattache ne peut pas naitre : sans
-            // returnable_id, aucune ligne deposit_issues n'est creee et la dette
-            // du client disparaitrait silencieusement de la comptabilite.
-            // La migration 0026 relie les actifs seedes ; cette garde couvre les
-            // actifs crees a la main apres coup.
-            if returnable_id_opt.is_none() {
-                return Err(CoreError::Validation(
-                    "L'emballage consigne de cette commande n'est rattache a aucun consignable \
-                     (packaging_assets.returnable_id est vide). Renseignez le rattachement dans \
-                     le catalogue des emballages avant de livrer, sinon la consigne ne sera pas \
-                     tracee."
-                        .to_string(),
-                ));
-            }
             sqlx::query(
                 "INSERT INTO customer_deposit_balances (
                     customer_id, packaging_asset_id, quantity_held,

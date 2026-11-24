@@ -430,24 +430,20 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
     let deps_draft = orders::get_customer_deposits(&db, client.id).await.unwrap();
     assert!(deps_draft.is_empty());
 
-    // Le catalogue d'emballages seedé par la migration 0019 ne renseigne pas
-    // returnable_id ; sans rattachement, deliver_order ne peut créer aucune
-    // consigne. La migration 0026 relie les actifs existants aux consignables.
-    // Ce test reproduit le cas d'un actif créé après coup : on vérifie que
-    // l'absence de rattachement est refusée explicitement (et non silencieuse).
+    // Le catalogue seedé ne renseigne pas returnable_id, et une base neuve n'a
+    // aucun consignable (test d'architecture). C'est deliver_order qui rattache
+    // l'actif à la volée : on vérifie donc l'état AVANT, puis le résultat.
     let asset_id_for_link = created.allocations[0].packaging_asset_id;
-    sqlx::query(
-        "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
-         VALUES ('EMB-TEST-CAS24-33', 'Casier test 24x33', 'TEST', 'crate', 1000)",
-    )
-    .execute(&db.pool)
-    .await
-    .unwrap();
-    let test_returnable_id: i64 =
-        sqlx::query_scalar("SELECT id FROM returnable_packaging_types WHERE code = 'EMB-TEST-CAS24-33'")
+    let linked_before: Option<i64> =
+        sqlx::query_scalar("SELECT returnable_id FROM packaging_assets WHERE id = ?")
+            .bind(asset_id_for_link)
             .fetch_one(&db.pool)
             .await
             .unwrap();
+    assert!(
+        linked_before.is_none(),
+        "l'actif seedé n'est pas rattaché avant la première livraison"
+    );
 
     // Confirm : décrémente le stock en unités de base (200 -> 188), sans créer d'achat fournisseur.
     let confirmed = auth::with_actor(
@@ -471,26 +467,6 @@ async fn orders_mixed_cases_1_to_7_and_lifecycle() {
         .await
         .unwrap();
     assert_eq!(bock_stock, 188_000);
-
-    // Sans rattachement au consignable, la livraison doit être REFUSÉE :
-    // sinon la dette d'emballages du client n'existerait nulle part.
-    let refused = auth::with_actor(
-        approver.clone(),
-        orders::deliver_order(&db, created.order.id),
-    )
-    .await;
-    assert!(
-        refused.is_err(),
-        "livrer une consigne non rattachée à un consignable doit échouer"
-    );
-
-    // Avec le rattachement, la livraison crée la consigne dans deposit_issues.
-    sqlx::query("UPDATE packaging_assets SET returnable_id = ? WHERE id = ?")
-        .bind(test_returnable_id)
-        .bind(asset_id_for_link)
-        .execute(&db.pool)
-        .await
-        .unwrap();
 
     // Deliver : crée mouvement LIVRAISON_CLIENT & incrémente customer_deposit_balances
     let delivered = auth::with_actor(
@@ -732,28 +708,21 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
         Role::Owner,
     );
 
-    // Un consignable et un actif rattache : c'est l'etat attendu apres 0026.
-    sqlx::query(
-        "INSERT INTO returnable_packaging_types (code, name, producer, kind, deposit_value)
-         VALUES ('EMB-LOT9C-CAS24', 'Casier 24x33 Lot 9c', 'TEST', 'crate', 1000)",
-    )
-    .execute(&db.pool)
-    .await
-    .unwrap();
-    let returnable_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM returnable_packaging_types WHERE code = 'EMB-LOT9C-CAS24'",
-    )
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
-    let asset_id: i64 = sqlx::query_scalar(
-        "SELECT id FROM packaging_assets WHERE code = 'PA-CASIER-24X33'",
-    )
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
-    sqlx::query("UPDATE packaging_assets SET returnable_id = ?, stock_empty = 10 WHERE id = ?")
-        .bind(returnable_id)
+    // Base neuve : aucun consignable, l'actif 24x33 n'est pas rattache.
+    let asset_id: i64 =
+        sqlx::query_scalar("SELECT id FROM packaging_assets WHERE code = 'PA-CASIER-24X33'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    let linked_before: Option<i64> =
+        sqlx::query_scalar("SELECT returnable_id FROM packaging_assets WHERE id = ?")
+            .bind(asset_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert!(linked_before.is_none(), "aucun consignable sur une base neuve");
+    // stock_empty suffisant pour allouer un casier
+    sqlx::query("UPDATE packaging_assets SET stock_empty = 10 WHERE id = ?")
         .bind(asset_id)
         .execute(&db.pool)
         .await
@@ -839,6 +808,25 @@ async fn order_consignment_is_traced_in_deposit_issues_when_invoiced_then_delive
     auth::with_actor(approver.clone(), orders::deliver_order(&db, created.order.id))
         .await
         .unwrap();
+
+    // deliver_order a cree le consignable manquant ET rattache l'actif
+    let returnable_id: i64 =
+        sqlx::query_scalar("SELECT returnable_id FROM packaging_assets WHERE id = ?")
+            .bind(asset_id)
+            .fetch_one(&db.pool)
+            .await
+            .expect("deliver_order doit rattacher l'actif à un consignable");
+    assert!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT code FROM returnable_packaging_types WHERE id = ?"
+        )
+        .bind(returnable_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap()
+        .starts_with("EMB-AUTO-"),
+        "le consignable doit être déduit de l'actif"
+    );
 
     // La consigne existe dans deposit_issues : c'est elle qui porte les
     // echeances, conversions et pertes. Avant le correctif, elle n'existait pas.

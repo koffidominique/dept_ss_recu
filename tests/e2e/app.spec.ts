@@ -290,6 +290,11 @@ test.describe('DEPOTPRO PREMIUM V3 — Scénarios E2E Interface & Métier', () =
     const bockVarId = await makeProd('Bock 33cl E2E', 'BOCK-E2E');
     const drogbaVarId = await makeProd('Drogba 33cl E2E', 'DROGBA-E2E');
 
+    // Lot 9c : la livraison trace désormais la consigne dans deposit_issues.
+    // L'actif d'emballage seedé n'ayant pas de consignable sur une base neuve,
+    // c'est deliver_order qui crée et rattache le consignable à la volée
+    // (comme `apply_catalog_presets`). Aucun préalable côté test.
+
     await page.goto('/orders');
     await expect(
       page.getByRole('heading', { name: /Prise de commande clientèle/i, level: 1 })
