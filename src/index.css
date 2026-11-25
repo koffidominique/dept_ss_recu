@@ -144,60 +144,22 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.order-receipt-sheet { width: 100%; max-width: 780px; margin: 0 auto; font: 9.5px/1.32 Arial, sans-serif; color: #1e293b; }
-.order-receipt-header { display: grid; grid-template-columns: 1.45fr 0.9fr; gap: 12px; align-items: stretch; border-bottom: 2px solid #d97706; padding-bottom: 8px; }
-.order-receipt-brand { display: grid; grid-template-columns: 76px 1fr; gap: 10px; align-items: center; }
-.order-receipt-brand img,.order-receipt-logo-placeholder { width: 76px; height: 76px; object-fit: contain; border: 1px dashed #94a3b8; border-radius: 4px; background: #fff; }
-.order-receipt-logo-placeholder { display: grid; place-items: center; color: #64748b; font-weight: 700; font-size: 9px; text-align: center; padding: 4px; }
-.order-receipt-brand h1 { margin: 0 0 2px; color: #b45309; font-size: 14px; line-height: 1.08; text-transform: uppercase; font-weight: 800; }
-.order-receipt-brand p { margin: 1.5px 0; font-size: 8.5px; color: #334155; }
-.order-receipt-number { display: grid; gap: 2px; padding: 7px 9px; border: 2px solid #059669; border-radius: 6px; text-align: right; background: #f8fafc; }
-.order-receipt-number strong { color: #047857; font-size: 13px; letter-spacing: 0.02em; }
-.order-receipt-number small { color: #475569; font-size: 8px; font-weight: 700; text-transform: uppercase; }
-.order-receipt-number span { font-size: 8.5px; color: #1e293b; }
-.order-receipt-party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
-.order-receipt-party-grid section { min-height: 74px; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff; }
-.order-receipt-party-grid h2,.order-receipt-products h2,.order-receipt-packaging h2,.order-receipt-finance h2 { margin: 0 0 4px; color: #b45309; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
-.order-receipt-party-grid p { margin: 2px 0; font-size: 8.5px; }
-.order-receipt-products table,.order-receipt-packaging table { width: 100%; border-collapse: collapse; font-size: 8px; }
-.order-receipt-products th { padding: 4px 4px; background: #1f2937; color: #fff; text-align: left; font-size: 7.5px; text-transform: uppercase; }
-.order-receipt-products th:first-child,.order-receipt-products td:first-child { text-align: center; width: 24px; }
-.order-receipt-products th:nth-child(4),.order-receipt-products td:nth-child(4) { text-align: center; }
-.order-receipt-products th:nth-child(5),.order-receipt-products td:nth-child(5),.order-receipt-products th:nth-child(6),.order-receipt-products td:nth-child(6) { text-align: right; }
-.order-receipt-products td,.order-receipt-packaging td { padding: 3.5px 4px; border: 1px solid #cbd5e1; vertical-align: top; }
-.order-receipt-products tbody tr:nth-child(even),.order-receipt-packaging tbody tr:nth-child(even) { background: #f8fafc; }
-.order-receipt-products .order-receipt-empty-row td { height: 20px; }
-.order-receipt-packaging th:nth-child(n+2),.order-receipt-packaging td:nth-child(n+2) { text-align: center; }
-.order-receipt-bottom-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 10px; margin-top: 8px; align-items: start; }
-.order-receipt-packaging { margin-top: 0; }
-.order-receipt-packaging th { padding: 4px; background: #fef3c7; color: #92400e; text-align: left; font-size: 7.5px; text-transform: uppercase; border: 1px solid #cbd5e1; }
-.order-receipt-packaging small { display: block; margin-top: 1px; color: #64748b; font-size: 7.5px; }
-.order-receipt-finance { width: 100%; margin: 0; }
-.order-receipt-summary { border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; }
-.order-receipt-summary div { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 3.5px 7px; border-bottom: 1px solid #e2e8f0; font-size: 8.5px; }
-.order-receipt-summary div:last-child { border-bottom: 0; }
-.order-receipt-summary .is-total { background: #047857; color: #fff; font-weight: 700; font-size: 9px; }
-.order-receipt-summary .is-due { background: #fef2f2; color: #b91c1c; font-weight: 700; font-size: 9px; }
-.order-receipt-payment { margin-top: 8px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.5px; background: #f8fafc; }
-.order-receipt-payment-channels { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3px; font-size: 8.5px; }
-.order-receipt-notes { margin: 6px 0; font-size: 8px; color: #475569; }
-.order-receipt-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
-.order-receipt-signatures div { min-height: 52px; padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.5px; }
-.order-receipt-sheet footer { margin-top: 8px; padding-top: 5px; border-top: 1px solid #cbd5e1; text-align: center; color: #64748b; font-size: 8px; }
+
+/* Document A4 commercial - nouveau modèle */
+.document-sheet { width: 100%; max-width: 794px; margin: 0 auto; background: #fff; color: #1f2937; }
+.document-sheet table { page-break-inside: auto; }
+.document-sheet tr { page-break-inside: avoid; page-break-after: auto; }
+.document-sheet thead { display: table-header-group; }
+.document-sheet tfoot { display: table-footer-group; }
 
 @media print {
   @page { size: A4 portrait; margin: 10mm; }
-  .order-receipt-sheet { max-width: none; padding: 0 !important; font-size: 8.5px; }
-  .order-receipt-products thead { display: table-header-group; }
-  .order-receipt-products tr,.order-receipt-packaging tr,.order-receipt-signatures { break-inside: avoid; page-break-inside: avoid; }
-  .order-receipt-header,.order-receipt-party-grid,.order-receipt-bottom-grid,.order-receipt-payment { break-inside: avoid; page-break-inside: avoid; }
-  .no-print {
-    display: none !important;
-  }
-  body {
-    background: #FFFFFF !important;
-    color: #000000 !important;
-  }
+  .document-sheet { max-width: none !important; width: 100% !important; padding: 0 !important; box-shadow: none !important; }
+  .document-sheet table { page-break-inside: auto; }
+  .document-sheet tr, .document-sheet section { break-inside: avoid; page-break-inside: avoid; }
+  .document-sheet thead { display: table-header-group; }
+  .no-print { display: none !important; }
+  body { background: #FFFFFF !important; color: #000000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-document-root {
     position: static !important;
     transform: none !important;

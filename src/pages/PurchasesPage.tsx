@@ -32,16 +32,6 @@ function purchaseProductSnapshot(json?: string | null): string {
   } catch { return 'Caractéristiques complémentaires non disponibles sur ce CMD historique'; }
 }
 
-function supplierRequirementSnapshot(json?: string | null): string | undefined {
-  if (!json || json === '{}') return 'Détail emballage non disponible sur ce CMD historique';
-  try {
-    const snapshot = JSON.parse(json) as { components?: Array<{ code: string; requiredPieces: number }> ; depositRegime?: string };
-    if (snapshot.depositRegime === 'none') return 'Aucune obligation d’emballage fournisseur';
-    const items = snapshot.components || [];
-    return items.length ? `Besoin initial d’emballages : ${items.map((item) => `${item.requiredPieces} ${item.code}`).join(', ')}` : 'Détail emballage non disponible sur ce CMD historique';
-  } catch { return 'Détail emballage non disponible sur ce CMD historique'; }
-}
-
 function purchaseOrderStatusLabel(order: PurchaseOrder): string {
   if (order.approval_status === 'pending_owner_approval') {
     return 'En attente de validation propriétaire';
@@ -94,11 +84,8 @@ export function buildPurchaseOrderDoc(order: PurchaseOrder): PrintableDocumentDa
     deliveryDate: order.expected_date,
     lines: order.lines.map((l) => ({
       label: l.product_name,
-      sublabel: [
-        purchaseProductSnapshot(l.product_snapshot_json),
-        `Conditionnement : ${packagingContentsLabel(l.packaging_name, l.base_unit, l.coefficient_milli)} · commande ${formatQty(l.ordered_quantity_milli)} ${l.packaging_name} = ${formatQty(l.ordered_quantity_milli * l.coefficient_milli / 1000)} ${l.base_unit}`,
-        supplierRequirementSnapshot(l.packaging_snapshot_json),
-      ].filter(Boolean).join(' · '),
+      sublabel: purchaseProductSnapshot(l.product_snapshot_json),
+      packagingInfo: packagingContentsLabel(l.packaging_name, l.base_unit, l.coefficient_milli),
       quantity: `${formatQty(l.ordered_quantity_milli)} ${l.packaging_name}`,
       unitPrice: l.unit_price,
       total: l.line_total,
@@ -165,31 +152,65 @@ export function buildPurchaseReceiptDoc(order: PurchaseOrder, receipt: PurchaseR
     secondaryPartyName: order.reference,
     secondaryPartyDetails: receipt.received_by_name ? `Réceptionné par : ${receipt.received_by_name}` : 'Contrôle physique quai dépôt',
     lines: [
-      ...receipt.lines.map((line) => ({
-        label: line.product_name,
-        sublabel: `Conditionnement : ${packagingContentsLabel(line.packaging_name, line.base_unit, line.coefficient_milli)} · reçu ${formatQty(line.received_quantity_milli)} ${line.packaging_name} = ${formatQty(line.base_quantity_milli)} ${line.base_unit}`,
-        quantity: `${formatQty(line.received_quantity_milli)} ${line.packaging_name}`,
-        unitPrice: line.unit_price,
-        total: line.amount,
-        missingQuantity: (line.missing_quantity_milli ?? 0) > 0 ? formatQty(line.missing_quantity_milli ?? 0) : null,
-        damagedQuantity: (line.damaged_quantity_milli ?? 0) > 0 ? formatQty(line.damaged_quantity_milli ?? 0) : null,
-        refusedQuantity: (line.refused_quantity_milli ?? 0) > 0 ? formatQty(line.refused_quantity_milli ?? 0) : null,
-        discrepancyReason: line.discrepancy_reason,
-      })),
+      ...receipt.lines.map((line) => {
+        const missing = line.missing_quantity_milli ?? 0;
+        const damaged = line.damaged_quantity_milli ?? 0;
+        const refused = line.refused_quantity_milli ?? 0;
+        const ordered = line.received_quantity_milli + missing + damaged + refused;
+        return {
+          label: line.product_name,
+          sublabel: `Conditionnement : ${packagingContentsLabel(line.packaging_name, line.base_unit, line.coefficient_milli)}`,
+          quantity: `${formatQty(line.received_quantity_milli)} ${line.packaging_name}`,
+          orderedQuantity: `${formatQty(ordered)} ${line.packaging_name}`,
+          unitPrice: line.unit_price,
+          total: line.amount,
+          missingQuantity: missing > 0 ? formatQty(missing) : null,
+          damagedQuantity: damaged > 0 ? formatQty(damaged) : null,
+          refusedQuantity: refused > 0 ? formatQty(refused) : null,
+          discrepancyReason: line.discrepancy_reason,
+        };
+      }),
     ],
-    packagingLines: receipt.packaging_exchanges.map((exchange) => ({
-      label: `${exchange.name_snapshot} (${exchange.code_snapshot})`,
-      kind: exchange.kind_snapshot,
-      expectedQuantity: exchange.pieces_issued,
-      issuedQuantity: exchange.pieces_issued,
-      statusLabel: 'Remis physiquement au fournisseur',
-      detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
-    })),
+    packagingLines: (() => {
+      const issuedByReturnable = new Map<number, number>();
+      for (const ex of receipt.packaging_exchanges) {
+        issuedByReturnable.set(ex.returnable_id, (issuedByReturnable.get(ex.returnable_id) ?? 0) + ex.pieces_issued);
+      }
+      const reqs = order.packaging_requirements ?? [];
+      const lines = reqs.map((r) => {
+        const issued = issuedByReturnable.get(r.returnable_id) ?? 0;
+        const gap = Math.max(r.required_pieces - issued, 0);
+        return {
+          label: `${r.name} (${r.code})`,
+          kind: r.kind,
+          expectedQuantity: r.required_pieces,
+          issuedQuantity: issued,
+          statusLabel: issued <= 0 ? 'À remettre' : gap <= 0 ? 'Remise complète' : 'Remise partielle',
+          detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
+        };
+      });
+      for (const ex of receipt.packaging_exchanges) {
+        if (!reqs.some((r) => r.returnable_id === ex.returnable_id)) {
+          lines.push({
+            label: `${ex.name_snapshot} (${ex.code_snapshot})`,
+            kind: ex.kind_snapshot,
+            expectedQuantity: ex.pieces_issued,
+            issuedQuantity: ex.pieces_issued,
+            statusLabel: 'Remis sans exigence figée',
+            detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
+          });
+        }
+      }
+      return lines;
+    })(),
     summaryRows: [
       { label: 'Montant des marchandises reçues', value: formatFcfa(receipt.total_amount), bold: true, tone: 'success' as const },
       { label: 'Dette fournisseur créée à la réception', value: formatFcfa(receipt.total_amount) },
       { label: 'Statut du contrôle', value: recStatus, tone: receipt.status === 'discrepancy' ? 'danger' : 'default' },
     ],
+    paymentTermsLabel: order.payment_terms_label ?? null,
+    commercialConditions: order.commercial_conditions ?? null,
+    deliveryDate: order.expected_date ?? null,
     notes: receipt.notes,
   };
 }

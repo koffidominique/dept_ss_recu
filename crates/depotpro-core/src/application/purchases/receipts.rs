@@ -83,6 +83,10 @@ async fn persist_purchase_receipt_snapshot_tx(
         supplier_code,
         supplier_phone,
         supplier_address,
+        po_payment_terms_label,
+        po_commercial_conditions,
+        po_expected_date,
+        po_delivery_address,
     ): (
         String,
         String,
@@ -96,9 +100,14 @@ async fn persist_purchase_receipt_snapshot_tx(
         String,
         String,
         Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
     ) = sqlx::query_as(
         "SELECT pr.reference, pr.status, pr.received_by_name, pr.total_amount, pr.notes, pr.created_at,
-                po.reference, s.id, s.name, s.code, s.phone, s.address
+                po.reference, s.id, s.name, s.code, s.phone, s.address,
+                po.payment_terms_label, po.commercial_conditions, po.expected_date, po.delivery_address
          FROM purchase_receipts pr
          JOIN purchase_orders po ON po.id = pr.purchase_order_id
          JOIN suppliers s ON s.id = po.supplier_id
@@ -134,13 +143,15 @@ async fn persist_purchase_receipt_snapshot_tx(
         unit_price: i64,
         amount: i64,
         discrepancy_reason: Option<String>,
+        product_snapshot_json: String,
     }
 
     let lines = sqlx::query_as::<_, SnapRecLine>(
         "SELECT prl.purchase_order_line_id, pol.product_name, pol.packaging_name, pol.base_unit,
                 pol.coefficient_milli, pol.ordered_quantity_milli, prl.quantity_milli AS received_quantity_milli,
                 prl.missing_quantity_milli, prl.damaged_quantity_milli, prl.refused_quantity_milli,
-                prl.base_quantity_milli, prl.unit_price, prl.amount, prl.discrepancy_reason
+                prl.base_quantity_milli, prl.unit_price, prl.amount, prl.discrepancy_reason,
+                pol.product_snapshot_json
          FROM purchase_receipt_lines prl
          JOIN purchase_order_lines pol ON pol.id = prl.purchase_order_line_id
          WHERE prl.receipt_id = ? ORDER BY prl.id",
@@ -157,55 +168,135 @@ async fn persist_purchase_receipt_snapshot_tx(
     .fetch_all(&mut **tx)
     .await?;
 
+    #[derive(sqlx::FromRow)]
+    struct PoReqSnap {
+        returnable_id: i64,
+        code: String,
+        name: String,
+        kind: String,
+        required_pieces: i64,
+    }
+    let po_requirements = sqlx::query_as::<_, PoReqSnap>(
+        "SELECT r.returnable_id, r.code_snapshot AS code, r.name_snapshot AS name,
+                r.kind_snapshot AS kind, SUM(r.required_pieces) AS required_pieces
+         FROM purchase_order_packaging_requirements r
+         JOIN purchase_order_lines pol ON pol.id = r.purchase_order_line_id
+         WHERE pol.purchase_order_id = ?
+         GROUP BY r.returnable_id, r.code_snapshot, r.name_snapshot, r.kind_snapshot
+         ORDER BY r.code_snapshot ASC",
+    )
+    .bind(po_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
     let pdf_lines = lines
         .iter()
-        .map(|l| DocumentPdfLine {
-            label: format!("{} ({})", l.product_name, l.packaging_name),
-            sublabel: Some(format!(
-                "Équiv. stock : {} {} · Commandé : {} {}",
-                format_milli(l.base_quantity_milli),
-                l.base_unit,
-                format_milli(l.ordered_quantity_milli),
-                l.packaging_name
-            )),
-            quantity: format!(
-                "{} {}",
-                format_milli(l.received_quantity_milli),
-                l.packaging_name
-            ),
-            unit_price: Some(l.unit_price),
-            total: Some(l.amount),
-            ordered_quantity: Some(format!(
-                "{} {}",
-                format_milli(l.ordered_quantity_milli),
-                l.packaging_name
-            )),
-            missing_quantity: (l.missing_quantity_milli > 0)
-                .then(|| format_milli(l.missing_quantity_milli)),
-            damaged_quantity: (l.damaged_quantity_milli > 0)
-                .then(|| format_milli(l.damaged_quantity_milli)),
-            refused_quantity: (l.refused_quantity_milli > 0)
-                .then(|| format_milli(l.refused_quantity_milli)),
-            discrepancy_reason: l.discrepancy_reason.clone(),
-            packaging_info: Some(l.packaging_name.clone()),
-            ..Default::default()
+        .map(|l| {
+            let prod_snap: serde_json::Value =
+                serde_json::from_str(&l.product_snapshot_json).unwrap_or_default();
+            let brand = prod_snap.get("brand").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let brewery = prod_snap.get("brewery").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let variant = prod_snap.get("variant").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let volume_ml = prod_snap.get("volumeMl").and_then(|v| v.as_i64()).filter(|v| *v > 0);
+            let format_label = match (variant, volume_ml) {
+                (Some(v), Some(ml)) => Some(format!("{v} {ml}ml")),
+                (Some(v), None) => Some(v.to_string()),
+                (None, Some(ml)) => Some(format!("{ml}ml")),
+                (None, None) => None,
+            };
+            let mut label_parts: Vec<String> = Vec::new();
+            if let Some(b) = brewery.or(brand) { label_parts.push(b.to_string()); }
+            label_parts.push(l.product_name.clone());
+            if let Some(f) = &format_label { label_parts.push(f.clone()); }
+            let label = label_parts.join(" - ");
+
+            let per_unit = if l.coefficient_milli > 0 && l.coefficient_milli % 1000 == 0 {
+                Some(l.coefficient_milli / 1000)
+            } else { None };
+            let packaging_info = match per_unit {
+                Some(n) if n > 1 => format!("{} {} {}s", l.packaging_name, n, l.base_unit),
+                _ => l.packaging_name.clone(),
+            };
+
+            DocumentPdfLine {
+                label,
+                sublabel: Some(format!(
+                    "Équiv. stock : {} {} · Commandé : {} {}",
+                    format_milli(l.base_quantity_milli),
+                    l.base_unit,
+                    format_milli(l.ordered_quantity_milli),
+                    l.packaging_name
+                )),
+                quantity: format!(
+                    "{} {}",
+                    format_milli(l.received_quantity_milli),
+                    l.packaging_name
+                ),
+                unit_price: Some(l.unit_price),
+                total: Some(l.amount),
+                ordered_quantity: Some(format!(
+                    "{} {}",
+                    format_milli(l.ordered_quantity_milli),
+                    l.packaging_name
+                )),
+                missing_quantity: (l.missing_quantity_milli > 0)
+                    .then(|| format_milli(l.missing_quantity_milli)),
+                damaged_quantity: (l.damaged_quantity_milli > 0)
+                    .then(|| format_milli(l.damaged_quantity_milli)),
+                refused_quantity: (l.refused_quantity_milli > 0)
+                    .then(|| format_milli(l.refused_quantity_milli)),
+                discrepancy_reason: l.discrepancy_reason.clone(),
+                packaging_info: Some(packaging_info),
+                ..Default::default()
+            }
         })
         .collect::<Vec<_>>();
 
-    let pdf_packaging = exchanges
+    let mut issued_by_returnable: std::collections::HashMap<i64, i64> =
+        std::collections::HashMap::new();
+    for ex in &exchanges {
+        *issued_by_returnable.entry(ex.returnable_id).or_insert(0) += ex.pieces_issued;
+    }
+    let mut pdf_packaging: Vec<DocumentPdfPackagingLine> = po_requirements
         .iter()
-        .map(|ex| DocumentPdfPackagingLine {
-            label: format!("{} ({})", ex.name_snapshot, ex.code_snapshot),
-            kind: ex.kind_snapshot.clone(),
-            expected_quantity: ex.pieces_issued,
-            issued_quantity: Some(ex.pieces_issued),
-            returned_quantity: None,
-            unit_deposit_xof: None,
-            status_label: "Emballages vides remis physiquement au fournisseur".to_string(),
-            detail: Some("Échange physique — hors facturation liquide".to_string()),
-            amount: None,
+        .map(|r| {
+            let issued = *issued_by_returnable.get(&r.returnable_id).unwrap_or(&0);
+            let gap = (r.required_pieces - issued).max(0);
+            let status_label = if issued <= 0 {
+                "À remettre".to_string()
+            } else if gap <= 0 {
+                "Remise complète".to_string()
+            } else {
+                "Remise partielle".to_string()
+            };
+            DocumentPdfPackagingLine {
+                label: format!("{} ({})", r.name, r.code),
+                kind: r.kind.clone(),
+                expected_quantity: r.required_pieces,
+                issued_quantity: Some(issued),
+                returned_quantity: None,
+                unit_deposit_xof: None,
+                status_label,
+                detail: Some("Échange physique — hors facturation liquide".to_string()),
+                amount: None,
+            }
         })
-        .collect::<Vec<_>>();
+        .collect();
+    for ex in &exchanges {
+        if !po_requirements.iter().any(|r| r.returnable_id == ex.returnable_id) {
+            pdf_packaging.push(DocumentPdfPackagingLine {
+                label: format!("{} ({})", ex.name_snapshot, ex.code_snapshot),
+                kind: ex.kind_snapshot.clone(),
+                expected_quantity: ex.pieces_issued,
+                issued_quantity: Some(ex.pieces_issued),
+                returned_quantity: None,
+                unit_deposit_xof: None,
+                status_label: "Remis sans exigence figée".to_string(),
+                detail: Some("Échange physique — hors facturation liquide".to_string()),
+                amount: None,
+            });
+        }
+    }
 
     let status_label = match status.as_str() {
         "discrepancy" => "RÉCEPTION AVEC ÉCART",
@@ -246,9 +337,12 @@ async fn persist_purchase_receipt_snapshot_tx(
         secondary_party_title: Some("COMMANDE D'ORIGINE & CONTRÔLE".to_string()),
         secondary_party_name: Some(format!("Bon de commande {po_ref}")),
         secondary_party_details: Some(format!("Réceptionné par : {issuer_name}")),
+        delivery_date: po_expected_date.clone(),
         cashier_name: Some(issuer_name.clone()),
         version: Some(1),
         issuer_role: Some(issuer_role.clone()),
+        payment_terms_label: po_payment_terms_label.clone(),
+        commercial_conditions: po_commercial_conditions.clone(),
         lines: pdf_lines,
         packaging_lines: pdf_packaging,
         summary_rows: vec![
@@ -315,6 +409,14 @@ async fn persist_purchase_receipt_snapshot_tx(
             "receivedByName": issuer_name,
             "totalAmountXof": total_amount,
             "notes": notes,
+        },
+        "purchaseOrder": {
+            "id": po_id,
+            "reference": po_ref,
+            "expectedDate": po_expected_date,
+            "deliveryAddress": po_delivery_address,
+            "paymentTermsLabel": po_payment_terms_label,
+            "commercialConditions": po_commercial_conditions,
         },
         "lines": receipt_lines_dto,
         "packagingExchanges": exchanges,

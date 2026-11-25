@@ -80,7 +80,7 @@ fn make_line(line: &OrderLineDto, order: &OrderDetailDto) -> DocumentPdfLine {
     let cond_label = if line.base_quantity > 0 && line.requested_quantity > 0 {
         let per_unit = line.base_quantity / line.requested_quantity;
         if per_unit > 1 {
-            format!("{unit} ({per_unit})")
+            format!("{unit} {per_unit} {}s", line.base_unit)
         } else {
             unit.to_string()
         }
