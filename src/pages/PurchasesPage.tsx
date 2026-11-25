@@ -171,19 +171,46 @@ export function buildPurchaseReceiptDoc(order: PurchaseOrder, receipt: PurchaseR
         };
       }),
     ],
-    packagingLines: receipt.packaging_exchanges.map((exchange) => ({
-      label: `${exchange.name_snapshot} (${exchange.code_snapshot})`,
-      kind: exchange.kind_snapshot,
-      expectedQuantity: exchange.pieces_issued,
-      issuedQuantity: exchange.pieces_issued,
-      statusLabel: 'Remis physiquement au fournisseur',
-      detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
-    })),
+    packagingLines: (() => {
+      const issuedByReturnable = new Map<number, number>();
+      for (const ex of receipt.packaging_exchanges) {
+        issuedByReturnable.set(ex.returnable_id, (issuedByReturnable.get(ex.returnable_id) ?? 0) + ex.pieces_issued);
+      }
+      const reqs = order.packaging_requirements ?? [];
+      const lines = reqs.map((r) => {
+        const issued = issuedByReturnable.get(r.returnable_id) ?? 0;
+        const gap = Math.max(r.required_pieces - issued, 0);
+        return {
+          label: `${r.name} (${r.code})`,
+          kind: r.kind,
+          expectedQuantity: r.required_pieces,
+          issuedQuantity: issued,
+          statusLabel: issued <= 0 ? 'À remettre' : gap <= 0 ? 'Remise complète' : 'Remise partielle',
+          detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
+        };
+      });
+      for (const ex of receipt.packaging_exchanges) {
+        if (!reqs.some((r) => r.returnable_id === ex.returnable_id)) {
+          lines.push({
+            label: `${ex.name_snapshot} (${ex.code_snapshot})`,
+            kind: ex.kind_snapshot,
+            expectedQuantity: ex.pieces_issued,
+            issuedQuantity: ex.pieces_issued,
+            statusLabel: 'Remis sans exigence figée',
+            detail: 'Échange matériel uniquement; aucune consigne client ni ligne financière.',
+          });
+        }
+      }
+      return lines;
+    })(),
     summaryRows: [
       { label: 'Montant des marchandises reçues', value: formatFcfa(receipt.total_amount), bold: true, tone: 'success' as const },
       { label: 'Dette fournisseur créée à la réception', value: formatFcfa(receipt.total_amount) },
       { label: 'Statut du contrôle', value: recStatus, tone: receipt.status === 'discrepancy' ? 'danger' : 'default' },
     ],
+    paymentTermsLabel: order.payment_terms_label ?? null,
+    commercialConditions: order.commercial_conditions ?? null,
+    deliveryDate: order.expected_date ?? null,
     notes: receipt.notes,
   };
 }
