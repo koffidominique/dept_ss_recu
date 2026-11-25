@@ -6,7 +6,7 @@ import type {
   CustomerOrderReceiptSnapshot,
   PaymentReceiptSnapshot,
 } from "../../../types/erp.ts";
-import { formatDateTime, formatFcfa, formatQty, packagingContentsLabel } from "../../../utils/format.ts";
+import { formatDateTime, formatFcfa, formatQty } from "../../../utils/format.ts";
 
 /* ============================================================================
  * REÇU DE COMMANDE CLIENT (modèle A4 Côte d'Ivoire & snapshots immuables)
