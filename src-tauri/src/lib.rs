@@ -115,6 +115,33 @@ pub fn run() {
                 ),
             );
 
+            let obligations_db = db.clone();
+            let obligations_interval_secs = std::env::var("DEPOTPRO_OBLIGATIONS_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(900)
+                .max(60);
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                    obligations_interval_secs,
+                ));
+                interval.tick().await; // premier tick immédiat ignoré : traitement déjà effectué au démarrage
+                loop {
+                    interval.tick().await;
+                    if let Err(e) =
+                        depotpro_core::application::packaging_obligations::process_due_obligations(
+                            &obligations_db,
+                            Some("system"),
+                        )
+                        .await
+                    {
+                        eprintln!(
+                            "Traitement périodique des échéances d'emballages ignoré : {e}"
+                        );
+                    }
+                }
+            });
+
             app.manage(DesktopState::new(db, backup_dir, lock_path));
             Ok(())
         })

@@ -47,6 +47,7 @@ npm run build
 cargo run --release --manifest-path crates/depotpro-server/Cargo.toml
 ```
 Par défaut, `depotpro-server` :
-- Écoute sur `127.0.0.1:3000` (configurable via `DEPOTPRO_HOST` et `DEPOTPRO_PORT`).
+- Écoute sur `127.0.0.1:3000` (configurable via `DEPOTPRO_HOST` et `PORT`).
 - Utilise `./data/depotpro_v3.db` (`DEPOTPRO_DB_PATH`) et `./data/Sauvegardes` (`DEPOTPRO_BACKUP_DIR`).
-- Sert le dossier `dist/` (`DEPOTPRO_DIST_DIR`) avec fallback SPA vers `index.html`, ainsi que l'API REST `/api/*`.
+- Sert le dossier `dist/` avec fallback SPA vers `index.html`, ainsi que l'API REST `/api/*`.
+- Traite les échéances d'emballages au démarrage puis périodiquement (`DEPOTPRO_OBLIGATIONS_INTERVAL_SECS`, défaut `900`, minimum `60`).

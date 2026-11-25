@@ -1,5 +1,7 @@
 // ============================================================================
-// Catalogue SQL des migrations embarquées (0001..0023)
+// Catalogue SQL des migrations embarquées (0001..0032)
+// Source de vérité : ce registre (`MIGRATIONS`) pilote l'application runtime.
+// Chaque entrée doit correspondre à un fichier SQL dans `migrations/sqlite/`.
 // ============================================================================
 
 pub const V3_SCHEMA_SQL: &str =
@@ -24,7 +26,7 @@ pub const V3_MIGRATION_0010_SQL: &str =
 pub const V3_MIGRATION_0009_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0009_support_tracking.sql");
 pub const V3_MIGRATION_0011_SQL: &str =
-    include_str!("../../../../../migrations/sqlite/0007_packaging_components.sql");
+    include_str!("../../../../../migrations/sqlite/0011_packaging_components.sql");
 pub const V3_MIGRATION_0012_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0012_catalogue_products.sql");
 pub const V3_MIGRATION_0013_SQL: &str =
