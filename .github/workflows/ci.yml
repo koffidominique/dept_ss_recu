@@ -143,13 +143,29 @@ jobs:
           # trace exploitable et l'on ne sait pas si la compilation ou un test
           # consomme le temps. Ces lignes coutent quelques octets.
           echo "::notice title=rust-core-debut::$(date -u +%H:%M:%S) debut"
-          CARGO_TERM_COLOR=never cargo test -p depotpro-core --no-fail-fast 2>&1 | tee /tmp/rust_core_test.log
-          rc=${PIPESTATUS[0]}
+          # On compile une fois, puis on execute chaque fichier de test separement
+          # avec un timeout individuel.
+          #
+          # Motif : un fichier dont un cas ne rend jamais la main consommait tout
+          # le budget du job, qui mourait sur le timeout global sans indiquer
+          # lequel. En isolant chaque fichier, un blocage coute 4 minutes et
+          # designe le coupable, au lieu d'immobiliser 20 minutes.
+          cargo test -p depotpro-core --no-run 2>&1 | tail -n 5
+          : > /tmp/rust_core_test.log
+          rc=0
+          for f in crates/depotpro-core/tests/*.rs; do
+            name=$(basename "$f" .rs)
+            start=$(date +%s)
+            if timeout 240 cargo test -p depotpro-core --test "$name" -- --nocapture >>/tmp/rust_core_test.log 2>&1; then
+              echo "::notice title=rust-core::$name OK en $(( $(date +%s) - start ))s"
+            else
+              st=$?
+              echo "::notice title=rust-core::$name ECHEC/TIMEOUT (code $st) en $(( $(date +%s) - start ))s"
+              [ "$st" -ne 124 ] && rc="$st"
+              [ "$st" -eq 124 ] && rc=124
+            fi
+          done
           echo "::notice title=rust-core-fin::$(date -u +%H:%M:%S) fin rc=$rc"
-          # Ce que la suite a reellement execute, pour distinguer « lent » de
-          # « bloque ».
-          grep -E '^(test result|running [0-9]+ test|error)' /tmp/rust_core_test.log | tail -n 40 || true
-          grep -c '^test .* \.\.\. ok$' /tmp/rust_core_test.log || true
           MSG=$(grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking) ' /tmp/rust_core_test.log | tail -n 60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
           if [ "$rc" -ne 0 ]; then
             echo "::error title=cargo-test-core::$MSG"
