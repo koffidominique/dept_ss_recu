@@ -161,8 +161,17 @@ jobs:
             else
               st=$?
               echo "::notice title=rust-core::$name ECHEC/TIMEOUT (code $st) en $(( $(date +%s) - start ))s"
-              [ "$st" -ne 124 ] && rc="$st"
-              [ "$st" -eq 124 ] && rc=124
+              # Les annotations GitHub sont tronquees : on garde la trace des
+              # echecs dans un fichier, et on affiche le diagnostic critique
+              # directement dans le log du job.
+              {
+                echo "===== $name (code $st) ====="
+                grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking|Finished|Running) ' /tmp/rust_core_test.log \
+                  | grep -E 'FAILED|panicked|assertion|failures:|^test .* FAILED|error|left:|right:|Retour supérieur' \
+                  | tail -n 30
+              } > /tmp/rc_failures.txt
+              cat /tmp/rc_failures.txt
+              rc=1
             fi
           done
           echo "::notice title=rust-core-fin::$(date -u +%H:%M:%S) fin rc=$rc"
