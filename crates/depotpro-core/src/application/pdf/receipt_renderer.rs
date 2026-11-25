@@ -87,8 +87,10 @@ fn draw_brand_header(cmds: &mut Vec<String>, company: &AppSettingsDto, doc: &Doc
     for line in title_lines.iter().take(2) { draw_text(cmds, bx, ty, line, 13.0, true, ORANGE); ty -= 14.0; }
     draw_line(cmds, bx, ty + 3.0, 395.0, ty + 3.0, ORANGE, 0.8);
     let mut iy = ty - 8.0;
-    let activity = company.business_activity.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("Distribution & Vente de Boissons (Gros / Demi-Gros / Détail)");
-    draw_text(cmds, bx, iy, &format!("Activité : {}", activity), 6.8, false, NAVY); iy -= 10.0;
+    if let Some(activity) = company.business_activity.as_deref().filter(|s| !s.trim().is_empty()) {
+        draw_text(cmds, bx, iy, &format!("Activité : {}", activity), 6.8, false, NAVY);
+        iy -= 10.0;
+    }
     let loc = [company.commune.as_deref(), company.quartier.as_deref(), company.city.as_deref(), company.country.as_deref()].into_iter().flatten().filter(|s| !s.trim().is_empty()).collect::<Vec<_>>().join(" / ");
     draw_text(cmds, bx, iy, &format!("Commune / Quartier : {}", if loc.is_empty() { ".........................................................." } else { &loc }), 6.6, false, NAVY); iy -= 10.0;
     if let Some(addr) = company.address.as_deref().filter(|s| !s.trim().is_empty()) { draw_text(cmds, bx, iy, &format!("Adresse : {}", addr), 6.6, false, NAVY); iy -= 10.0; }
