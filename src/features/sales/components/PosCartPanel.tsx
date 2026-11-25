@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import { PackageCheck, PauseCircle, PlayCircle, RotateCcw, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
 import { FormTipsButton } from '../../../components/common/FormTipsButton.tsx';
 import { DP_EASE } from '../../../components/motion/MotionPrimitives.tsx';
-import { MoneyInput } from '../../../components/common/MoneyInput.tsx';
 import { QuantityInput } from '../../../components/common/QuantityInput.tsx';
 import { formatFcfa } from '../../../utils/format.ts';
 import type { CartItem, HeldCart } from '../../../stores/uiStore.ts';
@@ -500,18 +499,7 @@ export function PosCartPanel({
                           +
                         </button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-[10px] text-[#667085] dark:text-slate-400">
-                          <span>Remise</span>
-                          <MoneyInput
-                            aria-label={`Remise ligne ${item.productName}`}
-                            value={item.discountAmount}
-                            onChange={(disc) =>
-                              onUpdateCartItem(item.key, { discountAmount: disc })
-                            }
-                            className="w-24"
-                          />
-                        </div>
+                      <div className="flex items-center gap-2 justify-end">
                         <div className="text-right min-w-[78px]">
                           <div className="font-mono-num text-xs font-semibold">
                             {lineCalc && lineCalc.valid && lineCalc.lineNet !== null

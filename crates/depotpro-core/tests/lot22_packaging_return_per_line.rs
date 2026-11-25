@@ -211,18 +211,13 @@ async fn seed(db: &DepotDb) -> (i64, i64, i64, i64, i64) {
 /// revient à figer une hypothèse sur le calcul des consignes — et c'est
 /// précisément ce que ce lot enseigne à ne pas faire. On interroge donc la
 /// base pour connaître les consignes réellement configurées.
-async fn cash_payment_for(
-    db: &DepotDb,
-    packaging_id: i64,
-    quantity: i64,
-) -> Vec<PaymentPartInput> {
-    let unit: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(retail_price, 0) FROM product_packagings WHERE id = ?",
-    )
-    .bind(packaging_id)
-    .fetch_one(&db.pool)
-    .await
-    .unwrap();
+async fn cash_payment_for(db: &DepotDb, packaging_id: i64, quantity: i64) -> Vec<PaymentPartInput> {
+    let unit: i64 =
+        sqlx::query_scalar("SELECT COALESCE(retail_price, 0) FROM product_packagings WHERE id = ?")
+            .bind(packaging_id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
 
     let deposit_per_pack: i64 = sqlx::query_scalar(
         "SELECT COALESCE(SUM(dpc.pieces_per_pack * rpt.deposit_value), 0)
@@ -304,8 +299,14 @@ async fn returning_two_crates_credits_the_crates_and_their_bottles() {
         .await
         .unwrap();
 
-        let crate_return = returned.iter().find(|(r, _)| *r == crate_id).map(|(_, p)| *p);
-        let bottle_return = returned.iter().find(|(r, _)| *r == bottle_id).map(|(_, p)| *p);
+        let crate_return = returned
+            .iter()
+            .find(|(r, _)| *r == crate_id)
+            .map(|(_, p)| *p);
+        let bottle_return = returned
+            .iter()
+            .find(|(r, _)| *r == bottle_id)
+            .map(|(_, p)| *p);
 
         assert_eq!(crate_return, Some(2), "2 casiers rendus");
         assert_eq!(
