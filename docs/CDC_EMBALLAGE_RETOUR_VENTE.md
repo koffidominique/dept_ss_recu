@@ -1,292 +1,226 @@
 # Cahier des charges — Emballage remis par le client (vente au comptoir)
 
-> **Statut : à valider avant implémentation.** Aucune ligne de code n'a été
-> écrite. Ce document décrit ce qui existe déjà, ce qui manque réellement, et
-> les deux points de facturation qui demandent votre arbitrage.
+> **Version 2 — décisions arrêtées.** Les trois questions de la v1 sont
+> tranchées. Ce document est prêt à implémenter.
+>
+> Décisions : (1) un casier vendu = sortie de **1 casier plein + N bouteilles
+> pleines**, donc un emballage rendu = entrée de **1 casier vide + N bouteilles
+> vides** ; (2) le champ « Remise » est **supprimé entièrement** ; (3) le suivi
+> est **par ligne de produit**.
 
 ---
 
-## 1. Demande d'origine, reformulée
+## 1. La règle métier, telle qu'elle doit être codée
 
-Sur le formulaire de vente, pour un produit dont l'emballage est un **casier** :
+Un conditionnement « casier » n'est pas une unité : c'est un **conteneur de
+bouteilles**. Les données le disent déjà — `deposit_packaging_components`
+attache au casier Bock 24×65cl **deux** composants consignés :
 
-- remplacer le champ « remise » par un champ **« Emballage remis par le
-  client »** ;
-- saisir la quantité d'emballages vides rendus ;
-- soldé si la totalité est rendue, sinon **dette à régulariser sous 15 jours** ;
-- ce montant **ne doit pas** entrer dans le total de la vente ;
-- le reçu doit l'afficher ligne par ligne.
-
-Décisions déjà prises : **remise supprimée**, champ **réservé aux casiers**,
-**cahier des charges d'abord**.
-
----
-
-## 2. L'écart entre la demande et le code réel
-
-Cette section est le cœur du document. Une partie de la logique demandée existe
-déjà ; l'implémenter telle quelle produirait soit un doublon, soit une
-régression comptable.
-
-### 2.1. Deux formulaires distincts, et ce n'est pas un détail
-
-| Écran | Route | Rôle |
+| Composant | `pieces_per_pack` | Consigne émise par casier vendu |
 |---|---|---|
-| **Point de vente** | `/sales/new` | vente comptoir, encaissement immédiat |
-| **Prise de commande** | `/orders` | commande client, livraison ultérieure, « commande mixte » |
+| Casier 24 (plastique) | 1 | 1 casier |
+| Bouteille 65cl (verre) | 24 | 24 bouteilles |
 
-Le vocabulaire de la demande (« Nouvelle Vente », « commande mixte », « champ
-casier + champ remise ») désigne **les deux à la fois**. Or ils n'ont pas le
-même modèle de données :
+Vendre 3 casiers sort donc du dépôt **3 casiers vides et 72 bouteilles vides**,
+et crée **deux dettes** dans `deposit_issues`, toutes deux rattachées à la même
+ligne de vente.
 
-- le POS porte une **remise monétaire par ligne** (`CartItem.discountAmount`) ;
-- la prise de commande porte une **remise globale** (`discount_xof`) et un prix
-  unitaire par ligne, **sans remise de ligne**.
+> **Conséquence directe, et c'est le cœur de ce lot :** rendre « 1 emballage »
+> ne signifie pas rendre un casier *ou* ses bouteilles — **cela signifie rendre
+> le casier et les 24 bouteilles qu'il contenait**. Un seul champ, qui crédite
+> les deux.
 
-Un « champ remise par ligne » n'existe donc que sur le POS. La suppression
-demandée (§4.2) ne concerne **que le POS**. Le parcours de commande ne perd
-rien : il n'avait rien.
+### 1.1. Formule
 
-**Décision à valider** : ce cahier des charges cible le **point de vente**
-(`/sales/new`). Le parcours de commande garde son propre panneau
-« emballages vides rapportés » (Lot 15), qui couvre déjà la restitution à la
-création de commande.
+Pour chaque ligne dont le conditionnement émet un casier :
 
-### 2.2. Ce qui existe déjà — et qu'il ne faut pas réécrire
+```
+casiers_émis      = quantité                       (1 par casier vendu)
+bouteilles_émises = quantité × pieces_per_pack     (du composant bouteille)
 
-| Élément demandé | Où c'est déjà fait |
+casiers_remis     = saisie de l'opérateur                        [0 … casiers_émis]
+bouteilles_remises = casiers_remis × pieces_per_pack
+```
+
+L'opérateur **ne saisit qu'un nombre** : le casier. Les bouteilles en découlent
+— un casier vide rendu contient forcément ses bouteilles vides. Saisir les deux
+séparément permettrait « 3 casiers rendus, 12 bouteilles rendues », qui ne
+correspond à aucun objet physique.
+
+### 1.2. Dette résiduelle
+
+```
+dette casier    = (casiers_émis    − casiers_remis)     × consigne casier
+dette bouteille = (bouteilles_émises − bouteilles_remises) × consigne bouteille
+```
+
+Chacune est déjà gérée par le cœur via `deposit_issues` (statut `pending`,
+`due_date` à **+15 jours** par défaut via `packaging_policies.return_delay_days`).
+
+### 1.3. Le total de la vente
+
+La consigne **facturée** au client (émise au moment de la vente) reste dans le
+total : elle a été facturée, elle est due. Seul le **retour** est hors total —
+c'est déjà le comportement actuel, et le point 5 de la demande est donc
+respecté sans modification (`create_persistence.rs`).
+
+> Nuance à connaître : ce qui ne doit **jamais** entrer dans le total est le
+> *montant du retour*. La consigne, elle, entre dans le total comme aujourd'hui.
+> Confondre les deux ferait baisser le total de la vente à chaque emballage
+> rendu.
+
+---
+
+## 2. Ce qui existe déjà (ne pas réécrire)
+
+| Élément | Où |
 |---|---|
-| Saisie des vides rendus | bloc « Retour d'emballages client » (`PosCartPanel.tsx` l. 228-380), avec plafond, valorisation et **reste dû** en direct |
-| Calcul « reste dû » | `computeAvailableReturnableRows` (`saleCalculations.ts` l. 312) |
-| Déduction de la dette | `create_persistence.rs` l. 212-265 : solde client et stock sous-dépôt dans la même transaction |
+| Consigne émise par composant, avec échéance 15 j | `create_persistence.rs` l. 150-185 |
+| Déduction du solde client + entrée stock sous-dépôt | `create_persistence.rs` l. 212-395 |
 | Apurement FIFO des dettes antérieures | même fichier, l. 297-338 |
-| **Hors total de la vente** | le total est `total_merchandise` ; le retour est un champ distinct, affiché « hors total commande » |
-| **Délai de 15 jours** | `packaging_policies.return_delay_days`, défaut **15** (`create_persistence.rs` l. 166), et déjà imprimé sur le reçu |
-| Reçu : statut par ligne | `ValidatedSaleBanner.tsx` l. 77-95 : « Restitution complète » / « N à restituer sous 15 jours » |
-
-**Conséquence** : les points 4 et 5 de la demande (dette de 15 jours hors total)
-**sont déjà satisfaits**. Les réimplémenter serait une erreur.
-
-### 2.3. Ce qui manque vraiment : la granularité par ligne
-
-C'est le seul vrai travail, et c'est bien ce que vous demandez.
-
-- **Aujourd'hui, le retour se saisit par *type d'emballage***, pas par ligne de
-  produit. Sur une vente de deux produits en casier, l'écran ne permet pas de
-  dire « pour la ligne 1, 2 casiers rendus sur 3 ».
-- **Le bouton d'annulation de la dette est déjà par ligne** : `deposit_issues`
-  porte `sale_line_id`.
-- **Le retour, lui, l'écrit à `NULL`** (`create_persistence.rs` l. 341-342 :
-  `VALUES (?, NULL, ?, ?, …)`).
-
-La colonne existe, la dette la renseigne, le retour l'ignore. **Le correctif
-est donc d'une ligne de SQL** — plus l'écran pour la produire.
-
-### 2.4. « Produit de caractéristique casier » : le vrai discriminant
-
-Ne pas confondre deux notions proches :
-
-| Notion | Où | Valeurs | Usage |
-|---|---|---|---|
-| `requested_unit` | ligne de vente | `crate`, `half_crate`, `bottle`, `pack`… | **vocabulaire de quantité** (combien d'unités) |
-| `returnable_packaging_types.kind` | type d'emballage consigné | `bottle`, `crate` (**CHECK**) | **nature physique de l'emballage** |
-
-Le critère correct est **`kind = 'crate'`** : une demi-caisse de bouteilles est
-facturée à l'unité mais rendue dans un casier entier. Filtrer sur
-`requested_unit = 'crate'` afficherait le champ sur les casiers pleins et le
-cacherait sur les demi-caisses — l'inverse du besoin.
-
-### 2.5. Le « champ casier » de la demande
-
-Sur le POS, la seule quantité de supports est `CartItem.supportQuantity`
-(nombre de casiers physiques, suivie séparément des bouteilles). Elle est
-**initialisée à `'1'` et n'est éditable nulle part** (`posCartBuilders.ts`
-l. 55 et 102).
-
-Deux lectures possibles de votre demande, à trancher :
-
-- **(a)** ce champ doit devenir visible et éditable ;
-- **(b)** votre « champ casier » désignait la ligne « casier » du panier, et il
-  n'y a rien à ajouter.
-
-Les deux peuvent être vrais. Le §6 propose de laisser (b) et de traiter (a) à
-part.
-
-### 2.6. Une dépendance à couvrir explicitement
-
-`sale_lines.id` n'existe qu'**après** l'insertion de la ligne. Le retour est
-écrit plus loin dans la même transaction, donc l'identifiant est disponible.
-Mais si le retour est saisi **avant** que la vente soit validée, il faut le
-rattacher au `CartItem.key` en mémoire, puis le résoudre au moment de
-l'insertion. **C'est le point technique le plus délicat du lot** et il doit
-être testé en premier.
+| Retour hors total | le total est `total_merchandise` ; le retour s'affiche à part |
+| Reçu : « N à restituer sous 15 jours » | `ValidatedSaleBanner.tsx` l. 77-95 |
 
 ---
 
-## 3. Périmètre retenu
+## 3. Ce qui manque, et que ce lot apporte
 
-**Dans le lot**
+### 3.1. Le retour par **ligne de produit**
 
-1. Saisie du retour **par ligne de panier**, sur les lignes dont l'emballage
-   est un casier (`kind = 'crate'`).
-2. Suppression du champ « Remise » sur les lignes du POS.
-3. `deposit_issues.sale_line_id` renseigné pour les retours.
-4. Reçu : une ligne d'emballage par ligne de vente, avec remis / dû / statut.
-5. Tests : unitaires sur le calcul, Rust sur le rattachement, E2E sur le
-   parcours.
+Saisie aujourd'hui **par type d'emballage**, pas par ligne. Or
+`deposit_issues.sale_line_id` existe depuis la v1, la dette la renseigne, et le
+retour l'écrit à `NULL` (`create_persistence.rs` l. 342).
 
-**Hors périmètre (explicite)**
+C'est ce qui permettra à la fiche de suivi client de dire **quelle ligne** doit
+encore un casier, au lieu d'un total agrégé.
 
-- Le parcours de commande `/orders` : garde son panneau actuel.
-- `supportQuantity` éditable : sujet distinct (§2.5a).
-- La remise **globale** du panier : conservée, elle n'entre pas dans la demande.
-- Les emballages **bouteille** : le champ ne s'affiche pas (§2.4).
-- Modification d'une vente après validation : impossible par construction.
+### 3.2. Le casier comme unité de saisie
 
----
+Aujourd'hui les lignes du bloc « Retour d'emballages client » sont des **types
+d'emballage** : « Casier 24 » et « Bouteille 65cl » apparaissent séparément,
+sans lien. L'opérateur doit deviner combien de bouteilles vont avec un casier.
 
-## 4. Spécification d'écran
+Demain, la ligne affiche **« Emballage remis par le client : [ 2 ] / 3 casiers »**
+et le système en déduit les 48 bouteilles.
 
-### 4.1. Ligne de panier — avant / après
+### 3.3. La suppression du champ « Remise »
 
-**Aujourd'hui**, pour une ligne de casier :
-
-```
-Youki 65cl · casier · 4 800 FCFA + consigne 1 000
-[−] [ 3 ] [+]                            Remise [ 0 ]   14 700
-                                                         +3 000 cons.
-```
-
-**Après** :
-
-```
-Youki 65cl · casier · 4 800 FCFA + consigne 1 000
-[−] [ 3 ] [+]                                         14 700
-                                                      +3 000 cons.
-Emballage remis par le client : [ 2 ] / 3 casiers   → reste 1 dû, 1 000 FCFA
-```
-
-Règles d'affichage :
-
-- le champ n'apparaît **que** si la ligne émet un emballage `kind = 'crate'` ;
-- le dénominateur est le nombre de casiers **émis par cette ligne** (produit
-  de la quantité par `pieces_per_pack` du composant casier) ;
-- la saisie est **plafonnée** au total émis par la ligne, plus les dettes
-  antérieures du client si l'on veut solder l'ancien. Le plafond existant
-  (`max_returnable_pieces`) est déjà calculé ; il faudra le **répartir** par
-  ligne sans changer le total.
-- le sous-titre indique le reste dû et sa valorisation, comme aujourd'hui.
-
-### 4.2. Suppression du champ « Remise »
-
-- retirer le bloc `Remise` + `MoneyInput` de `PosCartPanel.tsx` (l. 500-515) ;
-- **conserver** `discountAmount` dans `CartItem` et dans l'envoi au serveur, à
-  `0` : le supprimer du modèle casserait le calcul de total et la signature
-  d'idempotence (`posCartBuilders.ts` l. 333) ;
-- la remise **globale** du panier (`PosPaymentPanel`) reste inchangée.
-
-> ⚠️ Ce point supprime une capacité de facturation (geste commercial sur une
-> ligne). Il est implémenté **tel que demandé**, mais le reçu continuera
-> d'afficher `Remise` à 0 si le modèle la conserve. Si vous préférez que la
-> remise par ligne reste possible mais discrète, dites-le : c'est le seul
-> point du document qui touche à l'argent.
-
-### 4.3. Ce qui ne change pas à l'écran
-
-Le bloc « Retour d'emballages client » (par type) reste visible **pour les
-emballages bouteille** et pour solder des dettes antérieures. Le nouveau champ
-par ligne le complète sur les casiers. Les deux alimentent **le même**
-`received_returnables` — c'est ce qui garantit qu'aucun montant n'est compté
-deux fois.
+Confirmée sans réserve : retiré du panier, `discountAmount` reste à `0` dans le
+modèle et dans l'envoi (le supprimer du type casserait la signature
+d'idempotence et le calcul de total).
 
 ---
 
-## 5. Spécification du reçu
+## 4. Écran — `PosCartPanel.tsx`
 
-Le reçu de vente est construit par `buildSalePrintableDoc`
-(`ValidatedSaleBanner.tsx`), rendu par `PrintableDocumentSheet.tsx`.
+```
+Bock 65cl · casier · 4 800 FCFA + consigne 1 000
+[−] [ 3 ] [+]                                          14 700
+                                                       +3 000 cons.
+Emballage remis par le client :  [ 2 ] / 3 casiers      Reste 1 casier + 24 bouteilles
+```
 
-Pour chaque ligne de produit dont l'emballage est un casier, le reçu affiche :
+Règles :
 
-| Champ | Source |
+- champ affiché **uniquement** si la ligne émet un composant `kind = 'crate'` ;
+- dénominateur = `quantité` (nombre de casiers) ;
+- saisie entière, bornée `0 … quantité` ;
+- sous-titre : reste dû **en casiers et en bouteilles**, avec sa valorisation ;
+- à zéro saisi, afficher « aucun emballage rendu — dette totale de X FCFA » ;
+- le bloc global « Retour d'emballages client » **reste** pour les emballages
+  bouteille vendus à l'unité et pour les dettes antérieures d'autres produits.
+
+---
+
+## 5. Reçu
+
+Pour chaque ligne de casier :
+
+| Ligne du reçu | Source |
 |---|---|
-| Type de produit commandé | `sale_lines.product_name` + `sales_unit_label` |
-| Quantité commandée | `sale_lines.quantity_milli` |
-| Casiers émis | composant casier × quantité |
-| Casiers remis | `deposit_issues.returned_pieces` **de cette ligne** |
-| Casiers restant dus | émis − remis |
-| Statut | « Restitution complète » / « N à restituer sous 15 jours » |
-| Mention 15 jours | déjà présente ; conservée |
+| Type de produit | `product_name` + `sales_unit_label` |
+| Quantité commandée | `quantity_milli` |
+| Casiers sortis | quantité |
+| Bouteilles sorties | quantité × `pieces_per_pack` |
+| **Emballage remis** | `X casiers + Y bouteilles` |
+| **Restant dû** | casiers et bouteilles, avec valorisation |
+| Statut | « Restitution complète » / « Restitution partielle » / « Aucun emballage rendu » |
+| Mention | « à restituer sous 15 jours » (déjà présente) |
 
-Le montant du retour **n'apparaît pas** dans `summaryRows` : il reste dans la
-ligne « Retour emballages (hors total commande) », comme aujourd'hui.
+Aucun montant de retour dans les totaux : il reste dans la ligne
+« Retour emballages (hors total commande) ».
 
 ---
 
-## 6. Spécification technique
+## 6. Technique
 
-### 6.1. Contrat d'API
-
-`ReceivedReturnableInput` gagne un champ **optionnel** :
+### 6.1. Contrat
 
 ```rust
 pub struct ReceivedReturnableInput {
     pub returnable_id: i64,
     pub pieces: i64,
-    /// Ligne de vente d'origine, quand la restitution est saisie sur la ligne.
-    /// `None` = retour global au type (comportement actuel, conservé).
+    /// Ligne de vente d'origine. `None` = retour global au type (comportement
+    /// actuel, conservé pour les appels existants et le desktop).
     pub sale_line_id: Option<i64>,
 }
 ```
 
-Le champ est optionnel : les appels actuels continuent de fonctionner sans
-modification. C'est ce qui rend le lot livrable sans casser le desktop ni les
-tests existants.
+Champ **optionnel** : sans lui, rien ne change. C'est ce qui rend le lot
+livrable sans casser les tests, le desktop ni les intégrations.
 
 ### 6.2. Persistance
 
-Dans `create_persistence.rs` (l. 341), remplacer `NULL` par `sale_line_id`
-quand il est fourni. **Pas d'autre changement** dans ce fichier : la
-déduction de solde, le FIFO et le stock sont corrects et testés.
+Une seule modification dans `create_persistence.rs` :
+
+```
+- WHERE ... VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, 'returned')
++ WHERE ... VALUES (?, ?,    ?, ?, ?, ?, ?, ?, ?, NULL, 'returned')
++   .bind(returned.sale_line_id)
+```
+
+Le reste du fichier (déduction, FIFO, stock, mouvements) est correct et testé :
+**ne pas y toucher**.
+
+> **Piège FIFO à traiter.** Le retour est aujourd'hui apuré en FIFO sur les
+> dettes *antérieures* (`sale_id != ?`). Avec un rattachement par ligne, il faut
+> d'abord apurer **la ligne désignée**, puis retomber en FIFO pour le surplus.
+> Sinon la fiche de suivi affichera une dette sur la ligne 1 alors que le client
+> a rendu ses casiers de la ligne 1. **C'est le point le plus délicat du lot.**
 
 ### 6.3. Résolution de l'identifiant de ligne
 
-Le POS ne connaît pas `sale_lines.id` avant validation. Deux étapes :
-
-1. l'écran associe chaque saisie à `CartItem.key` ;
-2. au moment de construire la requête, `usePosData.ts` traduit `key` → index de
-   ligne, et le serveur renvoie l'identifiant par ligne dans le détail de la
-   vente ; **ou** le serveur résout lui-même si l'on envoie l'index de ligne.
-
-> **Recommandation** : envoyer l'**index de ligne** (`line_index`) plutôt que
-> l'identifiant, et laisser le serveur le résoudre à l'insertion. Cela évite
-> une seconde requête et un aller-retour de correspondance côté écran.
+Le POS ne connaît pas `sale_lines.id` avant validation. L'écran envoie
+l'**index de ligne** ; le serveur le résout à l'insertion, où `line_id` est déjà
+disponible dans la boucle (`create_persistence.rs` l. 77). Aucun aller-retour.
 
 ### 6.4. Modèle d'écran
 
-- ajouter `returnedCrates?: number` à `CartItem`;
-- l'agrégat `received_returnables` envoyé au serveur devient la somme des
-  saisies par ligne **plus** la saisie globale par type ;
-- `computeAvailableReturnableRows` reste l'autorité du plafond total.
+- `CartItem.returnedCrates?: number` (saisie) ;
+- l'agrégat `received_returnables` envoyé au serveur = saisies par ligne
+  (casier **et** bouteilles dérivées) + saisie globale par type ;
+- `computeAvailableReturnableRows` reste l'autorité du **plafond total** : la
+  somme des saisies par ligne ne peut pas le dépasser.
 
 ### 6.5. Migration
 
-**Aucune migration de schéma.** `deposit_issues.sale_line_id` existe depuis la
-v1 et le schéma attendu (`expected_schema_v28.json`) la porte. Un lot sans
-migration est un lot plus sûr.
+**Aucune.** `deposit_issues.sale_line_id` existe depuis la v1 et figure au
+schéma attendu (`expected_schema_v28.json`).
 
 ---
 
-## 7. Tests à écrire
+## 7. Tests
 
-| Niveau | Ce qu'il doit prouver |
+| Niveau | Ce qu'il prouve |
 |---|---|
-| Unitaire (TS) | deux lignes de casier saisies séparément produisent deux rattachements distincts ; le plafond par ligne ne dépasse jamais le total disponible |
-| Unitaire (TS) | la remise de ligne disparaît de l'écran mais `discountAmount` reste à 0 dans l'envoi |
-| Rust | `sale_line_id` est **non nul** sur le retour rattaché, et la dette reste `pending` pour la différence |
-| Rust | un retour **sans** `sale_line_id` (appel existant) se comporte exactement comme avant — non-régression |
-| Rust | le total de la vente est **identique** avec et sans retour : le point 5 de la demande |
-| E2E | vente de 3 casiers, le client en rend 2 → reçu « 1 à restituer sous 15 jours », total inchangé |
+| TS | 2 casiers rendus sur 3 → 2 casiers + 48 bouteilles crédités, dette de 1 casier + 24 bouteilles |
+| TS | la ligne n'apparaît pas si le conditionnement n'émet aucun casier |
+| TS | la remise a disparu de l'écran, `discountAmount` reste à 0 dans l'envoi |
+| Rust | `sale_line_id` **non nul** sur les deux retours (casier et bouteille) de la ligne |
+| Rust | **FIFO** : le retour apure d'abord sa propre ligne, puis les dettes antérieures |
+| Rust | retour **sans** `sale_line_id` → comportement identique à avant (non-régression) |
+| Rust | total de la vente **identique** avec et sans retour |
+| E2E | vente 3 casiers, 2 rendus → reçu « 1 casier + 24 bouteilles à restituer sous 15 jours », total inchangé |
 
 ---
 
@@ -294,38 +228,32 @@ migration est un lot plus sûr.
 
 | Risque | Parade |
 |---|---|
-| **Compter deux fois** un retour saisi à la fois par ligne et par type | un seul envoi, une seule agrégation testée |
-| Supprimer la remise casse un total | `discountAmount` conservé à 0 dans le modèle |
-| Le champ apparaît sur un demi-casier | filtre sur `kind = 'crate'`, pas sur `requested_unit` |
-| Rattachement perdu si la ligne est supprimée du panier | la saisie est purgée avec la ligne |
-| Reçu dupliqué (ligne + agrégat) | le reçu détaille par ligne, l'agrégat reste un total |
+| Créditer le casier sans les bouteilles | un seul champ, dérivation en un point unique, testée |
+| Comptage double (ligne + type) | un seul envoi, agrégation testée |
+| FIFO qui apure la mauvaise ligne | test Rust dédié à la priorité de ligne |
+| Consigne du retour retirée du total | le total ne bouge pas : test Rust comparatif |
+| Saisie supérieure au nombre de casiers | borne `0 … quantité` côté écran **et** côté serveur |
 
 ---
 
-## 9. Ce qui reste à trancher
+## 9. Hors périmètre
 
-1. **`supportQuantity`** (§2.5) : à rendre éditable, ou à laisser tel quel ?
-2. **Remise par ligne** (§4.2) : suppression confirmée, ou déplacement vers un
-   repli « geste commercial » ? C'est le seul point qui touche au calcul d'argent.
-3. **Retour multi-lignes d'une même dette** : si deux lignes émettent le même
-   type de casier, la restitution doit-elle être imputée à la ligne choisie, ou
-   au plus ancien dû d'abord (FIFO, comportement actuel) ? Le choix change ce
-   que le reçu affiche.
+- Parcours de commande `/orders` : garde son panneau (Lot 15).
+- `supportQuantity` éditable : sans objet après la réponse 1 — le champ
+  « casier » de la demande désignait la ligne casier du panier.
+- Demi-caisses : vendues à l'unité, elles n'émettent pas de casier ; le champ
+  ne s'affiche donc pas. À traiter séparément si le besoin apparaît.
 
 ---
 
-## 10. Estimation
+## 10. Ordre d'implémentation recommandé
 
-| Étape | Charge |
-|---|---|
-| Contrat + persistance Rust (`sale_line_id`) | petite |
-| Résolution ligne / index + tests Rust | moyenne |
-| Champ d'écran par ligne + plafonds | moyenne |
-| Suppression remise + non-régression | petite |
-| Reçu par ligne | petite |
-| Tests unitaires + E2E | moyenne |
+1. **Rust** : `sale_line_id` optionnel + apurement prioritaire par ligne, avec
+   les tests — c'est le socle, et le plus risqué.
+2. **Modèle d'écran** : `returnedCrates`, dérivation bouteilles, plafonds, tests.
+3. **Affichage** : champ par ligne, suppression de la remise.
+4. **Reçu** : détail par ligne.
+5. **E2E** : le parcours complet, total inchangé.
 
-Le lot est **court s'il reste dans ce périmètre**, et son intérêt principal est
-moins le champ lui-même que le rattachement par ligne : c'est ce qui rendra le
-reçu capable de dire *quelle* ligne doit encore un casier, au lieu d'un total
-agrégé.
+Le lot est livrable en une fois, mais l'étape 1 mérite d'être vue seule en revue :
+c'est la seule qui touche à de l'argent déjà facturé.
