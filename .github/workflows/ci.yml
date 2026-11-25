@@ -139,8 +139,17 @@ jobs:
       - name: Tests depotpro-core
         run: |
           set +e
-          CARGO_TERM_COLOR=never cargo test -p depotpro-core 2>&1 | tee /tmp/rust_core_test.log
+          # Horodatage : sans lui, un depassement de timeout ne laisse aucune
+          # trace exploitable et l'on ne sait pas si la compilation ou un test
+          # consomme le temps. Ces lignes coutent quelques octets.
+          echo "::notice title=rust-core-debut::$(date -u +%H:%M:%S) debut"
+          CARGO_TERM_COLOR=never cargo test -p depotpro-core --no-fail-fast 2>&1 | tee /tmp/rust_core_test.log
           rc=${PIPESTATUS[0]}
+          echo "::notice title=rust-core-fin::$(date -u +%H:%M:%S) fin rc=$rc"
+          # Ce que la suite a reellement execute, pour distinguer « lent » de
+          # « bloque ».
+          grep -E '^(test result|running [0-9]+ test|error)' /tmp/rust_core_test.log | tail -n 40 || true
+          grep -c '^test .* \.\.\. ok$' /tmp/rust_core_test.log || true
           MSG=$(grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking) ' /tmp/rust_core_test.log | tail -n 60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
           if [ "$rc" -ne 0 ]; then
             echo "::error title=cargo-test-core::$MSG"
