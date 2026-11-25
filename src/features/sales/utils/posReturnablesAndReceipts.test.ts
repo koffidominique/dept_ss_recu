@@ -29,6 +29,7 @@ import {
   computeReturnedPackagingSummary,
   type SaleCalculationItem,
 } from './saleCalculations.ts';
+import { buildSaleDraftFingerprint } from './posCartBuilders.ts';
 
 test('computeAvailableReturnableRows merges client due balances with outgoing cart returnables', () => {
   const balances: ClientPackagingBalance[] = [
@@ -561,3 +562,107 @@ test('formatCashMovementKind distinguishes packaging debt payments from trade re
 
 
 
+
+test('computeReturnedPackagingSummary keeps per-line returns distinct and feeds the aggregate', () => {
+  const rows = [
+    {
+      returnable_id: 100,
+      packaging_name: 'Casier 24',
+      packaging_code: 'CAS-24',
+      deposit_value: 1000,
+      prior_due_pieces: 0,
+      cart_outgoing_pieces: 3,
+      max_returnable_pieces: 3,
+    },
+  ];
+
+  // Deux lignes du panier rendent des casiers : ce sont deux dettes distinctes,
+  // rattachées chacune à SA ligne de vente. Les fusionner ferait mentir la
+  // fiche de suivi client.
+  const summary = computeReturnedPackagingSummary(
+    rows,
+    [],
+    [
+      { cartIndex: 0, returnable_id: 100, pieces: 2 },
+      { cartIndex: 1, returnable_id: 100, pieces: 1 },
+    ]
+  );
+
+  assert.deepEqual(summary.normalizedLineReturns, [
+    { cartIndex: 0, returnable_id: 100, pieces: 2 },
+    { cartIndex: 1, returnable_id: 100, pieces: 1 },
+  ]);
+  // L'agrégat par type reste la somme, pour la valorisation affichée.
+  assert.deepEqual(summary.normalized, [{ returnable_id: 100, pieces: 3 }]);
+  assert.equal(summary.totalPieces, 3);
+  assert.equal(summary.totalAmountFcfa, 3000);
+});
+
+test('computeReturnedPackagingSummary ignores line returns above the line ceiling', () => {
+  const rows = [
+    {
+      returnable_id: 100,
+      packaging_name: 'Casier 24',
+      packaging_code: 'CAS-24',
+      deposit_value: 1000,
+      prior_due_pieces: 0,
+      cart_outgoing_pieces: 3,
+      max_returnable_pieces: 3,
+    },
+  ];
+
+  const summary = computeReturnedPackagingSummary(rows, [], [
+    { cartIndex: 0, returnable_id: 100, pieces: 9 },
+    { cartIndex: 1, returnable_id: 999, pieces: 1 },
+    { cartIndex: -1, returnable_id: 100, pieces: 1 },
+  ]);
+
+  assert.deepEqual(summary.normalizedLineReturns, []);
+  assert.deepEqual(summary.normalized, []);
+  assert.equal(summary.totalPieces, 0);
+});
+
+test('buildSaleDraftFingerprint distinguishes which line received the crates', () => {
+  const rows = [
+    {
+      returnable_id: 100,
+      packaging_name: 'Casier 24',
+      packaging_code: 'CAS-24',
+      deposit_value: 1000,
+      prior_due_pieces: 0,
+      cart_outgoing_pieces: 3,
+      max_returnable_pieces: 3,
+    },
+  ];
+  const base = computeReturnedPackagingSummary(rows, [], [
+    { cartIndex: 0, returnable_id: 100, pieces: 1 },
+  ]);
+  const other = computeReturnedPackagingSummary(rows, [], [
+    { cartIndex: 1, returnable_id: 100, pieces: 1 },
+  ]);
+
+  const common = {
+    posClientId: 1,
+    posPriceTier: 'retail' as const,
+    posSaleType: 'cash' as const,
+    globalDiscount: 0,
+    dueDate: '',
+    posCart: [],
+    paymentRows: [],
+  };
+
+  const fpBase = buildSaleDraftFingerprint({
+    ...common,
+    receivedReturnables: base.normalized,
+    lineReturnables: base.normalizedLineReturns,
+  });
+  const fpOther = buildSaleDraftFingerprint({
+    ...common,
+    receivedReturnables: other.normalized,
+    lineReturnables: other.normalizedLineReturns,
+  });
+
+  // Même total rendu, mais pas la même ligne : deux ventes différentes, donc
+  // deux clés de requête différentes (sinon l'idempotence les confondrait).
+  assert.notEqual(fpBase, fpOther);
+});

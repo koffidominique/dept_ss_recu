@@ -161,6 +161,8 @@ async fn test_receive_returnables_reduces_client_balance() {
         let input = make_sale_input(client_id, product_id, packaging_id, vec![ReceivedReturnableInput {
             returnable_id: rid,
             pieces: 3,
+            // Retour global au type, sans ligne designee : comportement historique.
+            line_index: None,
         }]).await;
 
     let sale = create_sale_v4(&db, input).await;
@@ -188,6 +190,8 @@ async fn test_receive_returnables_increases_depot_stock() {
         let input = make_sale_input(client_id, product_id, packaging_id, vec![ReceivedReturnableInput {
             returnable_id: rid,
             pieces: 3,
+            // Retour global au type, sans ligne designee : comportement historique.
+            line_index: None,
         }]).await;
 
         create_sale_v4(&db, input).await.unwrap();
@@ -217,6 +221,8 @@ async fn test_receive_returnables_creates_deposit_issue_returned() {
         let input = make_sale_input(client_id, product_id, packaging_id, vec![ReceivedReturnableInput {
             returnable_id: rid,
             pieces: 3,
+            // Retour global au type, sans ligne designee : comportement historique.
+            line_index: None,
         }]).await;
 
         create_sale_v4(&db, input).await.unwrap();
@@ -249,6 +255,8 @@ async fn test_insufficient_balance_returns_error() {
             vec![ReceivedReturnableInput {
                 returnable_id: rid,
                 pieces: 15,
+                // Retour global au type, sans ligne designee : comportement historique.
+                line_index: None,
             }],
         )
         .await;
@@ -272,6 +280,8 @@ async fn test_zero_pieces_is_ignored() {
         let input = make_sale_input(client_id, product_id, packaging_id, vec![ReceivedReturnableInput {
             returnable_id: rid,
             pieces: 0,
+            // Retour global au type, sans ligne designee : comportement historique.
+            line_index: None,
         }]).await;
 
         let sale = create_sale_v4(&db, input).await.unwrap();
@@ -317,8 +327,16 @@ async fn test_multiple_returnables() {
             .bind(rid2).execute(&db.pool).await.unwrap();
 
         let input = make_sale_input(client_id, product_id, packaging_id, vec![
-            ReceivedReturnableInput { returnable_id: rid1, pieces: 3 },
-            ReceivedReturnableInput { returnable_id: rid2, pieces: 2 },
+            ReceivedReturnableInput {
+                    returnable_id: rid1,
+                    pieces: 3,
+                    line_index: None,
+                },
+            ReceivedReturnableInput {
+                    returnable_id: rid2,
+                    pieces: 2,
+                    line_index: None,
+                },
         ]).await;
 
         create_sale_v4(&db, input).await.unwrap();
@@ -365,6 +383,8 @@ async fn test_receive_returnables_without_prior_stock_row_and_outside_order_tota
             vec![ReceivedReturnableInput {
                 returnable_id: rid,
                 pieces: 3,
+                // Retour global au type, sans ligne designee : comportement historique.
+                line_index: None,
             }],
         )
         .await;
@@ -411,6 +431,8 @@ async fn test_cancel_sale_reverts_received_returnables_and_depot_stock() {
             vec![ReceivedReturnableInput {
                 returnable_id: rid,
                 pieces: 4,
+                // Retour global au type, sans ligne designee : comportement historique.
+                line_index: None,
             }],
         )
         .await;

@@ -139,8 +139,45 @@ jobs:
       - name: Tests depotpro-core
         run: |
           set +e
-          CARGO_TERM_COLOR=never cargo test -p depotpro-core 2>&1 | tee /tmp/rust_core_test.log
-          rc=${PIPESTATUS[0]}
+          # Horodatage : sans lui, un depassement de timeout ne laisse aucune
+          # trace exploitable et l'on ne sait pas si la compilation ou un test
+          # consomme le temps. Ces lignes coutent quelques octets.
+          echo "::notice title=rust-core-debut::$(date -u +%H:%M:%S) debut"
+          # On compile une fois, puis on execute chaque fichier de test separement
+          # avec un timeout individuel.
+          #
+          # Motif : un fichier dont un cas ne rend jamais la main consommait tout
+          # le budget du job, qui mourait sur le timeout global sans indiquer
+          # lequel. En isolant chaque fichier, un blocage coute 4 minutes et
+          # designe le coupable, au lieu d'immobiliser 20 minutes.
+          cargo test -p depotpro-core --no-run 2>&1 | tail -n 5
+          : > /tmp/rust_core_test.log
+          rc=0
+          for f in crates/depotpro-core/tests/*.rs; do
+            name=$(basename "$f" .rs)
+            start=$(date +%s)
+            # Trace lisible dans le log du job : les annotations sont tronquees
+            # et le log n'est pas toujours telechargeable a posteriori.
+            echo "---- $name ----"
+            if timeout 240 cargo test -p depotpro-core --test "$name" -- --nocapture >>/tmp/rust_core_test.log 2>&1; then
+              echo "::notice title=rust-core::$name OK en $(( $(date +%s) - start ))s"
+            else
+              st=$?
+              echo "::notice title=rust-core::$name ECHEC/TIMEOUT (code $st) en $(( $(date +%s) - start ))s"
+              # Les annotations GitHub sont tronquees : on garde la trace des
+              # echecs dans un fichier, et on affiche le diagnostic critique
+              # directement dans le log du job.
+              {
+                echo "===== $name (code $st) ====="
+                grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking|Finished|Running) ' /tmp/rust_core_test.log \
+                  | grep -E 'FAILED|panicked|assertion|failures:|^test .* FAILED|error|left:|right:|Retour supérieur' \
+                  | tail -n 30
+              } > /tmp/rc_failures.txt
+              cat /tmp/rc_failures.txt
+              rc=1
+            fi
+          done
+          echo "::notice title=rust-core-fin::$(date -u +%H:%M:%S) fin rc=$rc"
           MSG=$(grep -v -E '^\s*(Compiling|Checking|Downloading|Downloaded|Updating|Locking) ' /tmp/rust_core_test.log | tail -n 60 | sed 's/%/%25/g; s/\r//g' | tr '\n' '\a' | sed 's/\a/%0A/g')
           if [ "$rc" -ne 0 ]; then
             echo "::error title=cargo-test-core::$MSG"

@@ -127,6 +127,15 @@ pub struct PaymentPartInput {
 pub struct ReceivedReturnableInput {
     pub returnable_id: i64,
     pub pieces: i64,
+    /// Index de la ligne de vente d'origine, quand la restitution est saisie
+    /// sur une ligne precise.
+    ///
+    /// `None` = retour global au type d'emballage (comportement historique,
+    /// conserve pour le desktop et les appels existants). C'est ce champ qui
+    /// permet a la fiche de suivi client de dire QUELLE ligne doit encore un
+    /// casier, au lieu d'un total agrege.
+    #[serde(default)]
+    pub line_index: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
