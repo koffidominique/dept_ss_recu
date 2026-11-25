@@ -83,6 +83,10 @@ async fn persist_purchase_receipt_snapshot_tx(
         supplier_code,
         supplier_phone,
         supplier_address,
+        po_payment_terms_label,
+        po_commercial_conditions,
+        po_expected_date,
+        po_delivery_address,
     ): (
         String,
         String,
@@ -96,9 +100,14 @@ async fn persist_purchase_receipt_snapshot_tx(
         String,
         String,
         Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
     ) = sqlx::query_as(
         "SELECT pr.reference, pr.status, pr.received_by_name, pr.total_amount, pr.notes, pr.created_at,
-                po.reference, s.id, s.name, s.code, s.phone, s.address
+                po.reference, s.id, s.name, s.code, s.phone, s.address,
+                po.payment_terms_label, po.commercial_conditions, po.expected_date, po.delivery_address
          FROM purchase_receipts pr
          JOIN purchase_orders po ON po.id = pr.purchase_order_id
          JOIN suppliers s ON s.id = po.supplier_id
@@ -328,9 +337,12 @@ async fn persist_purchase_receipt_snapshot_tx(
         secondary_party_title: Some("COMMANDE D'ORIGINE & CONTRÔLE".to_string()),
         secondary_party_name: Some(format!("Bon de commande {po_ref}")),
         secondary_party_details: Some(format!("Réceptionné par : {issuer_name}")),
+        delivery_date: po_expected_date.clone(),
         cashier_name: Some(issuer_name.clone()),
         version: Some(1),
         issuer_role: Some(issuer_role.clone()),
+        payment_terms_label: po_payment_terms_label.clone(),
+        commercial_conditions: po_commercial_conditions.clone(),
         lines: pdf_lines,
         packaging_lines: pdf_packaging,
         summary_rows: vec![
@@ -397,6 +409,14 @@ async fn persist_purchase_receipt_snapshot_tx(
             "receivedByName": issuer_name,
             "totalAmountXof": total_amount,
             "notes": notes,
+        },
+        "purchaseOrder": {
+            "id": po_id,
+            "reference": po_ref,
+            "expectedDate": po_expected_date,
+            "deliveryAddress": po_delivery_address,
+            "paymentTermsLabel": po_payment_terms_label,
+            "commercialConditions": po_commercial_conditions,
         },
         "lines": receipt_lines_dto,
         "packagingExchanges": exchanges,
