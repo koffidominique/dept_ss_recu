@@ -156,6 +156,9 @@ jobs:
           for f in crates/depotpro-core/tests/*.rs; do
             name=$(basename "$f" .rs)
             start=$(date +%s)
+            # Trace lisible dans le log du job : les annotations sont tronquees
+            # et le log n'est pas toujours telechargeable a posteriori.
+            echo "---- $name ----"
             if timeout 240 cargo test -p depotpro-core --test "$name" -- --nocapture >>/tmp/rust_core_test.log 2>&1; then
               echo "::notice title=rust-core::$name OK en $(( $(date +%s) - start ))s"
             else
