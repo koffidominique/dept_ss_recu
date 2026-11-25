@@ -48,7 +48,7 @@ même cœur Rust** ; aucune règle métier n'est réimplémentée côté fronten
 | Serveur | `crates/depotpro-server` | Axum, API REST `/api/*`, sert `dist/` |
 | Desktop | `src-tauri` | Tauri 2, IPC, verrou d'instance, `app_data_dir` |
 | Cœur métier | `crates/depotpro-core` | Toutes les règles, transactions, schéma |
-| Migrations | `migrations/sqlite/` | 25 migrations SQL versionnées |
+| Migrations | `migrations/sqlite/` | 32 migrations SQL versionnées (registre runtime : `crates/depotpro-core/src/infrastructure/db/sql_defs.rs`) |
 
 ### Invariants numériques
 
@@ -71,6 +71,9 @@ clé existe déjà, ce qui rend un double-clic inoffensif.
 | --- | --- | --- |
 | Port HTTP | `PORT` | `3000` |
 | Hôte d'écoute | `DEPOTPRO_HOST` | `127.0.0.1` |
+| Base SQLite | `DEPOTPRO_DB_PATH` | `./data/depotpro_v3.db` |
+| Sauvegardes | `DEPOTPRO_BACKUP_DIR` | `./data/Sauvegardes` |
+| Traitement échéances emballages | `DEPOTPRO_OBLIGATIONS_INTERVAL_SECS` | `900` (min `60`) |
 
 ### Authentification et permissions
 
@@ -145,11 +148,12 @@ Quatre modules coopèrent :
   perte et inscrit au grand livre** comme dette financière du client.
 - **`partial_returns`** — retours partiels avec validation des composants.
 
-> **Limite connue** : `process_due_obligations` s'exécute **au démarrage du
-> serveur** (`crates/depotpro-server/src/main.rs`), pas périodiquement. Une
-> obligation qui échoit pendant que l'application tourne n'est traitée qu'au
-> prochain redémarrage. De plus, l'échec de cette tâche est seulement journalisé
-> (`tracing::warn!`) — il n'interrompt pas le démarrage.
+> **Comportement actuel** : `process_due_obligations` s'exécute **au démarrage**
+> (serveur Axum et desktop Tauri), puis **périodiquement** pendant l'exécution
+> (intervalle par défaut : 900 s, configurable via
+> `DEPOTPRO_OBLIGATIONS_INTERVAL_SECS`, minimum 60 s). Les échecs sont
+> journalisés sans interrompre l'application ; une obligation échue est donc
+> traitée au démarrage ou au prochain tick périodique.
 
 ## Caisse
 

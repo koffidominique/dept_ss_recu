@@ -1,6 +1,6 @@
 use depotpro_core::application::reports;
 use depotpro_core::infrastructure::db::{
-    split_sql_statements, DepotDb, SchemaSnapshot, MIGRATIONS, V3_SCHEMA_SQL,
+    split_sql_statements, DepotDb, SchemaSnapshot, CURRENT_SCHEMA_VERSION, MIGRATIONS, V3_SCHEMA_SQL,
 };
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::path::PathBuf;
@@ -34,6 +34,70 @@ fn normalize_snapshot(mut snap: SchemaSnapshot) -> SchemaSnapshot {
     // Sort schema versions by version
     snap.schema_versions.sort_by_key(|sv| sv.version);
     snap
+}
+
+#[test]
+fn migration_registry_is_contiguous_unique_and_consistent() {
+    assert!(
+        !MIGRATIONS.is_empty(),
+        "Le registre de migrations ne doit pas être vide"
+    );
+
+    let mut versions: Vec<i64> = MIGRATIONS.iter().map(|m| m.version).collect();
+    let mut sorted = versions.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(
+        versions.len(),
+        sorted.len(),
+        "Les versions de migration doivent être uniques"
+    );
+
+    let mut sorted_versions = versions.clone();
+    sorted_versions.sort_unstable();
+    assert_eq!(
+        versions, sorted_versions,
+        "Les migrations doivent être déclarées dans l'ordre croissant des versions"
+    );
+
+    let expected: Vec<i64> = (1..=CURRENT_SCHEMA_VERSION).collect();
+    assert_eq!(
+        sorted_versions, expected,
+        "Le registre doit être contigu de 1 à CURRENT_SCHEMA_VERSION ({CURRENT_SCHEMA_VERSION})"
+    );
+
+    let mut names = std::collections::HashSet::new();
+    for m in MIGRATIONS {
+        assert!(
+            !m.name.trim().is_empty(),
+            "Migration {} a un nom vide",
+            m.version
+        );
+        assert!(
+            m.sql.contains(|c: char| !c.is_whitespace()),
+            "Migration {} ({}) a un SQL vide",
+            m.version,
+            m.name
+        );
+        assert!(
+            names.insert(m.name),
+            "Nom de migration dupliqué: {}",
+            m.name
+        );
+        let expected_prefix = format!("{:04}_", m.version);
+        assert!(
+            m.name.starts_with(&expected_prefix),
+            "Migration {} doit commencer par '{expected_prefix}', obtenu '{}'",
+            m.version,
+            m.name
+        );
+    }
+
+    assert_eq!(
+        MIGRATIONS.last().map(|m| m.version),
+        Some(CURRENT_SCHEMA_VERSION),
+        "La dernière migration doit correspondre à CURRENT_SCHEMA_VERSION"
+    );
 }
 
 #[tokio::test]

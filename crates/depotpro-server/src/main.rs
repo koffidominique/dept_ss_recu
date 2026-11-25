@@ -52,6 +52,47 @@ async fn main() {
         auth_limiter: Arc::new(RwLock::new(AuthRateLimiter::default())),
     };
 
+    let obligations_db = state.db.clone();
+    let obligations_interval_secs = std::env::var("DEPOTPRO_OBLIGATIONS_INTERVAL_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(900)
+        .max(60);
+    tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(obligations_interval_secs));
+        interval.tick().await; // premier tick immédiat ignoré : traitement déjà effectué au démarrage
+        loop {
+            interval.tick().await;
+            let db = obligations_db.read().await.clone();
+            match depotpro_core::application::packaging_obligations::process_due_obligations(
+                &db,
+                Some("system"),
+            )
+            .await
+            {
+                Ok(summary) => {
+                    if summary.obligations_processed > 0
+                        || summary.conversions_created > 0
+                        || summary.ledger_entries_created > 0
+                    {
+                        tracing::info!(
+                            obligations_processed = summary.obligations_processed,
+                            conversions_created = summary.conversions_created,
+                            ledger_entries_created = summary.ledger_entries_created,
+                            "Traitement périodique des échéances d'emballages effectué"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Traitement périodique des échéances d'emballages ignoré : {e}"
+                    );
+                }
+            }
+        }
+    });
+
     let app = build_router(state);
 
     let port: u16 = std::env::var("PORT")

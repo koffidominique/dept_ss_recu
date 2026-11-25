@@ -137,7 +137,7 @@ Avant toute modification, examiner le dépôt intégralement.
 - `scripts/seed_catalog.py`
 - `migrations/sqlite/`
 - `migrations/sqlite/0006_catalogue_v3.sql`
-- `migrations/sqlite/0007_packaging_components.sql`
+- `migrations/sqlite/0011_packaging_components.sql`
 - `migrations/sqlite/0008_compatibility_validation_partial_returns_catalogue.sql`
 - `migrations/sqlite/0010_crate_compatibility.sql`
 - `migrations/sqlite/0012_catalogue_products.sql`
