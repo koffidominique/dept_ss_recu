@@ -256,11 +256,22 @@ fn sale_input(
             sales_unit_id: None,
             quantity: "3".to_string(),
             discount_amount: Some(0),
+            crate_capacity_snapshot: None,
+            crate_capacity_verification_snapshot: None,
+            crate_value_xof_snapshot: None,
+            crate_compatibility_group_snapshot: None,
+            bottles_equivalent_snapshot: None,
+            is_returnable_snapshot: None,
+            crate_received_quantity_snapshot: None,
+            crate_missing_quantity_snapshot: None,
         }],
         payments,
         received_returnables: received,
         notes: None,
         external_reference: None,
+        crate_debt_snapshot_xof: None,
+        crate_received_snapshot_xof: None,
+        crate_return_composition_snapshot: None,
     }
 }
 
@@ -415,7 +426,7 @@ async fn a_return_without_line_index_still_works_as_before() {
         .fetch_one(&db.pool)
         .await
         .unwrap();
-        assert_eq!(balance, 7, "10 dus - 3 rendus");
+        assert_eq!(balance, 10, "10 dus + 3 vendus - 3 rendus = 10 dus");
     })
     .await;
 }

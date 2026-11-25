@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { PackageCheck, PauseCircle, PlayCircle, RotateCcw, ShoppingCart, Trash2, UserPlus } from 'lucide-react';
+import { PackageCheck, PauseCircle, PlayCircle, RotateCcw, ShoppingCart, Trash2, UserPlus, AlertCircle, AlertTriangle } from 'lucide-react';
 import { FormTipsButton } from '../../../components/common/FormTipsButton.tsx';
 import { DP_EASE } from '../../../components/motion/MotionPrimitives.tsx';
 import { QuantityInput } from '../../../components/common/QuantityInput.tsx';
 import { formatFcfa } from '../../../utils/format.ts';
 import type { CartItem, HeldCart } from '../../../stores/uiStore.ts';
-import type { Client, ClientPackagingBalance, PaymentMethodConfig } from '../../../types/erp.ts';
+import type { Client, ClientPackagingBalance, PaymentMethodConfig, PosPackagingDisplay, CrateMixCompatibilityResult } from '../../../types/erp.ts';
+import { apiClient } from '../../../services/api/createApiClient.ts';
 import {
   computeAvailableReturnableRows,
   computeReturnedPackagingSummary,
@@ -110,6 +111,71 @@ export function PosCartPanel({
     [availableReturnableRows, receivedReturnables]
   );
 
+  // Packaging display data from centralized Rust service
+  const [packagingDisplays, setPackagingDisplays] = useState<Map<number, PosPackagingDisplay>>(new Map());
+  const [packagingDisplayLoading, setPackagingDisplayLoading] = useState<Set<number>>(new Set());
+
+  // Fetch packaging display data for cart items with variantId
+  useEffect(() => {
+    const itemsWithVariant = posCart.filter(item => item.variantId !== null && item.variantId !== undefined);
+    
+    for (const item of itemsWithVariant) {
+      const variantId = item.variantId!;
+      if (!packagingDisplays.has(variantId) && !packagingDisplayLoading.has(variantId)) {
+        setPackagingDisplayLoading(prev => new Set(prev).add(variantId));
+        apiClient.getPosPackagingDisplay(variantId)
+          .then((display: PosPackagingDisplay) => {
+            setPackagingDisplays(prev => new Map(prev).set(variantId, display));
+            setPackagingDisplayLoading(prev => {
+              const next = new Set(prev);
+              next.delete(variantId);
+              return next;
+            });
+          })
+          .catch(() => {
+            setPackagingDisplayLoading(prev => {
+              const next = new Set(prev);
+              next.delete(variantId);
+              return next;
+            });
+          });
+      }
+    }
+  }, [posCart, packagingDisplays, packagingDisplayLoading]);
+
+  // Mixed crate compatibility validation
+  const [crateMixResult, setCrateMixResult] = useState<CrateMixCompatibilityResult | null>(null);
+  const [crateMixChecking, setCrateMixChecking] = useState(false);
+
+  const checkCrateMixCompatibility = useCallback(async () => {
+    const returnableVariantIds = posCart
+      .filter(item => {
+        const display = item.variantId ? packagingDisplays.get(item.variantId) : null;
+        return display?.is_returnable && display?.crate_capacity !== null;
+      })
+      .map(item => item.variantId!)
+      .filter((id, index, arr) => arr.indexOf(id) === index);
+
+    if (returnableVariantIds.length < 2) {
+      setCrateMixResult(null);
+      return;
+    }
+
+    setCrateMixChecking(true);
+    try {
+      const result = await apiClient.checkCrateMixCompatibility(returnableVariantIds);
+      setCrateMixResult(result);
+    } catch {
+      setCrateMixResult(null);
+    } finally {
+      setCrateMixChecking(false);
+    }
+  }, [posCart, packagingDisplays]);
+
+  useEffect(() => {
+    checkCrateMixCompatibility();
+  }, [checkCrateMixCompatibility]);
+
   return (
     <div className="space-y-4 lg:col-span-5">
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111A2E] dp-surface p-5 space-y-4">
@@ -151,6 +217,42 @@ export function PosCartPanel({
             )}
           </div>
         </div>
+
+        {/* Mixed crate compatibility warning */}
+        {crateMixResult && !crateMixResult.compatible && (
+          <div className="rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-3 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-rose-800 dark:text-rose-300">
+                Mélange de casiers non compatible
+              </p>
+              <p className="text-xs text-rose-700 dark:text-rose-400 mt-0.5">
+                {crateMixResult.message}
+              </p>
+              {crateMixResult.incompatible_pairs.length > 0 && (
+                <ul className="text-xs text-rose-700 dark:text-rose-400 mt-1 space-y-0.5">
+                  {crateMixResult.incompatible_pairs.map(([product, reason], index) => (
+                    <li key={index} className="flex items-center gap-1">
+                      <span className="font-mono-num">•</span>
+                      <span className="font-medium">{product}</span>
+                      <span className="text-rose-600 dark:text-rose-300">— {reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Compatibility OK indicator */}
+        {crateMixResult && crateMixResult.compatible && (
+          <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 p-2 flex items-center gap-2">
+            <span className="h-4 w-4 text-emerald-600 dark:text-emerald-400">✅</span>
+            <span className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              {crateMixResult.message}
+            </span>
+          </div>
+        )}
 
         {/* Sélection client et mode vente */}
         <div className="grid grid-cols-2 gap-3">
@@ -421,6 +523,11 @@ export function PosCartPanel({
                 // émet un casier le propose. Un produit vendu à la bouteille n'a
                 // rien à rendre en casier, et le bloc global reste là pour lui.
                 const crateComponent = item.depositComponents?.find((c) => c.kind === 'crate');
+                const bottleComponent = item.depositComponents?.find((c) => c.kind === 'bottle');
+                
+                // Use centralized packaging display data if available
+                const packagingDisplay = item.variantId ? packagingDisplays.get(item.variantId) : null;
+                const bottlesPerCrate = packagingDisplay?.crate_capacity ?? bottleComponent?.pieces_per_pack ?? 0;
                 const crateQuantity = Number.parseInt(item.quantity, 10);
                 const maxCrates = Number.isFinite(crateQuantity) ? Math.max(0, crateQuantity) : 0;
                 const crateReturn =
@@ -538,6 +645,27 @@ export function PosCartPanel({
                       </div>
                       {crateComponent && maxCrates > 0 && (
                         <div className="mt-2 rounded-lg border border-dashed border-[#1D4ED8]/40 dark:border-[#60A5FA]/40 bg-[#1D4ED8]/5 dark:bg-[#60A5FA]/10 p-2">
+                          {/* Packaging verification status indicator */}
+                          {packagingDisplay && (
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                packagingDisplay.verification_indicator === '✅' 
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                  : packagingDisplay.verification_indicator === '🟡'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                  : packagingDisplay.verification_indicator === '🔵'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                  : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                              }`}>
+                                {packagingDisplay.verification_indicator} {packagingDisplay.capacity_display}
+                              </span>
+                              {packagingDisplay.crate_value_xof > 0 && (
+                                <span className="font-mono-num text-[11px] text-[#667085] dark:text-slate-400">
+                                  Valeur casier: {packagingDisplay.formatted_crate_value}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <label
                               htmlFor={`crate-return-${item.key}`}
@@ -565,14 +693,20 @@ export function PosCartPanel({
                           </div>
                           <div className="mt-1 font-mono-num text-[10px] text-[#667085] dark:text-slate-400">
                             {crateReturn > 0
-                              ? `${crateReturn} casier(s) + ${crateReturn * (crateComponent.pieces_per_pack ?? 0)} bouteille(s) rendus · ${formatFcfa(crateReturn * crateComponent.deposit_value * ((crateComponent.pieces_per_pack ?? 0) + 1))} hors total`
-                              : `aucun emballage rendu — dette totale de ${formatFcfa(maxCrates * crateComponent.deposit_value * ((crateComponent.pieces_per_pack ?? 0) + 1))}`}
+                              ? `${crateReturn} casier(s) + ${crateReturn * bottlesPerCrate} bouteille(s) rendus · ${formatFcfa(crateReturn * (packagingDisplay?.crate_value_xof ?? crateComponent.deposit_value))} hors total`
+                              : `aucun emballage rendu — dette totale de ${formatFcfa(maxCrates * (packagingDisplay?.crate_value_xof ?? crateComponent.deposit_value))}`}
                           </div>
                           {maxCrates - crateReturn > 0 && (
                             <div className="mt-0.5 text-[10px] font-medium text-[#8A5A0B] dark:text-amber-300">
                               Reste {maxCrates - crateReturn} casier(s) +{' '}
-                              {(maxCrates - crateReturn) * (crateComponent.pieces_per_pack ?? 0)}{' '}
+                              {(maxCrates - crateReturn) * bottlesPerCrate}{' '}
                               bouteille(s) à restituer sous 15 jours
+                            </div>
+                          )}
+                          {packagingDisplay?.warning && (
+                            <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              {packagingDisplay.warning}
                             </div>
                           )}
                         </div>

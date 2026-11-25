@@ -61,6 +61,14 @@ pub const V3_MIGRATION_0027_SQL: &str =
 
 pub const V3_MIGRATION_0028_SQL: &str =
     include_str!("../../../../../migrations/sqlite/0028_delivery_run_reconciliation.sql");
+pub const V3_MIGRATION_0029_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0029_crate_type_capacity_verification.sql");
+pub const V3_MIGRATION_0030_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0030_catalogue_variants_packaging.sql");
+pub const V3_MIGRATION_0031_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0031_snapshot_crate_values.sql");
+pub const V3_MIGRATION_0032_SQL: &str =
+    include_str!("../../../../../migrations/sqlite/0032_stock_movement_tracking_unit.sql");
 
 #[derive(Debug, Clone, Copy)]
 pub struct MigrationDef {
@@ -210,10 +218,30 @@ pub const MIGRATIONS: &[MigrationDef] = &[
         name: "0028_delivery_run_reconciliation",
         sql: V3_MIGRATION_0028_SQL,
     },
+    MigrationDef {
+        version: 29,
+        name: "0029_crate_type_capacity_verification",
+        sql: V3_MIGRATION_0029_SQL,
+    },
+    MigrationDef {
+        version: 30,
+        name: "0030_catalogue_variants_packaging",
+        sql: V3_MIGRATION_0030_SQL,
+    },
+    MigrationDef {
+        version: 31,
+        name: "0031_snapshot_crate_values",
+        sql: V3_MIGRATION_0031_SQL,
+    },
+    MigrationDef {
+        version: 32,
+        name: "0032_stock_movement_tracking_unit",
+        sql: V3_MIGRATION_0032_SQL,
+    },
 ];
 
 pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = 1;
-pub const CURRENT_SCHEMA_VERSION: i64 = 28;
+pub const CURRENT_SCHEMA_VERSION: i64 = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationRunReport {

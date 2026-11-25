@@ -132,12 +132,29 @@ pub async fn create_sale_return(
         }
     }
 
-    let ret_ref = DepotDb::next_sequence(&mut tx, "RET").await?;
+let ret_ref = DepotDb::next_sequence(&mut tx, "RET").await?;
     let avo_ref = DepotDb::next_sequence(&mut tx, &avo_prefix).await?;
 
+    // Fetch crate snapshot data for the return (from the original sale lines)
+    let crate_value_snapshot: i64 = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(SUM(crate_value_xof_snapshot), 0) FROM sale_lines WHERE sale_id = ? AND is_returnable_snapshot = 1"
+    )
+    .bind(sale_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0);
+
+    let crate_capacity_snapshot: Option<i64> = sqlx::query_scalar::<_, Option<i64>>(
+        "SELECT MAX(crate_capacity_snapshot) FROM sale_lines WHERE sale_id = ? AND is_returnable_snapshot = 1 AND crate_capacity_snapshot IS NOT NULL"
+    )
+    .bind(sale_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .flatten();
+
     let ret_id = sqlx::query(
-        "INSERT INTO sales_returns (reference, credit_note_ref, request_key, sale_id, session_id, total_amount, credit_reduction, refund_amount, refund_method_code, restock_approved, reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sales_returns (reference, credit_note_ref, request_key, sale_id, session_id, total_amount, credit_reduction, refund_amount, refund_method_code, restock_approved, reason, crate_value_xof_snapshot, crate_capacity_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&ret_ref)
     .bind(&avo_ref)
@@ -154,6 +171,8 @@ pub async fn create_sale_return(
     })
     .bind(if input.restock_approved { 1_i64 } else { 0_i64 })
     .bind(&reason)
+    .bind(crate_value_snapshot)
+    .bind(crate_capacity_snapshot)
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();

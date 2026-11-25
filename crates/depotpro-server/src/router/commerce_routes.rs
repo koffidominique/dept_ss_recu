@@ -240,6 +240,11 @@ pub(crate) fn packaging_and_system_router() -> Router<AppState> {
                 .post(packaging_components::create_crate_type_pc),
         )
         .route(
+            "/api/packaging-components/crate-types/:id",
+            put(packaging_components::update_crate_type_pc)
+                .delete(packaging_components::delete_crate_type_pc),
+        )
+        .route(
             "/api/partial-returns",
             get(partial_returns_and_validation::partial_returns_overview)
                 .post(partial_returns_and_validation::create_partial_return),

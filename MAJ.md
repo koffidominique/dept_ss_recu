@@ -1,1256 +1,742 @@
-La règle métier est désormais fondée sur deux niveaux distincts :
+Voici un **prompt maître d’implémentation** à transmettre à un agent de développement travaillant sur le dépôt GitHub de DEPOTPRO. Il couvre la structure de la base SQLite, les catalogues SOLIBRA et BRASSIVOIRE, les capacités des casiers, les règles de retour des emballages et leur intégration au formulaire de vente, au stock et aux reçus.
 
-1. **Créance physique d’emballages** : dès qu’un client achète une boisson conditionnée dans un casier réutilisable, il doit restituer le nombre correspondant de casiers vides. La valeur de ces emballages est enregistrée et visible, mais elle ne devient pas immédiatement une dette financière.
-2. **Créance financière d’emballages** : si les casiers ne sont pas restitués à la date limite fixée par le sous-dépôt, ou si une perte ou une destruction est constatée, le système transforme la quantité concernée en dette financière, sur la base de la valeur applicable au moment de la vente.
+# PROMPT MAÎTRE — IMPLÉMENTATION DU CATALOGUE DES BRASSERIES IVOIRIENNES ET DES RÈGLES DE CONDITIONNEMENT DANS DEPOTPRO
 
-Avec ton exemple, après la vente, le client doit **4 000 FCFA de marchandise** et **un casier à restituer**, valorisé à 3 600 FCFA. À l’échéance, si le casier n’a pas été rendu, les 3 600 FCFA deviennent une créance financière : le total des sommes dues atteint alors **7 600 FCFA**. Avant cette échéance, le système ne doit pas compter ces 3 600 FCFA comme une dette financière exigible.
+## 1. CONTEXTE DU PROJET
 
-Le catalogue public de SOLIBRA fournit une bonne base de références et de conditionnements : par exemple, Beaufort 33 cl en casier de 24, Beaufort 50 cl en casier de 12, Bock 33 cl en casier de 24, ainsi que plusieurs autres formats Bock. Ces références seront préchargées comme données de référence, sans empêcher l’owner de les modifier.&#x20;
+Tu interviens sur le projet **DEPOTPRO**, une application de gestion commerciale et de stock destinée aux sous-dépôts de boissons en Côte d’Ivoire.
 
-[image](https://www.google.com/s2/favicons?domain=https://solibrachezvous.ci&sz=32)
+Le dépôt communiqué le plus récemment est :
 
-Solibra Chez Vous+2
+`https://github.com/koffidominique/dept_ss_recu.git`
 
-Voici la version révisée du **MASTER PROMPT**, avec la nouvelle gestion des créances d’emballages, les délais de restitution, la conversion en dette financière, et un catalogue standard administrable par l’owner.
+L’architecture cible à respecter est celle du projet existant : **React, TypeScript, Rust, Axum, SQLite et Tauri 2**, si ces technologies sont bien présentes dans le dépôt.
 
-J’ai également prévu une séparation essentielle : **la brasserie qui fabrique ou commercialise une marque, le fournisseur qui approvisionne le sous-dépôt et le produit vendu sont trois notions différentes**. Cela évite de mélanger le catalogue des boissons avec les relations commerciales du dépôt.
+Avant toute modification :
 
-# MASTER PROMPT — SS DEPOT RUST
+- Examine intégralement l’architecture et les conventions du dépôt.
+- Identifie les tables SQLite, modèles Rust, DTO, services, routes Axum, commandes Tauri et composants React existants.
+- Identifie les mécanismes actuels de gestion des produits, variantes, conditionnements, stock, ventes, clients, fournisseurs et reçus.
+- Réutilise les structures existantes lorsqu'elles sont adaptées.
+- Ne crée pas une deuxième architecture parallèle.
+- Ne remplace pas une fonctionnalité existante sans analyser ses dépendances.
+- Ne crée pas de backend Node.js ou Express supplémentaire : le backend métier doit rester en Rust.
 
-## Gestion avancée des sous-dépôts de boissons en Côte d’Ivoire
+L’objectif est d’intégrer un véritable système de catalogue multi-brasseries, adapté aux réalités commerciales ivoiriennes.
 
-### Module central : Catalogue, Brasseries, Fournisseurs, Clients, Stocks et Gestion des emballages
+## 2. OBJECTIF PRINCIPAL
 
----
+Mettre en place dans la base de données un système permettant de gérer :
 
-# 1. RÔLE ET MISSION DE L'AGENT IA
+1. Les brasseries et fabricants.
+2. Les marques et sous-marques.
+3. Les catégories et types de boissons.
+4. Les formats et volumes des produits.
+5. Les types de contenants.
+6. Les conditionnements commerciaux.
+7. Les casiers physiques réutilisables.
+8. La capacité réelle de chaque casier.
+9. La compatibilité physique des casiers entre produits.
+10. Les règles de retour des emballages.
+11. Les valeurs financières configurables des casiers.
+12. La traçabilité et la vérification des informations du catalogue.
 
-Tu es un architecte logiciel senior, expert en conception d'ERP de distribution, en gestion commerciale, en gestion de stocks, en comptabilité auxiliaire, en bases de données relationnelles et en développement d'applications desktop performantes.
+Le système doit permettre à l’OWNER de créer, modifier, désactiver, activer et compléter les catalogues sans intervention d’un développeur.
 
-Tu interviens sur le projet **SS DEPOT RUST**.
+**Règle fondamentale : les caractéristiques d’un produit ne doivent jamais être déduites uniquement de son nom, de sa marque ou de son volume. Chaque variante possède ses propres caractéristiques et son propre conditionnement.**
 
-Ta mission est de concevoir et d'implémenter une application professionnelle de gestion de sous-dépôt de boissons, adaptée aux réalités commerciales et opérationnelles de la Côte d'Ivoire.
+## 3. PRINCIPES MÉTIER NON NÉGOCIABLES
 
-L'application doit notamment gérer :
+### 3.1. Différencier produit, contenant et emballage
 
-- Les brasseries et les marques de boissons.
-- Le catalogue centralisé des produits et de leurs conditionnements.
-- Les fournisseurs et leurs relations avec le sous-dépôt.
-- Les achats et réapprovisionnements.
-- Les ventes au comptant et à crédit.
-- Les clients et le suivi de leurs comptes.
-- Les stocks de boissons pleines.
-- Les stocks de casiers et emballages vides.
-- Les retours d'emballages entre clients et sous-dépôt.
-- Les retours d'emballages entre sous-dépôt et fournisseurs.
-- Les échéances de restitution.
-- La transformation des emballages non restitués en créances financières.
-- Les recettes, dépenses, paiements et dettes commerciales.
-- Les inventaires, pertes, casses et ajustements.
-- Les rapports financiers, commerciaux et opérationnels.
+Ne pas confondre :
 
-Tu dois respecter la logique métier décrite dans ce document. Ne remplace pas une règle commerciale explicite par une interprétation personnelle.
+- Le produit : Bock, Beaufort, Castel, Heineken, Ivoire Classic, etc.
+- La variante : Bock 33 cl, Bock 50 cl, Heineken 33 cl, etc.
+- Le contenant : bouteille en verre, canette, bouteille PET.
+- Le conditionnement commercial : bouteille, casier, carton, pack, lot.
+- L’emballage réutilisable : casier plastique physique utilisé pour transporter les bouteilles.
 
-L'application doit être fiable, cohérente, sécurisée, rapide, utilisable hors connexion et adaptée à une exploitation quotidienne.
+Un produit peut être proposé dans plusieurs contenants ou conditionnements. Il faut donc modéliser ces informations séparément.
 
-# 2. ARCHITECTURE TECHNIQUE
+### 3.2. Règle de suivi des emballages retour
 
-Conserver l'architecture technique cible du projet :
+Dans DEPOTPRO, l’objet réutilisable suivi physiquement et financièrement est principalement le **casier plastique**.
 
-- Frontend : React + TypeScript.
-- Backend métier : Rust.
-- Base de données locale : SQLite.
-- Interface : Tailwind CSS et composants modernes.
-- Communication frontend/backend : API interne sécurisée.
-- Application desktop installable sur Windows et macOS.
+Les bouteilles en verre contenues dans ce casier ne doivent pas devenir chacune un objet financier indépendant de consignation.
 
-Toutes les opérations sensibles doivent être exécutées et validées dans le backend Rust.
+Le système doit néanmoins connaître la capacité du casier afin d'afficher la composition des emballages vides attendus.
 
-Ne jamais laisser le frontend être la seule autorité pour les calculs financiers, les stocks, les créances ou les échéances.
+Exemples de présentation :
 
-La base doit fonctionner sans connexion Internet.
+- Casier de 24 bouteilles : `1 casier(s) + 24 bouteille(s) rendus`.
+- Casier de 12 bouteilles : `1 casier(s) + 12 bouteille(s) rendus`.
+- Casier de 20 bouteilles : `1 casier(s) + 20 bouteille(s) rendus`.
 
-Toutes les dates et tous les montants doivent être enregistrés de manière cohérente. Utiliser le fuseau horaire Africa/Abidjan par défaut et le franc CFA BCEAO (XOF).
+La quantité de bouteilles est une information descriptive liée au casier. Elle ne doit pas créer automatiquement une dette financière individuelle pour chaque bouteille.
 
-Pour les montants financiers, utiliser des entiers en FCFA, jamais des nombres flottants.
+### 3.3. Ne pas appliquer une règle générale de capacité
 
-Les modifications de stock, de compte client, de créances d'emballages et de paiements doivent être transactionnelles et atomiques.
+Il est interdit d’implémenter une règle globale comme :
 
-# 3. MODÈLE MÉTIER FONDAMENTAL
+- 33 cl = 24 bouteilles ;
+- 50 cl et plus = 12 bouteilles.
 
-L'application doit distinguer quatre ensembles de données qui ne doivent jamais être confondus :
+Cette approximation serait incorrecte.
 
-1. **Marchandises :** boissons pleines achetées et vendues.
-2. **Emballages :** casiers vides et autres emballages réutilisables suivis par le dépôt.
-3. **Comptabilité commerciale :** créances clients, dettes fournisseurs, paiements, recettes et dépenses.
-4. **Créances financières d'emballages :** sommes dues lorsque les emballages concernés ne sont pas restitués dans les conditions et délais définis.
+Exemple : Racines 50 cl peut être conditionnée en casier de 20 bouteilles dans le catalogue de référence établi pour le projet.
 
-Un emballage peut donc avoir deux états successifs :
+La capacité doit donc être stockée individuellement dans la configuration de conditionnement de chaque variante.
 
-- Une obligation physique de restitution, exprimée en quantité.
-- Une créance financière, exprimée en FCFA, lorsque les conditions de conversion sont réunies.
+### 3.4. Emballages non retournables
 
-Ces deux états doivent être suivis séparément.
+Les produits en canette, PET, pack ou carton ne doivent pas générer automatiquement une obligation de retour de casier.
 
-**Règle fondamentale : une obligation de restitution n'est pas automatiquement une dette financière exigible.**
+Une obligation de retour n’est créée que lorsque le conditionnement est effectivement configuré comme réutilisable et retournable.
 
-La valeur indicative de l'emballage peut être affichée et utilisée pour les analyses dès la vente, mais elle ne doit pas être ajoutée automatiquement au solde financier du client.
+### 3.5. Casier mélangé
 
-# 4. CATALOGUE STANDARD DE L'APPLICATION
+Le système doit permettre de composer un casier avec plusieurs marques uniquement si leurs emballages physiques sont compatibles.
 
-## 4.1. Objectif
+Exemple :
 
-Créer un catalogue standard de boissons qui constitue la base de données initiale de l'application.
+- Une partie du casier contient de la Beaufort 33 cl.
+- Une autre partie contient de la Bock 33 cl.
+- Le mélange est autorisé uniquement si les variantes possèdent le même profil physique compatible.
 
-Ce catalogue doit être structuré par :
+En revanche, un mélange de formats ou contenants incompatibles doit être interdit.
 
-1. Brasserie ou producteur.
-2. Marque.
-3. Produit.
-4. Variante du produit.
-5. Format de bouteille ou de contenant.
-6. Conditionnement commercial.
-7. Type d'emballage.
-8. Caractéristiques de restitution éventuelle.
+Ne pas déterminer cette compatibilité seulement à partir du volume. Elle doit être définie par un profil physique de casier ou un groupe de compatibilité administrable.
 
-Il doit être possible d'enrichir le catalogue sans modifier le code source de l'application.
+## 4. MODÈLE DE DONNÉES À METTRE EN PLACE
 
-Le catalogue central doit être utilisable dès la première installation.
+Conçois un modèle relationnel normalisé qui s’intègre au schéma SQLite existant.
 
-## 4.2. Séparer brasseries, marques et fournisseurs
+Les entités suivantes doivent être couvertes. Les noms exacts pourront être adaptés aux conventions déjà présentes dans le projet.
 
-Ne jamais considérer qu'une brasserie est automatiquement le fournisseur direct d'un sous-dépôt.
+### A. Table `breweries`
 
-Créer des entités distinctes :
+Gestion des brasseries et fabricants.
 
-- `breweries` : brasseries, producteurs ou entreprises responsables des marques.
-- `brands` : marques commerciales.
-- `products` : produits commercialisés.
-- `product_variants` : variantes précises d'un produit.
-- `suppliers` : fournisseurs effectifs du sous-dépôt.
-- `supplier_products` : association entre les fournisseurs et les références qu'ils approvisionnent.
+Champs recommandés :
 
-Une même marque peut être distribuée par plusieurs fournisseurs selon les accords commerciaux.
-
-Un même fournisseur peut approvisionner le dépôt en produits provenant de plusieurs brasseries.
-
-Une brasserie ne doit pas être automatiquement créée comme fournisseur du sous-dépôt.
-
-## 4.3. Catalogue de référence SOLIBRA
-
-Précharger dans la base standard des références issues du catalogue public de SOLIBRA.
-
-Source officielle de référence :
-
-[https://solibrachezvous.ci/boutique/](https://solibrachezvous.ci/boutique/)
-
-Exemples de références et conditionnements à intégrer dans les données initiales :
-
-| Marque / produit | Présentation publique relevée            |
-| ---------------- | ---------------------------------------- |
-| Beaufort         | 25 cl, carton de 24 bouteilles           |
-| Beaufort         | 33 cl, casier de 24 bouteilles           |
-| Beaufort         | 50 cl, casier de 12 bouteilles           |
-| Beaufort         | Canette 33 cl, carton de 24              |
-| Bock             | 33 cl, casier de 24 bouteilles           |
-| Bock             | 50 cl, casier de 12 bouteilles           |
-| Bock             | 65 cl, casier de 12 bouteilles           |
-| Bock             | 100 cl, casier de 12 bouteilles          |
-| Bock             | Canette 33 cl, carton de 24              |
-| Bock             | Canette 50 cl, carton de 24              |
-| Castel           | 33 cl, casier de 24 bouteilles           |
-| Castel           | 50 cl, casier de 12 bouteilles           |
-| Doppel Munich    | 33 cl, casier de 24                      |
-| Doppel Munich    | 50 cl, casier de 12                      |
-| Guinness         | 33 cl, casier de 24                      |
-| Guinness         | 65 cl, casier de 12                      |
-| Malta Guinness   | 30 cl, casier de 24                      |
-| Valpierre        | 50 cl, casier de 12                      |
-| Valpierre        | 100 cl, casier de 12                     |
-| Budweiser        | 33 cl, conditionnement public à vérifier |
-| Orangina         | Canette 33 cl, carton de 24              |
-| World Cola       | 1,5 l, pack de 6                         |
-
-Le catalogue public présente également des références et marques telles que Racines, Racines Fort, Chill, Sombreros, Corona Extra, Youki et Youzou.
-
-L'agent doit préparer leur structure dans le catalogue et permettre l'ajout de leurs différentes variantes.
-
-Les exemples ci-dessus sont des données initiales de référence, pas une affirmation d'exhaustivité. Les conditionnements, disponibilités, fabricants, prix et règles d'emballage doivent être vérifiés auprès des fournisseurs et actualisés par l'owner.
-
-Ne jamais inventer un conditionnement manquant.
-
-Pour chaque référence dont le producteur réel n'est pas confirmé, utiliser un statut « À vérifier » plutôt que d'attribuer arbitrairement le produit à SOLIBRA.
-
-Ne pas reprendre automatiquement les prix de la boutique publique comme prix d'achat du sous-dépôt.
-
-Les prix de vente et d'achat propres à chaque dépôt doivent rester configurables.
-
-## 4.4. Autres brasseries
-
-Prévoir la structure permettant d'intégrer d'autres brasseries et producteurs présents sur le marché ivoirien.
-
-L'architecture doit permettre d'ajouter à tout moment :
-
-- Une nouvelle brasserie.
-- Une nouvelle marque.
-- Un nouveau produit.
-- Une nouvelle variante.
-- Un nouveau format de bouteille.
-- Un nouveau conditionnement.
-- Un nouveau type d'emballage.
-
-Le catalogue doit pouvoir évoluer sans migration structurelle de la base de données à chaque ajout de produit.
-
-## 4.5. Gestion des conditionnements
-
-Chaque variante doit être identifiée de manière unique.
+- `id`
+- `name`
+- `code`
+- `country`
+- `description`
+- `website`
+- `is_active`
+- `created_at`
+- `updated_at`
 
 Exemples :
 
-- Bock 33 cl, bouteille, casier de 24.
-- Bock 50 cl, bouteille, casier de 12.
-- Bock 65 cl, bouteille, casier de 12.
-- Bock 33 cl, canette, carton de 24.
-- Beaufort 25 cl, bouteille, carton de 24.
+- SOLIBRA
+- BRASSIVOIRE
 
-Ces références sont différentes et ne doivent pas être regroupées sous un seul produit générique.
+### B. Table `brands`
 
-Champs recommandés pour `product_variants` :
+Gestion des marques.
+
+Champs :
+
+- `id`
+- `brewery_id`
+- `name`
+- `code`
+- `description`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Une marque appartient à une brasserie.
+
+### C. Tables de classification
+
+Créer ou adapter les tables suivantes :
+
+- `product_categories`
+- `drink_types`
+- `container_types`
+- `commercial_packaging_types`
+
+Exemples de catégories :
+
+- Bières
+- Boissons gazeuses
+- Boissons maltées
+- Boissons énergisantes
+- Vins et boissons alcoolisées
+- Eaux et autres boissons
+
+Exemples de contenants :
+
+- Verre
+- PET
+- Canette aluminium
+- Autre contenant configurable
+
+Exemples de conditionnements commerciaux :
+
+- Bouteille individuelle
+- Casier
+- Carton
+- Pack
+- Lot
+- Canette individuelle
+
+Ces classifications doivent être administrables lorsque cela est pertinent.
+
+### D. Table `packaging_profiles`
+
+Cette table est essentielle. Elle représente le profil physique du casier ou de l’emballage.
+
+Champs recommandés :
+
+- `id`
+- `code`
+- `name`
+- `packaging_material` : plastique, carton, autre
+- `is_returnable`
+- `is_physically_tracked`
+- `tracking_mode`
+- `capacity_units`
+- `capacity_unit_label`
+- `compatible_group_id`
+- `default_value_xof`
+- `verification_status`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Pour les casiers réutilisables, `tracking_mode` doit permettre de distinguer un suivi physique et financier du casier d'un simple conditionnement non retournable.
+
+La capacité doit être un nombre entier nullable.
+
+**Ne jamais remplacer une capacité inconnue par 0, 12 ou 24.** Utiliser `NULL` et un statut de vérification approprié.
+
+La valeur financière est configurable en XOF par l’OWNER. Ne pas inventer de montant par défaut.
+
+### E. Table `products`
+
+Champs recommandés :
+
+- `id`
+- `brand_id`
+- `category_id`
+- `drink_type_id`
+- `name`
+- `description`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+### F. Table `product_variants`
+
+Une variante représente une référence commerciale précise.
+
+Exemples :
+
+- Bock 33 cl
+- Bock 50 cl
+- Guinness 65 cl
+- Heineken 33 cl
+- Heineken 50 cl en canette
+
+Champs recommandés :
 
 - `id`
 - `product_id`
 - `sku`
-- `barcode`
 - `volume_ml`
-- `container_type` : bouteille, canette, carton, autre.
-- `sales_unit`
-- `units_per_package`
-- `package_type_id`
-- `is_returnable_packaging`
+- `container_type_id`
+- `barcode`
 - `is_active`
-- `catalog_source`
-- `verification_status`
-
-Le système doit pouvoir distinguer les casiers de 12 bouteilles des casiers de 24 bouteilles, même si les deux concernent une bouteille de 33 cl.
-
-## 4.6. Administration du catalogue par l'owner
-
-L'owner de l'application doit disposer des droits complets sur le catalogue standard.
-
-Créer une interface dédiée :
-
-**Administration → Catalogue standard**
-
-L'owner doit pouvoir :
-
-- Créer une brasserie.
-- Modifier une brasserie.
-- Archiver ou supprimer une brasserie inutilisée.
-- Créer une marque.
-- Modifier une marque.
-- Supprimer ou archiver une marque.
-- Créer un produit.
-- Modifier un produit.
-- Ajouter des variantes.
-- Modifier les volumes.
-- Modifier les conditionnements.
-- Modifier le nombre de bouteilles par casier ou carton.
-- Définir si un emballage doit être restitué.
-- Associer un produit à un type d'emballage.
-- Définir sa valeur indicative.
-- Définir son prix de référence éventuel.
-- Importer un catalogue.
-- Exporter le catalogue.
-- Consulter l'historique des modifications.
-
-Prévoir une interface ergonomique avec recherche, filtres par brasserie, marque, catégorie et format.
-
-### Règles de sécurité
-
-Le catalogue standard ne doit être modifiable que par le rôle `OWNER` ou `SUPER_ADMIN`, selon le mode de déploiement.
-
-Dans une architecture multi-dépôts :
-
-- L'owner de l'application gère le catalogue central.
-- Le gestionnaire d'un dépôt peut activer ou désactiver les références dans son catalogue local.
-- Le gestionnaire peut personnaliser ses prix et ses paramètres commerciaux.
-- Une modification du catalogue central ne doit pas écraser les prix ni les mouvements historiques d'un dépôt.
-
-Dans une installation autonome, l'administrateur principal identifié comme owner doit pouvoir administrer la base standard locale.
-
-La suppression doit être logique par défaut : utiliser `is_active`, `deleted_at` ou un mécanisme d'archivage.
-
-La suppression physique ne doit être permise que si la référence n'a aucune dépendance historique ou commerciale.
-
-Une référence déjà utilisée dans une vente ou un mouvement de stock doit rester consultable dans l'historique, même si elle est archivée.
-
-Chaque modification sensible doit être enregistrée dans un journal d'audit.
-
-# 5. GESTION DES EMBALLAGES RÉUTILISABLES
-
-## 5.1. Principe général
-
-Le sous-dépôt manipule des boissons conditionnées dans différents emballages.
-
-Seuls les emballages expressément déclarés comme réutilisables et suivis doivent générer une obligation de restitution.
-
-Pour le fonctionnement standard du projet, suivre les casiers réutilisables associés aux boissons en bouteilles.
-
-Ne pas créer automatiquement une obligation de retour pour :
-
-- Les packs de bières non conditionnés en casiers réutilisables.
-- Les packs de canettes.
-- Les cartons de canettes.
-- Les cartons de bouteilles.
-- Les packs d'eau.
-- Les canettes vendues individuellement.
-- Les bouteilles vendues individuellement sans casier suivi.
-- Tout autre emballage marqué comme non restituable.
-
-L'owner doit toutefois pouvoir définir une règle particulière pour une nouvelle référence ou un nouvel emballage.
-
-## 5.2. Valeur des emballages
-
-Chaque type d'emballage réutilisable doit pouvoir avoir une valeur configurable.
-
-Exemple :
-
-| Type d'emballage      | Valeur indicative   |
-| --------------------- | ------------------- |
-| Casier Bock 33 cl     | 3 600 FCFA          |
-| Casier Bock 50 cl     | Valeur configurable |
-| Casier Beaufort 33 cl | Valeur configurable |
-| Casier Beaufort 50 cl | Valeur configurable |
-
-Les montants ci-dessus sont illustratifs.
-
-Pour chaque type d'emballage, enregistrer :
-
-- Sa désignation.
-- Son code.
-- Le ou les produits compatibles.
-- Son format.
-- Sa valeur indicative.
-- Sa valeur applicable en cas de non-restitution.
-- Sa date d'entrée en vigueur.
-- Son statut actif ou inactif.
-
-La valeur de l'emballage doit être indépendante du prix commercial de la boisson.
-
-Ne jamais calculer automatiquement la valeur de l'emballage en fonction du prix du casier plein.
-
-## 5.3. Politique de restitution configurable
-
-Le sous-dépôt doit pouvoir définir un délai de restitution des emballages.
-
-Créer un module :
-
-**Paramètres → Politique de retour d'emballages**
-
-Paramètres configurables :
-
-- Délai standard de restitution en jours.
-- Délai propre à un type d'emballage.
-- Délai propre à un produit.
-- Délai particulier accordé à un client.
-- Date et heure de départ du délai.
-- Règle de calcul de la date d'échéance.
-- Possibilité d'accorder un délai supplémentaire.
-- Possibilité d'activer une conversion automatique en créance financière.
-- Possibilité d'exiger une validation manuelle pour certaines conversions.
-- Montant applicable en cas de non-restitution.
-- Règle en cas de perte ou de destruction.
-- Possibilité de recevoir un emballage après échéance.
-
-Le système doit conserver la politique applicable au moment de chaque vente.
-
-Une modification ultérieure des paramètres ne doit pas modifier rétroactivement les échéances et les montants des ventes déjà réalisées.
-
-Chaque délai et chaque valeur doivent être enregistrés sous forme de photographie historique au moment de la création de l'obligation.
-
-# 6. VENTE CLIENT ET CRÉANCE PHYSIQUE D'EMBALLAGES
-
-## 6.1. Déclenchement automatique
-
-Lorsqu'un client achète une référence associée à un casier réutilisable, le système doit automatiquement :
-
-1. Enregistrer la vente.
-2. Décrémenter le stock de boissons pleines.
-3. Créer une obligation de restitution d'emballages.
-4. Enregistrer le nombre de casiers dus.
-5. Enregistrer leur valeur unitaire de référence.
-6. Calculer la date limite de restitution.
-7. Enregistrer le client concerné.
-8. Enregistrer la vente d'origine.
-9. Créer un historique de l'obligation.
-
-Cette obligation doit être indépendante du mode de paiement.
-
-Une vente au comptant peut elle aussi créer une obligation d'emballages.
-
-Une vente à crédit peut créer simultanément une créance commerciale et une créance physique d'emballages.
-
-## 6.2. Exemple obligatoire de validation
-
-Un client achète :
-
-- 1 casier de Bock 33 cl plein : 12 000 FCFA.
-- Valeur indicative du casier vide : 3 600 FCFA.
-- Paiement immédiat : 8 000 FCFA.
-
-Le système doit enregistrer :
-
-**Compte commercial :**
-
-- Montant de la vente : 12 000 FCFA.
-- Paiement : 8 000 FCFA.
-- Créance commerciale : 4 000 FCFA.
-
-**Compte emballages :**
-
-- Nombre de casiers dus : 1.
-- Nombre de casiers retournés : 0.
-- Valeur unitaire de référence : 3 600 FCFA.
-- Échéance : calculée selon la politique du dépôt.
-- Créance financière d'emballages exigible : 0 FCFA avant échéance, tant qu'aucune perte, destruction ou autre motif de conversion n'est validé.
-
-Le tableau de bord client doit afficher séparément :
-
-- Dette commerciale : 4 000 FCFA.
-- Emballages physiques à restituer : 1 casier.
-- Valeur indicative des emballages en attente : 3 600 FCFA.
-- Créance financière d'emballages échue : 0 FCFA.
-
-Ne pas additionner la valeur indicative au solde financier exigible avant la conversion.
-
-# 7. TRANSFORMATION EN CRÉANCE FINANCIÈRE
-
-## 7.1. Déclencheurs
-
-Une obligation physique peut devenir une créance financière dans les cas suivants :
-
-1. Le client n'a pas restitué l'emballage à la date limite fixée par le sous-dépôt.
-2. Le client déclare avoir perdu l'emballage.
-3. L'emballage est détruit.
-4. L'emballage est détérioré au point de ne plus pouvoir être accepté, selon la politique du dépôt.
-5. Un responsable habilité valide un autre motif prévu par les règles commerciales du dépôt.
-
-La conversion peut être automatique à l'échéance ou soumise à une validation manuelle, selon les paramètres de l'application.
-
-## 7.2. Conversion à l'échéance
-
-Au moment de l'échéance :
-
-- Vérifier la quantité initialement due.
-- Soustraire les quantités déjà restituées.
-- Exclure les quantités déjà converties.
-- Calculer la quantité restant à restituer.
-- Appliquer la valeur unitaire enregistrée au moment de la vente, sauf règle contractuelle explicitement différente.
-- Créer une créance financière pour la quantité non restituée.
-- Enregistrer l'opération dans le compte financier du client.
-- Enregistrer une opération correspondante dans le journal des emballages.
-
-Formule :
-
-`Montant de la créance d'emballages = Quantité non restituée échue × Valeur unitaire applicable`
-
-Exemple :
-
-- 1 casier dû.
-- 0 casier retourné.
-- Date d'échéance dépassée.
-- Valeur applicable : 3 600 FCFA.
-
-Résultat :
-
-- Créance commerciale initiale : 4 000 FCFA.
-- Créance financière d'emballages : 3 600 FCFA.
-- Total financier dû : 7 600 FCFA.
-
-La conversion doit être idempotente : le traitement d'une même échéance ne doit jamais créer deux fois la même dette.
-
-## 7.3. Perte ou destruction avant échéance
-
-Si le client déclare avoir perdu ou détruit un emballage avant l'échéance :
-
-- Un utilisateur habilité doit pouvoir déclarer l'événement.
-- La quantité concernée est enregistrée.
-- Le motif doit être obligatoire.
-- L'opération doit être horodatée.
-- La valeur applicable est calculée.
-- Une créance financière peut être créée immédiatement, selon la politique du dépôt.
-
-Exiger une validation managériale pour les opérations sensibles.
-
-Les quantités déjà retournées ne doivent jamais être facturées une seconde fois.
-
-## 7.4. Emballages partiellement restitués
-
-Le système doit gérer les retours partiels.
-
-Exemple :
-
-- 5 casiers dus.
-- 3 casiers retournés.
-- 2 casiers non retournés à échéance.
-- Valeur unitaire : 3 600 FCFA.
-
-À échéance :
-
-- Obligation satisfaite : 3 casiers.
-- Non-restitution : 2 casiers.
-- Créance financière créée : 7 200 FCFA.
-
-La quantité retournée ne doit jamais entrer dans le calcul de la dette financière.
-
-## 7.5. Retour tardif après conversion financière
-
-Le système doit autoriser la restitution physique d'un emballage même si sa valeur a déjà été convertie en créance financière.
-
-Il faut prévoir un mécanisme de régularisation contrôlé :
-
-- Vérifier le type d'emballage.
-- Vérifier la créance d'emballage d'origine.
-- Identifier la quantité restituée.
-- Enregistrer le retour tardif.
-- Générer une contre-écriture financière ou un avoir correspondant à la valeur recouvrée.
-- Mettre à jour le solde de la créance d'emballages.
-
-Si la dette n'a pas encore été payée, le montant restant dû est réduit ou annulé à hauteur de la valeur restituée.
-
-Si la dette a déjà été payée, le système doit produire un avoir ou un crédit au compte client. Tout remboursement en espèces doit suivre une opération de remboursement distincte et autorisée.
-
-Ne jamais supprimer ou modifier silencieusement une ancienne créance.
-
-L'historique doit permettre de comprendre :
-
-- Pourquoi la dette a été créée.
-- Quand elle a été créée.
-- Quand l'emballage a été récupéré.
-- Quelle valeur a été régularisée.
-- Quelle somme reste due.
-
-# 8. GESTION DES RETOURS D'EMBALLAGES CLIENTS
-
-Créer un écran dédié :
-
-**Clients → Retour d'emballages**
-
-Fonctionnalités :
-
-- Rechercher un client.
-- Afficher ses emballages en attente.
-- Afficher les dates d'échéance.
-- Afficher les emballages échus.
-- Afficher les emballages déjà convertis en créances financières.
-- Sélectionner le type d'emballage retourné.
-- Saisir la quantité.
-- Valider le retour.
-- Afficher le nouveau solde d'emballages.
-- Afficher l'éventuelle régularisation financière.
-
-Chaque retour doit incrémenter le stock physique des emballages vides récupérés.
-
-Interdire le retour d'une quantité supérieure à ce que le client doit réellement, sauf réception exceptionnelle autorisée et tracée.
-
-Le système doit permettre de consulter l'historique complet des retours d'un client.
-
-# 9. GESTION DES FOURNISSEURS ET DU RÉAPPROVISIONNEMENT
-
-## 9.1. Création du fournisseur
-
-Avant tout réapprovisionnement, le sous-dépôt doit pouvoir créer et enregistrer son fournisseur.
-
-Informations :
-
-- Nom ou raison sociale.
-- Contact principal.
-- Téléphone.
-- Adresse.
-- Informations complémentaires.
-- Brasserie(s) ou produits fournis.
-- Conditions commerciales.
-- Historique des commandes.
-- Historique des livraisons.
-- Historique des retours d'emballages.
-
-## 9.2. Règle commerciale du réapprovisionnement
-
-Le sous-dépôt commande des boissons pleines au fournisseur.
-
-Dans le modèle opérationnel standard, le fournisseur accepte le réapprovisionnement en échange de la remise d'un nombre équivalent de casiers vides compatibles.
-
-Exemple :
-
-Le sous-dépôt commande :
-
-- 20 casiers Bock 33 cl.
-- 10 casiers Bock 50 cl.
-
-Le sous-dépôt doit remettre au fournisseur :
-
-- 20 casiers vides compatibles Bock 33 cl.
-- 10 casiers vides compatibles Bock 50 cl.
-
-Le système doit gérer les retours par type exact d'emballage et non uniquement par nombre total de casiers.
-
-Un casier de 33 cl ne doit pas automatiquement être considéré comme équivalent à un casier de 50 cl.
-
-Une équivalence différente ne peut être acceptée que si elle a été explicitement configurée ou validée.
-
-## 9.3. Workflow de réapprovisionnement
-
-1. L'utilisateur sélectionne un fournisseur.
-2. Il crée une nouvelle commande.
-3. Il ajoute les références et les quantités souhaitées.
-4. Le système calcule les emballages vides nécessaires.
-5. Il affiche le stock disponible de boissons pleines.
-6. Il affiche le stock disponible d'emballages vides.
-7. Il prépare l'opération de remise des emballages.
-8. L'utilisateur confirme la quantité effectivement remise.
-9. Le fournisseur livre les boissons pleines.
-10. L'utilisateur valide les quantités effectivement reçues.
-11. Le stock de boissons pleines augmente.
-12. Le stock de casiers vides diminue.
-13. La commande est mise à jour.
-
-Autoriser une livraison partielle si le fournisseur et le dépôt acceptent cette situation. Les quantités réellement reçues et les quantités réellement remises doivent être enregistrées indépendamment des quantités initialement commandées.
-
-## 9.4. Absence de dette automatique sur les emballages fournisseurs
-
-Dans le fonctionnement standard défini pour le projet :
-
-- Le retour d'emballages au fournisseur se fait dans le cadre de l'échange de réapprovisionnement.
-- Il n'y a pas de dette financière automatique créée pour les emballages échangés.
-- Il n'y a pas de créance financière automatique liée à un déséquilibre d'emballages.
-- Le système doit signaler une quantité insuffisante avant validation de l'échange.
-- Toute exception doit nécessiter une décision explicite et être enregistrée.
-
-Ne pas appliquer automatiquement aux fournisseurs la règle de conversion des emballages non restitués applicable aux clients. Une règle spécifique fournisseur ne pourra exister que si elle est expressément configurée pour un accord commercial particulier.
-
-# 10. GESTION DES STOCKS
-
-Maintenir des stocks distincts :
-
-1. Stock de boissons pleines.
-2. Stock de casiers vides.
-3. Éventuellement, stocks d'autres emballages suivis.
-4. Stock endommagé ou en attente de décision, si le dépôt le souhaite.
-
-Chaque mouvement doit être tracé.
-
-Types de mouvements :
-
-- Réception fournisseur.
-- Vente client.
-- Retour d'emballages client.
-- Retour d'emballages fournisseur.
-- Inventaire.
-- Ajustement.
-- Perte.
-- Casse.
-- Destruction.
-- Régularisation.
-
-Chaque mouvement doit contenir :
-
-- Identifiant.
-- Type de mouvement.
-- Référence concernée.
-- Quantité.
-- Stock avant.
-- Stock après.
-- Source de l'opération.
-- Date et heure.
-- Utilisateur responsable.
-- Commentaire éventuel.
-
-Il doit être impossible de modifier directement le stock sans produire un mouvement historique.
-
-# 11. COMPTES CLIENTS ET COMPTABILITÉ
-
-## 11.1. Séparation des comptes
-
-Prévoir des registres distincts :
-
-- `customer_commercial_ledger`
-- `customer_packaging_ledger`
-- `customer_financial_ledger`
-- `customer_payment_ledger`
-
-Le compte commercial suit les ventes, paiements et créances de marchandises.
-
-Le compte emballages suit les obligations physiques et les retours.
-
-Le compte financier d'emballages suit uniquement les montants devenus exigibles à la suite d'une conversion valide.
-
-Le compte des paiements suit les règlements et remboursements.
-
-La valeur indicative d'un emballage en attente ne doit pas être comptabilisée comme une créance financière exigible.
-
-## 11.2. Tableau de bord client
-
-Pour chaque client, afficher distinctement :
-
-- Solde commercial débiteur.
-- Montant total payé.
-- Montant total des ventes.
-- Emballages physiquement dus.
-- Emballages retournés.
-- Emballages échus non restitués.
-- Valeur indicative des emballages en attente.
-- Créances financières d'emballages.
-- Paiements affectés aux créances d'emballages.
-- Avoirs liés aux retours tardifs.
-- Total financier restant dû.
-
-La valeur indicative doit être clairement identifiée comme telle.
-
-Ne pas présenter une valeur indicative comme une somme immédiatement exigible.
-
-# 12. INVENTAIRES ET RÉGULARISATIONS
-
-Créer un module d'inventaire complet pour :
-
-- Les boissons pleines.
-- Les casiers vides.
-- Les emballages récupérés.
-- Les emballages endommagés.
-- Les emballages en attente d'une décision.
-
-L'inventaire doit comparer le stock théorique et le stock réel.
-
-Toute différence doit être justifiée.
-
-Une perte ou une destruction d'emballages doit pouvoir être associée à :
-
-- Un événement interne.
-- Un client.
-- Un fournisseur.
-- Un mouvement d'inventaire.
-
-Si la perte est imputable à un client et que les conditions sont remplies, créer la créance financière correspondante.
-
-Un ajustement de stock ne doit jamais créer automatiquement une dette client sans lien explicite avec une obligation documentée et validée.
-
-# 13. BASE DE DONNÉES SQLITE
-
-Concevoir un schéma relationnel propre, normalisé et documenté.
-
-Tables principales attendues :
-
-### Catalogue et référentiels
-
-- `breweries`
-- `brands`
-- `products`
-- `product_variants`
-- `packaging_types`
-- `product_packaging`
-- `catalog_sources`
-- `catalog_change_logs`
-
-### Fournisseurs
-
-- `suppliers`
-- `supplier_products`
-- `supplier_orders`
-- `supplier_order_lines`
-- `supplier_deliveries`
-- `supplier_delivery_lines`
-- `supplier_packaging_returns`
-
-### Clients et ventes
-
-- `customers`
-- `sales`
-- `sale_lines`
-- `customer_payments`
-- `customer_credit_notes`
-
-### Emballages
-
-- `packaging_policies`
-- `packaging_valuations`
-- `customer_packaging_obligations`
-- `customer_packaging_returns`
-- `packaging_movements`
-- `packaging_conversions`
-- `packaging_adjustments`
-
-### Stocks
-
-- `stock_locations`
-- `stock_movements`
-- `stock_inventory_sessions`
-- `stock_inventory_lines`
-
-### Comptabilité auxiliaire et audit
-
-- `customer_commercial_ledger`
-- `customer_packaging_financial_ledger`
-- `customer_payment_ledger`
-- `supplier_account_ledger`
-- `cash_transactions`
-- `audit_logs`
-
-Les noms et la structure définitive peuvent être améliorés par l'architecte, mais toutes les séparations métier exigées doivent être conservées.
-
-## 13.1. Structure d'une obligation d'emballages
-
-La table `customer_packaging_obligations` doit notamment permettre de conserver :
-
-- `id`
-- `customer_id`
-- `sale_id`
-- `sale_line_id`
-- `product_variant_id`
-- `packaging_type_id`
-- `quantity_due`
-- `quantity_returned`
-- `quantity_lost`
-- `quantity_destroyed`
-- `quantity_converted`
-- `unit_value_snapshot`
-- `total_reference_value`
-- `obligation_date`
-- `due_date`
-- `policy_id`
-- `status`
 - `created_at`
 - `updated_at`
 
-La structure peut être adaptée si une conception événementielle plus robuste est retenue.
+Ne pas mélanger les variantes ayant des volumes ou contenants différents.
+
+### G. Table `variant_packaging_options`
+
+Cette table associe une variante aux conditionnements dans lesquels elle peut être vendue, stockée ou achetée.
+
+Champs recommandés :
+
+- `id`
+- `variant_id`
+- `commercial_packaging_type_id`
+- `packaging_profile_id` nullable
+- `units_per_package`
+- `is_returnable`
+- `is_default`
+- `verification_status`
+- `created_at`
+- `updated_at`
+
+Exemples :
+
+- Beaufort 33 cl vendue en bouteille individuelle ou en casier de 24.
+- Heineken 50 cl en canette vendue en carton ou en conditionnement non retournable.
+- Bock 50 cl en bouteille vendue en casier de 12.
+
+La capacité doit venir de cette configuration, jamais d'une constante codée en dur.
+
+### H. Traçabilité des données catalogue
 
-## 13.2. Règle de valorisation historique
+Prévoir un mécanisme de provenance, soit par table dédiée, soit par champs adaptés :
 
-La valeur d'emballage utilisée pour une vente doit être conservée dans l'enregistrement de l'obligation.
+- source de l'information ;
+- date de consultation ;
+- date de vérification ;
+- statut de vérification ;
+- personne ayant validé la donnée ;
+- commentaire ou justification.
 
-Une modification future du catalogue ou de la valeur de l'emballage ne doit pas changer les créances historiques.
+Statuts possibles :
 
-Toute régularisation doit utiliser la valeur et les paramètres applicables à l'opération d'origine, sauf correction explicitement autorisée.
+- `verified`
+- `needs_verification`
+- `owner_confirmed`
+- `inactive`
 
-## 13.3. Intégrité financière
+Une information non confirmée ne doit pas être présentée comme une donnée officielle vérifiée.
 
-Toute conversion d'une obligation physique en créance financière doit être enregistrée dans une transaction SQLite unique :
-
-1. Vérifier la quantité encore non restituée.
-2. Vérifier la quantité déjà convertie.
-3. Calculer le montant applicable.
-4. Enregistrer le mouvement de conversion.
-5. Créer l'écriture financière correspondante.
-6. Mettre à jour le statut et les quantités.
-7. Enregistrer l'utilisateur et la date.
+## 5. CATALOGUE INITIAL À PRÉCHARGER
 
-Si une étape échoue, toute la transaction doit être annulée.
+Créer un seed initial structuré, par exemple `catalog_seed.json`, puis son mécanisme d’import dans SQLite.
 
-Prévoir des contraintes, index et clés étrangères adaptés.
+Les informations ci-dessous constituent la base de départ du catalogue. Conserver une provenance et un statut de vérification pour chaque capacité.
 
-# 14. ÉCRANS ET EXPÉRIENCE UTILISATEUR
+### A. SOLIBRA — Bières et boissons maltées
 
-Créer des écrans professionnels, modernes et intuitifs.
+| Marque             | Variante     | Capacité de référence |
+| ------------------ | ------------ | --------------------- |
+| Beaufort           | 33 cl verre  | 24                    |
+| Beaufort           | 50 cl verre  | 12                    |
+| Bock               | 33 cl verre  | 24                    |
+| Bock               | 50 cl verre  | 12                    |
+| Bock               | 65 cl verre  | 12                    |
+| Bock               | 100 cl verre | 12                    |
+| Castel             | 33 cl verre  | 24                    |
+| Castel             | 50 cl verre  | 12                    |
+| Chill Citron       | 50 cl verre  | 12                    |
+| Doppel Munich      | 33 cl verre  | 24                    |
+| Doppel Munich      | 50 cl verre  | 12                    |
+| Doppel Energy Malt | 33 cl verre  | 24                    |
+| Guinness           | 33 cl verre  | 24                    |
+| Guinness           | 65 cl verre  | 12                    |
+| Malta Guinness     | 30 cl verre  | 24                    |
+| Racines            | 33 cl verre  | 24                    |
+| Racines            | 50 cl verre  | **20**                |
+| Racines Fort       | 50 cl verre  | 12                    |
+| Sombreros          | 33 cl verre  | 24                    |
+| Sombreros          | 50 cl verre  | 12                    |
 
-Navigation principale recommandée :
+### B. SOLIBRA — Boissons gazeuses
 
-- Tableau de bord.
-- Ventes.
-- Clients.
-- Fournisseurs.
-- Réapprovisionnement.
-- Catalogue.
-- Stocks.
-- Retours d'emballages.
-- Inventaires.
-- Caisse et finances.
-- Rapports.
-- Administration.
-- Paramètres.
+| Marque   | Variante    | Capacité de référence |
+| -------- | ----------- | --------------------- |
+| Orangina | 30 cl verre | 24                    |
+| Orangina | 50 cl verre | 12                    |
+| Youki    | 30 cl verre | 24                    |
+| Youki    | 50 cl verre | 12                    |
+| Youzou   | 30 cl verre | 24                    |
+| Youzou   | 50 cl verre | 12                    |
 
-Écrans particuliers :
+Les variantes PET et canettes doivent être créées séparément lorsqu'elles sont présentes dans le catalogue, avec leurs conditionnements commerciaux propres et sans obligation de retour automatique.
 
-**Catalogue**
+### C. BRASSIVOIRE — Bières et boissons
 
-- Vue par brasserie.
-- Vue par marque.
-- Vue par produit.
-- Vue par format.
-- Recherche instantanée.
-- Filtres.
-- Création et modification.
+Créer les marques et variantes de départ suivantes :
 
-**Fiche client**
+| Marque            | Variante        | Capacité du casier |
+| ----------------- | --------------- | ------------------ |
+| Ivoire Classic    | 33 cl verre     | À confirmer        |
+| Ivoire Classic    | 60 cl verre     | À confirmer        |
+| Ivoire Black      | 33 cl verre     | À confirmer        |
+| Ivoire Black      | 60 cl verre     | À confirmer        |
+| Heineken          | 25 cl bouteille | À confirmer        |
+| Heineken          | 33 cl bouteille | À confirmer        |
+| Heineken          | 50 cl bouteille | À confirmer        |
+| Heineken          | 50 cl canette   | Non retournable    |
+| Desperados        | 25 cl bouteille | À confirmer        |
+| Desperados        | 33 cl bouteille | À confirmer        |
+| Desperados        | 50 cl canette   | Non retournable    |
+| Rhino Energy Malt | 33 cl bouteille | À confirmer        |
 
-- Historique des achats.
-- Dette commerciale.
-- Historique des paiements.
-- Emballages dus.
-- Emballages retournés.
-- Échéances.
-- Créances financières d'emballages.
-- Avoirs et régularisations.
+Pour les capacités inconnues :
 
-**Suivi des emballages**
+- Enregistrer `NULL`.
+- Utiliser `needs_verification`.
+- Ne pas inventer une capacité de 12 ou 24.
+- Permettre à l’OWNER de renseigner et confirmer la capacité après vérification physique ou documentaire.
 
-- Emballages en attente.
-- Emballages bientôt échus.
-- Emballages échus.
-- Pertes déclarées.
-- Emballages convertis en créances.
-- Retours tardifs.
-- Historique des mouvements.
+Pour les produits en canette, utiliser un conditionnement non retournable par défaut, sauf configuration contraire expressément justifiée et validée.
 
-**Fournisseur**
+### D. Qualité et fiabilité du seed
 
-- Commandes.
-- Livraisons.
-- Quantités de boissons pleines reçues.
-- Casiers vides remis.
-- Historique des échanges.
-- Écarts constatés.
+Ne pas présenter l'ensemble des données du seed comme étant automatiquement certifiées par les brasseries.
 
-Le design doit permettre de comprendre immédiatement la différence entre une dette commerciale, un emballage physiquement dû et une dette financière d'emballages.
+Chaque donnée doit conserver son statut de vérification. L'application doit permettre de corriger les catalogues sans effacer l'historique des opérations commerciales déjà réalisées.
 
-Ne jamais utiliser le mot « consigne » dans les libellés fonctionnels, les écrans, les rapports ou les notifications. Utiliser le vocabulaire métier du projet :
+## 6. CALCUL AUTOMATIQUE DES EMBALLAGES RETOUR
 
-- Retour d'emballages.
-- Emballages dus.
-- Emballages retournés.
-- Emballages échus.
-- Emballages non restitués.
-- Stock de casiers vides.
-- Créance financière d'emballages.
-- Historique des retours.
+Développer un service Rust centralisé de calcul des emballages.
 
-# 15. NOTIFICATIONS ET ALERTES
+Il ne doit pas y avoir plusieurs formules divergentes dans les composants React, les reçus, le stock ou les commandes.
 
-Créer des alertes configurables :
+### Formule de référence
 
-- Emballages proches de leur date limite.
-- Emballages arrivés à échéance.
-- Emballages non restitués.
-- Conversion en créance financière.
-- Client ayant plusieurs obligations en retard.
-- Stock insuffisant de casiers vides pour un réapprovisionnement.
-- Écart d'inventaire.
-- Produit proche de la rupture.
+Pour un conditionnement retournable :
 
-L'application étant utilisable hors connexion, les échéances doivent être recalculées à chaque démarrage et lors des opérations appropriées.
+`bouteilles_equivalentes = nombre_casiers_manquants × capacité_du_casier`
 
-Le traitement des échéances doit être idempotent et ne doit pas dépendre d'une connexion Internet.
+La capacité est récupérée depuis `variant_packaging_options` ou le profil associé.
 
-Si l'application était fermée à la date d'échéance, elle doit identifier les obligations devenues échues au prochain démarrage et appliquer les règles de conversion prévues.
+Exemples :
 
-Afficher une notification et conserver une trace de chaque conversion.
+| Produit        | Casiers manquants | Capacité | Composition affichée      |
+| -------------- | ----------------- | -------- | ------------------------- |
+| Beaufort 33 cl | 1                 | 24       | 1 casier + 24 bouteilles  |
+| Bock 50 cl     | 1                 | 12       | 1 casier + 12 bouteilles  |
+| Racines 50 cl  | 1                 | 20       | 1 casier + 20 bouteilles  |
+| Guinness 65 cl | 2                 | 12       | 2 casiers + 24 bouteilles |
 
-# 16. DROITS ET AUTORISATIONS
+Pour un produit non retournable, le résultat est zéro obligation de retour de casier.
 
-Prévoir au minimum les rôles suivants :
+Si la capacité est inconnue :
 
-### OWNER / SUPER ADMIN
+- Ne pas inventer de nombre de bouteilles.
+- Afficher une alerte de configuration.
+- Permettre la vente selon les règles commerciales existantes.
+- Ne pas calculer automatiquement une quantité de casiers à partir de bouteilles individuelles tant que la capacité nécessaire manque.
+- Ne pas bloquer arbitrairement toutes les opérations si une information non indispensable est absente.
 
-- Gestion du catalogue standard.
-- Gestion des paramètres globaux.
-- Gestion des utilisateurs et rôles.
-- Configuration des politiques de restitution.
-- Consultation de toutes les données.
-- Validation des opérations sensibles.
-- Exportation et sauvegarde.
+Utiliser des entiers pour les quantités et des transactions SQLite pour garantir la cohérence des écritures.
 
-### ADMINISTRATEUR DU DÉPÔT
+## 7. INTÉGRATION AU FORMULAIRE « NOUVELLE VENTE »
 
-- Gestion opérationnelle du dépôt.
-- Paramètres locaux autorisés.
-- Gestion des clients et fournisseurs.
-- Gestion des ventes et achats.
-- Validation des retours et des inventaires selon ses droits.
+Le formulaire de vente doit exploiter directement les caractéristiques du catalogue.
 
-### CAISSIER
+Lorsqu'un utilisateur sélectionne un produit :
 
-- Ventes.
-- Paiements.
-- Consultation de certaines données clients.
-- Retours d'emballages autorisés.
+- Afficher sa marque.
+- Afficher son volume.
+- Afficher son type de contenant.
+- Afficher son conditionnement commercial.
+- Afficher si le casier est retournable.
+- Afficher la capacité exacte lorsqu'elle est connue.
+- Afficher la valeur du casier lorsqu'elle est configurée.
+- Afficher un indicateur de compatibilité pour les casiers mélangés.
 
-### MAGASINIER
+L'utilisateur doit pouvoir enregistrer, pour chaque ligne de vente :
 
-- Réception.
-- Stock.
-- Inventaires.
-- Préparation des retours d'emballages.
-- Mouvements autorisés.
+- Quantité vendue ;
+- Unité de vente ;
+- Nombre de casiers remis ;
+- Nombre de casiers vides reçus du client ;
+- Nombre de casiers restant à rendre ;
+- Composition descriptive des casiers attendus.
 
-Les droits doivent être contrôlés par le backend, pas uniquement masqués dans l'interface.
+Le calcul doit être effectué et validé côté Rust. React peut afficher le résultat du calcul, mais ne doit pas être l'unique responsable de la règle métier.
 
-Toute opération financière sensible doit enregistrer l'utilisateur responsable.
+Exemple d'affichage :
 
-# 17. SAUVEGARDE, HISTORIQUE ET AUDIT
+**BEAUFORT 33 CL**
 
-La base locale doit pouvoir être sauvegardée et restaurée.
+`1 casier(s) + 24 bouteille(s) rendus`
 
-Prévoir :
+**BOCK 50 CL**
 
-- Sauvegardes automatiques.
-- Sauvegardes manuelles.
-- Export du catalogue standard.
-- Import du catalogue standard.
-- Journal d'activité.
-- Historique des modifications.
-- Historique des ventes.
-- Historique des retours.
-- Historique des conversions financières.
-- Historique des corrections et avoirs.
+`1 casier(s) + 12 bouteille(s) rendus`
 
-Aucune suppression de données financières ou d'emballages déjà mouvementés ne doit être effectuée sans procédure contrôlée.
+**RACINES 50 CL**
 
-# 18. TESTS MÉTIER OBLIGATOIRES
+`1 casier(s) + 20 bouteille(s) rendus`
 
-Créer des tests unitaires et des tests d'intégration pour les scénarios suivants.
+L'affichage doit pouvoir être adapté au contexte : casiers déjà reçus, casiers restant à rendre ou emballages attendus.
 
-### Test 1 — Vente partiellement payée
+Il faut éviter toute confusion entre les emballages remis au client et ceux que le client doit restituer.
 
-Vente :
+## 8. GESTION DES CASIERS MÉLANGÉS
 
-- 1 casier Bock 33 cl : 12 000 FCFA.
-- Paiement : 8 000 FCFA.
-- Valeur de l'emballage : 3 600 FCFA.
+Mettre en place une validation de compatibilité.
 
-Résultat attendu avant échéance :
+Une composition mélangée est autorisée uniquement si les variantes concernées :
 
-- Dette commerciale : 4 000 FCFA.
-- Emballages dus : 1.
-- Valeur indicative : 3 600 FCFA.
-- Créance financière d'emballages : 0 FCFA.
+- utilisent un emballage réutilisable ;
+- sont associées à un profil physique compatible ;
+- partagent le même groupe de compatibilité ;
+- respectent la capacité physique du casier.
 
-### Test 2 — Restitution avant échéance
+Exemples :
 
-Le client restitue son casier avant la date limite.
+- Beaufort 33 cl + Bock 33 cl : autorisé uniquement si le profil physique est compatible.
+- Beaufort 33 cl + un produit 50 cl : interdit si les emballages physiques sont incompatibles.
+- Heineken en canette + Beaufort en bouteille : interdit comme casier de retour.
 
-Résultat :
+Ne jamais supposer que deux produits sont compatibles uniquement parce qu'ils ont le même volume.
 
-- Emballages dus : 0.
-- Emballages retournés : 1.
-- Créance financière d'emballages : 0 FCFA.
-- Stock de casiers vides augmenté de 1.
+En cas d'incompatibilité, afficher une explication claire et empêcher la validation du mélange.
 
-### Test 3 — Non-restitution à échéance
+## 9. INTÉGRATION AU STOCK ET À L'INVENTAIRE
 
-Le client ne restitue pas le casier.
+Le catalogue doit être relié au stock.
 
-Résultat :
+Les mouvements doivent différencier :
 
-- Créance commerciale : 4 000 FCFA.
-- Créance financière d'emballages : 3 600 FCFA.
-- Total financier dû : 7 600 FCFA.
-- Quantité physique en attente : 0 pour la quantité convertie.
-- Historique de conversion conservé.
+- Stock de boissons pleines ;
+- Stock de casiers physiques ;
+- Casiers pleins ;
+- Casiers vides ;
+- Casiers chez les clients ;
+- Casiers indisponibles, perdus ou détruits, selon les règles existantes.
 
-### Test 4 — Restitution partielle
+La capacité en bouteilles sert à décrire le conditionnement et à convertir les quantités commerciales lorsque cela est nécessaire.
 
-Le client doit 5 casiers et en restitue 3 avant échéance.
+Ne pas transformer chaque bouteille vide en actif ou dette financière indépendante.
 
-Résultat :
+Une éventuelle perte ou non-restitution de casier doit pouvoir donner lieu à une créance financière sur le client selon les règles métier déjà établies.
 
-- 3 casiers sont soldés physiquement.
-- 2 casiers restent à restituer.
-- À échéance, seuls les 2 casiers restants sont convertis.
+Éviter les doublons de mouvements de stock lorsque la vente déclenche plusieurs documents.
 
-### Test 5 — Perte avant échéance
+## 10. GESTION DES VALEURS FINANCIÈRES
 
-Le client déclare avoir perdu un casier et la déclaration est validée.
+L'OWNER doit pouvoir définir :
 
-Résultat :
+- Valeur du casier ;
+- Valeur éventuelle par type de casier ;
+- Date d'effet d'une nouvelle valeur ;
+- Statut actif ou inactif.
 
-- La quantité concernée est convertie immédiatement selon la politique.
-- Une créance financière est générée une seule fois.
-- Le motif et le responsable sont enregistrés.
+La valeur doit être stockée en XOF avec un type numérique adapté aux montants monétaires.
 
-### Test 6 — Retour tardif
+Lorsqu'une valeur de casier change, ne jamais recalculer rétroactivement les anciennes ventes ou les anciennes créances.
 
-Un casier est restitué après sa conversion en créance financière.
+Les documents historiques doivent conserver la valeur applicable au moment de l'opération, par exemple grâce à un champ de snapshot dans les mouvements ou documents concernés.
 
-Résultat :
+La capacité du casier et sa valeur financière sont deux propriétés différentes.
 
-- Le retour physique est enregistré.
-- La créance est régularisée par une contre-écriture ou un avoir.
-- Si elle a déjà été payée, un crédit client ou un remboursement autorisé est généré.
-- L'historique initial reste intact.
+## 11. INTÉGRATION AUX REÇUS ET BONS DE COMMANDE
 
-### Test 7 — Réapprovisionnement fournisseur
+Les reçus clients doivent présenter les produits et leurs variantes exactes.
 
-Commande :
+Pour chaque ligne :
 
-- 20 casiers Bock 33 cl.
-- 10 casiers Bock 50 cl.
+- Marque ;
+- Désignation ;
+- Volume ;
+- Contenant ;
+- Conditionnement ;
+- Quantité vendue ;
+- Prix unitaire ;
+- Montant ;
+- Casier applicable ;
+- Capacité ;
+- Quantité de casiers reçus ;
+- Quantité de casiers restant à rendre, si applicable.
 
-Échange :
+Le document doit distinguer les montants commerciaux, les paiements, les dettes commerciales et les éventuelles créances liées aux casiers.
 
-- 20 casiers vides compatibles 33 cl remis.
-- 10 casiers vides compatibles 50 cl remis.
+Les bons de commande fournisseur doivent reprendre les références et conditionnements réellement commandés.
 
-Résultat :
+Le système doit conserver la distinction métier déjà définie : le réapprovisionnement fournisseur ne doit pas être transformé en procédure de retour ou de dette client.
 
-- 20 casiers pleins 33 cl ajoutés au stock.
-- 10 casiers pleins 50 cl ajoutés au stock.
-- 30 casiers vides déduits du stock.
-- Aucun compte de dette financière d'emballages créé automatiquement.
+Les documents doivent utiliser un snapshot des informations utiles afin qu'une modification ultérieure du catalogue ne modifie pas les reçus historiques.
 
-### Test 8 — Produit non restituable
+## 12. API RUST / AXUM ET SERVICES MÉTIER
 
-Un client achète un carton de 24 canettes.
+Adapter les routes existantes et créer les services manquants.
 
-Résultat :
+Fonctionnalités à exposer :
 
-- Stock commercial décrémenté.
-- Aucune obligation de retour de casier créée.
-- Aucune échéance d'emballages créée.
+- Lister les brasseries ;
+- Créer et modifier une brasserie ;
+- Gérer les marques ;
+- Gérer les classifications ;
+- Gérer les produits ;
+- Gérer les variantes ;
+- Gérer les conditionnements ;
+- Configurer les capacités ;
+- Configurer les profils de casiers ;
+- Gérer les groupes de compatibilité ;
+- Vérifier la configuration d'un produit ;
+- Calculer les obligations de retour ;
+- Importer le catalogue initial ;
+- Consulter les informations de provenance et de vérification.
 
-### Test 9 — Modification de valeur du catalogue
+Créer des DTO séparés pour les entrées et sorties API.
 
-Une valeur d'emballage passe de 3 600 à 4 000 FCFA.
+Valider côté Rust :
 
-Résultat :
+- Volumes positifs ;
+- Capacités entières strictement positives lorsqu'elles sont renseignées ;
+- Relations entre produits et brasseries ;
+- Compatibilité des conditionnements ;
+- Cohérence de la règle de retour ;
+- Valeurs financières non négatives ;
+- Existence des références étrangères ;
+- Absence de doublons de références commerciales.
 
-- Les nouvelles ventes utilisent la nouvelle valeur.
-- Les obligations historiques conservent leur valeur d'origine.
-- Les créances historiques ne sont pas recalculées rétroactivement.
+Les opérations critiques doivent être exécutées dans des transactions SQLite.
 
-### Test 10 — Traitement répété des échéances
+## 13. INTERFACE D'ADMINISTRATION DU CATALOGUE
 
-Le traitement des échéances est exécuté deux fois.
+Créer ou adapter une interface intitulée :
 
-Résultat :
+**Catalogue des produits et brasseries**
 
-- Une seule conversion financière est créée.
-- Aucun doublon dans le compte client.
-- Aucun double comptage dans les rapports.
+L'OWNER doit pouvoir :
 
-### Test 11 — Catalogue standard
+- Ajouter une brasserie ;
+- Ajouter une marque ;
+- Créer un produit ;
+- Créer plusieurs variantes ;
+- Choisir le volume ;
+- Choisir le contenant ;
+- Choisir le conditionnement ;
+- Définir la capacité exacte du casier ;
+- Définir si l'emballage est retournable ;
+- Définir son profil physique ;
+- Définir son groupe de compatibilité ;
+- Définir sa valeur financière ;
+- Modifier les informations ;
+- Activer ou désactiver un produit ;
+- Consulter le statut de vérification.
 
-L'owner crée un nouveau produit, modifie un conditionnement puis archive une référence.
+Prévoir des filtres par :
 
-Résultat :
+- Brasserie ;
+- Marque ;
+- Catégorie ;
+- Volume ;
+- Type de contenant ;
+- Conditionnement ;
+- Retournable ou non retournable ;
+- Capacité connue ou inconnue ;
+- Statut de vérification.
 
-- Le produit est disponible dans le catalogue après création.
-- Les nouvelles ventes utilisent les nouveaux paramètres.
-- Les historiques existants restent intacts.
-- La référence archivée ne peut plus être sélectionnée pour une nouvelle vente, sauf réactivation.
+Ajouter des avertissements visuels pour les configurations incomplètes.
 
-# 19. CRITÈRES D'ACCEPTATION
+Une capacité inconnue ne doit pas être affichée comme une capacité de 0 bouteille.
 
-La fonctionnalité sera considérée comme terminée uniquement lorsque :
+## 14. MIGRATIONS SQLITE ET COMPATIBILITÉ
 
-1. Le catalogue standard existe et est préchargé.
-2. Les produits sont bien séparés par brasserie, marque et variantes.
-3. L'owner peut créer, modifier et supprimer ou archiver les références.
-4. Les conditionnements et volumes sont configurables.
-5. Les fournisseurs sont indépendants des brasseries.
-6. Le réapprovisionnement suit la règle d'échange des emballages vides.
-7. Les ventes génèrent correctement les obligations physiques d'emballages.
-8. Les ventes à crédit distinguent la dette commerciale de l'obligation physique.
-9. Les délais de restitution sont configurables.
-10. Une non-restitution échue peut devenir une créance financière.
-11. Une perte ou destruction validée peut déclencher cette conversion.
-12. Les retours partiels sont correctement calculés.
-13. Les retours tardifs peuvent régulariser la créance financière.
-14. Les valeurs historiques restent conservées.
-15. Les stocks pleins et vides sont séparés.
-16. Les écritures financières sont cohérentes et sans doublons.
-17. Les rapports affichent séparément les créances commerciales et celles d'emballages.
-18. L'application fonctionne hors connexion.
-19. Les données historiques et les journaux d'audit sont préservés.
-20. Tous les scénarios de tests métier passent.
+Créer des migrations versionnées et réversibles lorsque le mécanisme du projet le permet.
 
-# 20. MÉTHODE D'EXÉCUTION IMPOSÉE À L'AGENT IA
+Exigences :
 
-Ne développe pas tous les modules de manière désordonnée.
+- Ne pas supprimer les tables existantes sans justification.
+- Ne pas perdre les données commerciales historiques.
+- Prévoir les clés étrangères et les index.
+- Prévoir les contraintes d'unicité nécessaires.
+- Prévoir les valeurs nullables quand une information n'est pas connue.
+- Garantir que les migrations peuvent être exécutées sur une base contenant déjà des clients, produits, ventes et mouvements de stock.
+- Vérifier les transactions et les contraintes SQLite.
+- Respecter le mécanisme de migration déjà utilisé dans le projet.
 
-Respecte les phases suivantes :
+Le script de seed doit être idempotent : son exécution plusieurs fois ne doit pas créer de doublons.
 
-**PHASE 1 — Audit de l'existant**
+## 15. TESTS OBLIGATOIRES
 
-- Examiner l'architecture du projet.
-- Examiner les tables SQLite existantes.
-- Identifier les modules déjà développés.
-- Identifier les incohérences du modèle métier.
-- Établir les migrations nécessaires.
-- Ne pas supprimer les fonctionnalités existantes sans justification.
+Créer des tests unitaires Rust, des tests d'intégration SQLite et les tests frontend pertinents.
 
-**PHASE 2 — Conception des données**
+### Tests de capacité
 
-- Définir les entités et leurs relations.
-- Définir les contraintes d'intégrité.
-- Définir les registres commerciaux et d'emballages.
-- Définir les règles d'échéance et de conversion.
-- Documenter les migrations SQLite.
+1. Beaufort 33 cl : capacité = 24.
+2. Bock 50 cl : capacité = 12.
+3. Racines 50 cl : capacité = 20.
+4. BRASSIVOIRE avec capacité inconnue : aucune capacité fictive ne doit être générée.
+5. Canette Heineken 50 cl : pas de casier retournable par défaut.
 
-**PHASE 3 — Catalogue standard**
+### Tests de calcul
 
-- Créer les tables de référence.
-- Précharger les données SOLIBRA vérifiées.
-- Ajouter les structures pour les autres brasseries.
-- Développer les interfaces d'administration par l'owner.
-- Implémenter les règles d'archivage et d'audit.
+- 1 casier de 24 = 24 bouteilles équivalentes.
+- 2 casiers de 24 = 48 bouteilles équivalentes.
+- 1 casier de 12 = 12 bouteilles équivalentes.
+- 3 casiers de 12 = 36 bouteilles équivalentes.
+- 1 casier de 20 = 20 bouteilles équivalentes.
 
-**PHASE 4 — Gestion des emballages**
+### Tests de compatibilité
 
-- Implémenter les types et valeurs d'emballages.
-- Implémenter les politiques de restitution.
-- Implémenter les obligations physiques.
-- Implémenter les retours partiels.
-- Implémenter les échéances.
-- Implémenter les conversions financières.
-- Implémenter les retours tardifs et les régularisations.
+- Deux produits du même groupe compatible : mélange autorisé.
+- Deux produits de groupes différents : mélange interdit.
+- Une canette et une bouteille : mélange interdit dans un casier retournable.
+- Un produit sans profil de casier : aucune compatibilité supposée.
 
-**PHASE 5 — Fournisseurs et réapprovisionnement**
+### Tests de protection des données
 
-- Implémenter les fournisseurs.
-- Implémenter les commandes.
-- Implémenter la remise des emballages vides.
-- Implémenter les réceptions partielles.
-- Implémenter les mouvements de stock.
+- Une modification du catalogue ne modifie pas un reçu historique.
+- Un changement de valeur de casier ne modifie pas une ancienne créance.
+- Un import de seed répété ne crée aucun doublon.
+- Une migration ne supprime aucune donnée existante.
+- Une transaction interrompue ne laisse pas de mouvements partiellement enregistrés.
 
-**PHASE 6 — Clients et ventes**
+## 16. LIVRABLES TECHNIQUES ATTENDUS
 
-- Intégrer les obligations d'emballages aux ventes.
-- Gérer les crédits clients.
-- Gérer les paiements.
-- Synchroniser les registres sans mélanger les soldes.
+Réaliser les changements dans le dépôt, et non simplement produire une proposition théorique.
 
-**PHASE 7 — Interface et rapports**
+Livrer :
 
-- Développer les écrans.
-- Ajouter les filtres.
-- Ajouter les alertes.
-- Ajouter les tableaux de bord.
-- Produire les rapports détaillés.
+1. Le diagnostic de l'architecture et des tables existantes.
+2. Le schéma relationnel final.
+3. Les migrations SQLite.
+4. Le fichier `catalog_seed.json` ou son équivalent conforme au projet.
+5. Le mécanisme d'import initial.
+6. Les modèles Rust.
+7. Les DTO et validations.
+8. Les services métier Rust.
+9. Les routes Axum ou commandes Tauri nécessaires.
+10. Les composants React/TypeScript.
+11. Le formulaire d'administration des produits.
+12. L'intégration au formulaire de nouvelle vente.
+13. L'intégration au stock et aux reçus.
+14. Les tests automatisés.
+15. La documentation des règles métier.
 
-**PHASE 8 — Tests et validation**
+## 17. CRITÈRES D'ACCEPTATION FINALE
 
-- Exécuter tous les tests métier.
-- Tester les transactions concurrentes.
-- Tester les restaurations.
-- Tester les échéances après fermeture de l'application.
-- Vérifier l'absence de doublons.
-- Corriger tous les problèmes bloquants.
+L'implémentation sera considérée comme achevée uniquement si :
 
-À chaque phase, produire un bilan des changements effectués, des fichiers créés ou modifiés, des migrations réalisées et des tests exécutés.
+- Les brasseries SOLIBRA et BRASSIVOIRE sont présentes dans le catalogue initial.
+- Les marques et variantes sont structurées correctement.
+- Un produit peut avoir plusieurs formats et conditionnements.
+- La capacité est définie individuellement pour chaque variante et conditionnement.
+- Racines 50 cl peut conserver une capacité de 20 sans être écrasée par une règle globale de 12.
+- Les produits BRASSIVOIRE dont la capacité est inconnue restent configurables sans donnée inventée.
+- Les packs, cartons, PET et canettes ne génèrent pas de dette de casier par défaut.
+- Les casiers réutilisables sont suivis physiquement et financièrement selon les règles de DEPOTPRO.
+- La quantité équivalente de bouteilles est calculée depuis la capacité réellement configurée.
+- Les casiers mélangés sont soumis à une validation de compatibilité.
+- Le formulaire de vente affiche les bonnes informations.
+- Les reçus reprennent les données exactes de la vente.
+- Les anciennes opérations restent cohérentes après les migrations et les modifications du catalogue.
+- Les tests passent et l'application se compile.
 
-Ne prétends jamais qu'une fonctionnalité est terminée si elle n'a pas été implémentée et testée.
+## 18. DIRECTIVE FINALE À L'AGENT DE DÉVELOPPEMENT
 
----
+Travaille progressivement et directement dans le dépôt.
 
-# INSTRUCTION FINALE
+Ne te contente pas de créer des tables inutilisées ou une interface décorative.
 
-La priorité absolue est la cohérence métier.
+Chaque nouvelle donnée doit être réellement exploitée par les services métier, le formulaire de vente, les calculs d'emballage, le stock et les documents commerciaux.
 
-Le système doit comprendre qu'un casier vendu avec une boisson peut créer une obligation physique de restitution, que cette obligation possède une valeur configurable et que cette valeur peut devenir une créance financière si la restitution n'a pas été faite dans les conditions exigées par le sous-dépôt.
+Respecte les données existantes et les règles métier du sous-dépôt ivoirien.
 
-Le système doit également comprendre que les retours d'emballages entre le sous-dépôt et son fournisseur relèvent d'un processus d'échange distinct.
+Ne fabrique jamais une information commerciale manquante : une capacité inconnue doit rester inconnue jusqu'à sa vérification par l'OWNER.
 
-Enfin, le catalogue standard doit être une véritable base de référence administrable par l'owner, et non une liste de produits figée dans le code.
+**Priorité absolue : garantir une seule source de vérité pour les produits, leurs variantes, leurs conditionnements, la capacité des casiers et les règles de retour dans toute l'application DEPOTPRO.**
 
-**Ne simplifie pas ces règles. Ne mélange jamais les comptes commerciaux, les obligations physiques d'emballages et les créances financières d'emballages. Implémente le modèle de manière traçable, transactionnelle et vérifiable.**
+À la fin, fournis un rapport indiquant :
 
-**Point de conception important :** j'ai prévu que le système conserve la valeur de l'emballage au moment de la vente. Ainsi, si l'owner passe la valeur d'un casier de 3 600 à 4 000 FCFA, les anciennes obligations ne changent pas rétroactivement. J'ai également intégré la restitution tardive : un client qui rend finalement son casier après facturation doit pouvoir obtenir la régularisation correspondante, sans effacement de l'historique.
+- Les fichiers créés et modifiés ;
+- Les migrations appliquées ;
+- Les données initiales importées ;
+- Les fonctionnalités réellement opérationnelles ;
+- Les tests exécutés et leurs résultats ;
+- Les éventuelles informations catalogue encore à confirmer ;
+- Les points restant à traiter.
 
-Le catalogue SOLIBRA doit rester une **base de référence évolutive**, et non un catalogue verrouillé : l'owner peut le faire grandir, le corriger et l'adapter aux réalités constatées auprès des fournisseurs.
+**Point essentiel :** ce prompt impose une source unique de vérité pour la capacité des casiers. Ainsi, DEPOTPRO ne confondra plus automatiquement un casier de 12, 20 ou 24 bouteilles selon le seul volume du produit. Les informations non confirmées resteront modifiables par l’OWNER, sans fausser les ventes ni les reçus.

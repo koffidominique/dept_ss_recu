@@ -70,7 +70,7 @@ pub struct CrateTypeDto {
     pub code: String,
     pub name: String,
     pub producer: String,
-    pub capacity: i64,
+    pub capacity: Option<i64>,
     pub bottle_capacity_ml: i64,
     pub bottle_profile_id: i64,
     pub compatibility_group_id: Option<i64>,
@@ -81,6 +81,7 @@ pub struct CrateTypeDto {
     pub description: Option<String>,
     pub is_active: i64,
     pub created_at: String,
+    pub capacity_verification_status: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]

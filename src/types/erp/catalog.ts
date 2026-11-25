@@ -37,6 +37,41 @@ export interface BrandRef {
   is_active: number;
 }
 
+export interface CrateType {
+  id: number;
+  code: string;
+  name: string;
+  producer: string;
+  capacity: number | null;
+  bottle_capacity_ml: number;
+  bottle_profile_id: number;
+  compatibility_group_id: number | null;
+  dimensions: string | null;
+  weight_g: number | null;
+  material: string;
+  deposit_value: number;
+  description: string | null;
+  is_active: number;
+  created_at: string;
+  capacity_verification_status: 'to_verify' | 'verified' | 'owner_confirmed' | null;
+}
+
+export interface CrateTypeInput {
+  code: string;
+  name: string;
+  producer: string;
+  capacity?: number | null;
+  bottle_capacity_ml: number;
+  bottle_profile_id: number;
+  compatibility_group_id?: number | null;
+  dimensions?: string | null;
+  weight_g?: number | null;
+  material?: string;
+  deposit_value?: number;
+  description?: string | null;
+  is_active?: boolean;
+}
+
 export interface ContainerTypeRef {
   id: number;
   code: string;
@@ -292,4 +327,174 @@ export interface DeleteProductResult {
   id: number;
   reference: string;
   name: string;
+}
+
+/* ============================================================================
+ * Types métier : Packaging Profiles, Variant Packaging Options, Verification Logs
+ * ============================================================================ */
+
+export interface PackagingProfile {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  profile_type: 'crate' | 'pallet' | 'bin' | 'other';
+  capacity_units: number | null;
+  capacity_unit_label: string | null;
+  dimensions_cm: string | null;
+  weight_kg: number | null;
+  material: string | null;
+  default_value_xof: number;
+  default_deposit_value_xof: number | null;
+  compatible_group_id: number | null;
+  verification_status: 'verified' | 'needs_verification' | 'owner_confirmed' | 'inactive';
+  verification_notes: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PackagingProfileInput {
+  code: string;
+  name: string;
+  description?: string | null;
+  profile_type: 'crate' | 'pallet' | 'bin' | 'other';
+  capacity_units?: number | null;
+  capacity_unit_label?: string | null;
+  dimensions_cm?: string | null;
+  weight_kg?: number | null;
+  material?: string | null;
+  default_value_xof: number;
+  default_deposit_value_xof?: number | null;
+  compatible_group_id?: number | null;
+  verification_status?: 'verified' | 'needs_verification' | 'owner_confirmed' | 'inactive';
+  verification_notes?: string | null;
+  is_active?: boolean;
+}
+
+export interface VariantPackagingOption {
+  id: number;
+  variant_id: number;
+  commercial_packaging_type_id: number;
+  packaging_profile_id: number | null;
+  is_default_sale: number;
+  is_default_purchase: number;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  variant_name?: string | null;
+  packaging_type_code?: string | null;
+  packaging_type_name?: string | null;
+  profile_code?: string | null;
+  profile_name?: string | null;
+  profile_capacity?: number | null;
+  profile_verification_status?: string | null;
+  profile_value?: number | null;
+}
+
+export interface CreateVariantPackagingOptionInput {
+  variant_id: number;
+  commercial_packaging_type_id: number;
+  packaging_profile_id?: number | null;
+  is_default_sale?: boolean;
+  is_default_purchase?: boolean;
+  is_active?: boolean;
+}
+
+export interface UpdateVariantPackagingOptionInput {
+  commercial_packaging_type_id?: number;
+  packaging_profile_id?: number | null;
+  is_default_sale?: boolean;
+  is_default_purchase?: boolean;
+  is_active?: boolean;
+}
+
+export interface CatalogueVerificationLog {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by: string | null;
+  change_reason: string | null;
+  created_at: string;
+}
+
+export interface CreateCatalogueVerificationLogInput {
+  entity_type: string;
+  entity_id: number;
+  field_name: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  changed_by?: string | null;
+  change_reason?: string | null;
+}
+
+/* ============================================================================
+ * Types métier : Return Packaging Calculation (Calcul emballages retour)
+ * ============================================================================ */
+
+export interface LineReturnPackagingInput {
+  variant_id: number;
+  quantity: number;
+  missing_crates: number;
+  returned_crates: number;
+}
+
+export interface LineReturnPackagingResult {
+  variant_id: number;
+  variant_name: string;
+  commercial_packaging_type: string;
+  is_returnable: boolean;
+  units_per_package: number;
+  packaging_profile_id: number | null;
+  packaging_profile_name: string | null;
+  crate_capacity: number | null;
+  crate_capacity_verification_status: string | null;
+  crate_value_xof: number;
+  compatibility_group_id: number | null;
+  total_bottle_equivalent: number;
+  total_crate_debt_xof: number;
+  can_mix_in_crate: boolean;
+  warning: string | null;
+  display_composition: string;
+}
+
+export interface SaleReturnPackagingResult {
+  lines: LineReturnPackagingResult[];
+  total_bottle_equivalent: number;
+  total_crate_debt_xof: number;
+  warnings: string[];
+}
+
+export interface CrateMixCompatibilityResult {
+  compatible: boolean;
+  group_id: number | null;
+  group_name: string | null;
+  incompatible_pairs: Array<[string, string]>;
+  message: string;
+}
+
+export interface PosPackagingDisplay {
+  variant_id: number;
+  variant_name: string;
+  packaging_type_code: string;
+  packaging_type_name: string;
+  container_name: string;
+  container_material: string;
+  volume_ml: number;
+  units_per_package: number;
+  is_returnable: boolean;
+  crate_capacity: number | null;
+  capacity_display: string;
+  capacity_unit_label: string;
+  verification_status: string | null;
+  verification_indicator: string;
+  crate_value_xof: number;
+  formatted_crate_value: string;
+  warning: string | null;
 }

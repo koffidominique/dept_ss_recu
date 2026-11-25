@@ -2,7 +2,7 @@
 // Routes Axum : Référentiels catalogue, tarification & catalogue V3
 // ============================================================================
 
-use axum::routing::{get, put};
+use axum::routing::{get, post, put};
 use axum::Router;
 
 use crate::handlers::{
@@ -40,6 +40,56 @@ pub(crate) fn catalogue_router() -> Router<AppState> {
         .route(
             "/api/crate-types/:id",
             put(catalogue_refs::update_crate_type).delete(catalogue_refs::delete_crate_type),
+        )
+        // Packaging Profiles (Profils d'emballages physiques)
+        .route(
+            "/api/packaging-profiles",
+            get(packaging_components::list_packaging_profiles_pc)
+                .post(packaging_components::create_packaging_profile_pc),
+        )
+        .route(
+            "/api/packaging-profiles/:id",
+            get(packaging_components::get_packaging_profile_pc)
+                .put(packaging_components::update_packaging_profile_pc)
+                .delete(packaging_components::delete_packaging_profile_pc),
+        )
+        // Variant Packaging Options (Options de conditionnement par variante)
+        .route(
+            "/api/variants/:variant_id/packaging-options",
+            get(packaging_components::list_variant_packaging_options_pc)
+                .post(packaging_components::create_variant_packaging_option_pc),
+        )
+        .route(
+            "/api/packaging-options/:id",
+            get(packaging_components::get_variant_packaging_option_pc)
+                .put(packaging_components::update_variant_packaging_option_pc)
+                .delete(packaging_components::delete_variant_packaging_option_pc),
+        )
+        // Catalogue Verification Log
+        .route(
+            "/api/catalogue-verification-logs",
+            post(packaging_components::create_catalogue_verification_log_pc),
+        )
+        .route(
+            "/api/entities/:entity_type/:entity_id/verification-logs",
+            get(packaging_components::list_catalogue_verification_logs_pc),
+        )
+        // Return Packaging Calculation (Calcul centralisé des emballages retour)
+        .route(
+            "/api/return-packaging/calculate-line",
+            post(packaging_components::calculate_line_return_packaging_http),
+        )
+        .route(
+            "/api/return-packaging/calculate-sale",
+            post(packaging_components::calculate_sale_return_packaging_http),
+        )
+        .route(
+            "/api/return-packaging/check-mix-compatibility",
+            post(packaging_components::check_crate_mix_compatibility_http),
+        )
+        .route(
+            "/api/return-packaging/pos-display/:variant_id",
+            get(packaging_components::get_pos_packaging_display_http),
         )
         .route(
             "/api/compatibility-groups",
@@ -180,6 +230,10 @@ pub(crate) fn catalogue_router() -> Router<AppState> {
         .route(
             "/api/catalogue-v3/initialize",
             axum::routing::post(catalogue_v3::initialize_catalogue),
+        )
+        .route(
+            "/api/catalogue-v3/import-seed",
+            axum::routing::post(catalogue_v3::import_catalog_seed),
         )
         // Référentiels & unités V4 (BDBoisson)
         .route(

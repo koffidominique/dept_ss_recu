@@ -69,17 +69,24 @@ pub async fn create_crate_type(
             "Le code, le nom et le producteur sont obligatoires.".to_string(),
         ));
     }
-    if input.capacity <= 0 || input.bottle_capacity_ml <= 0 {
+    if let Some(cap) = input.capacity {
+        if cap <= 0 {
+            return Err(CoreError::Validation(
+                "La capacité doit être positive si fournie.".to_string(),
+            ));
+        }
+    }
+    if input.bottle_capacity_ml <= 0 {
         return Err(CoreError::Validation(
-            "La capacité et le volume bouteille doivent être positifs.".to_string(),
+            "Le volume bouteille doit être positif.".to_string(),
         ));
     }
 
     let (_guard, mut tx) = db.begin_write().await?;
     check_duplicate(&mut tx, "crate_types", "code", &clean_code, None).await?;
     let id = sqlx::query(
-        "INSERT INTO crate_types (code, name, producer, capacity, bottle_capacity_ml, bottle_profile_id, compatibility_group_id, dimensions, weight_g, material, deposit_value, description, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO crate_types (code, name, producer, capacity, bottle_capacity_ml, bottle_profile_id, compatibility_group_id, dimensions, weight_g, material, deposit_value, description, is_active, capacity_verification_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&clean_code)
     .bind(clean_name)
@@ -94,6 +101,7 @@ pub async fn create_crate_type(
     .bind(input.deposit_value.unwrap_or(0))
     .bind(input.description.as_deref().map(str::trim).filter(|s| !s.is_empty()))
     .bind(if input.is_active.unwrap_or(true) { 1_i64 } else { 0_i64 })
+    .bind(input.capacity_verification_status.as_deref().unwrap_or("to_verify"))
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();
@@ -140,7 +148,7 @@ pub async fn update_crate_type(
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or(existing.producer);
-    let capacity = input.capacity.unwrap_or(existing.capacity);
+    let capacity = input.capacity.or(existing.capacity);
     let bottle_capacity_ml = input
         .bottle_capacity_ml
         .unwrap_or(existing.bottle_capacity_ml);
@@ -155,6 +163,9 @@ pub async fn update_crate_type(
     let material = input.material.unwrap_or(existing.material);
     let deposit_value = input.deposit_value.unwrap_or(existing.deposit_value);
     let description = input.description.unwrap_or(existing.description);
+    let capacity_verification_status = input
+        .capacity_verification_status
+        .unwrap_or(existing.capacity_verification_status.unwrap_or_else(|| "to_verify".to_string()));
     let is_active = input
         .is_active
         .map(|b| if b { 1 } else { 0 })
@@ -164,7 +175,7 @@ pub async fn update_crate_type(
         "UPDATE crate_types
          SET code = ?, name = ?, producer = ?, capacity = ?, bottle_capacity_ml = ?,
              bottle_profile_id = ?, compatibility_group_id = ?, dimensions = ?, weight_g = ?,
-             material = ?, deposit_value = ?, description = ?, is_active = ?
+             material = ?, deposit_value = ?, description = ?, is_active = ?, capacity_verification_status = ?
          WHERE id = ?",
     )
     .bind(&code)
@@ -180,6 +191,7 @@ pub async fn update_crate_type(
     .bind(deposit_value)
     .bind(description)
     .bind(is_active)
+    .bind(capacity_verification_status)
     .bind(id)
     .execute(&mut *tx)
     .await?;

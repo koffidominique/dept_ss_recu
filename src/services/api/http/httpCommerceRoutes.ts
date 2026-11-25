@@ -99,6 +99,76 @@ export const httpCatalogApi = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  listCrateTypes: (search?: string) =>
+    httpRequest<Awaited<ReturnType<ApiClient['listCrateTypes']>>>(`/api/crate-types${buildQueryString({ search, pageSize: 200 })}`),
+  createCrateType: (input: Parameters<ApiClient['createCrateType']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['createCrateType']>>>('/api/crate-types', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateCrateType: (id: number, input: Parameters<ApiClient['updateCrateType']>[1]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['updateCrateType']>>>(`/api/crate-types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  deleteCrateType: async (id: number) => {
+    await httpRequest(`/api/crate-types/${id}`, { method: 'DELETE' });
+  },
+  // Packaging Profiles
+  listPackagingProfiles: (params?: { include_archived?: boolean; verification_status?: string }) =>
+    httpRequest<Awaited<ReturnType<ApiClient['listPackagingProfiles']>>>(
+      `/api/packaging-profiles${buildQueryString({ include_archived: params?.include_archived ? '1' : '0', verification_status: params?.verification_status })}`
+    ),
+  createPackagingProfile: (input: Parameters<ApiClient['createPackagingProfile']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['createPackagingProfile']>>>('/api/packaging-profiles', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updatePackagingProfile: (id: number, input: Parameters<ApiClient['updatePackagingProfile']>[1]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['updatePackagingProfile']>>>(`/api/packaging-profiles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  deletePackagingProfile: async (id: number) => {
+    await httpRequest(`/api/packaging-profiles/${id}`, { method: 'DELETE' });
+  },
+  // Variant Packaging Options
+  listVariantPackagingOptions: (variantId: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['listVariantPackagingOptions']>>>(`/api/variants/${variantId}/packaging-options`),
+  createVariantPackagingOption: (input: Parameters<ApiClient['createVariantPackagingOption']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['createVariantPackagingOption']>>>('/api/variants/packaging-options', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateVariantPackagingOption: (id: number, input: Parameters<ApiClient['updateVariantPackagingOption']>[1]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['updateVariantPackagingOption']>>>(`/api/packaging-options/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  deleteVariantPackagingOption: async (id: number) => {
+    await httpRequest(`/api/packaging-options/${id}`, { method: 'DELETE' });
+  },
+  // Catalogue Verification Logs
+  listCatalogueVerificationLogs: (entityType: string, entityId: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['listCatalogueVerificationLogs']>>>(`/api/entities/${entityType}/${entityId}/verification-logs`),
+  // Return Packaging Calculation
+  calculateLineReturnPackaging: (input: Parameters<ApiClient['calculateLineReturnPackaging']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['calculateLineReturnPackaging']>>>('/api/return-packaging/calculate-line', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  calculateSaleReturnPackaging: (lines: Parameters<ApiClient['calculateSaleReturnPackaging']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['calculateSaleReturnPackaging']>>>('/api/return-packaging/calculate-sale', {
+      method: 'POST',
+      body: JSON.stringify(lines),
+    }),
+  checkCrateMixCompatibility: (variantIds: Parameters<ApiClient['checkCrateMixCompatibility']>[0]) =>
+    httpRequest<Awaited<ReturnType<ApiClient['checkCrateMixCompatibility']>>>('/api/return-packaging/check-mix-compatibility', {
+      method: 'POST',
+      body: JSON.stringify(variantIds),
+    }),
+  getPosPackagingDisplay: (variantId: number) =>
+    httpRequest<Awaited<ReturnType<ApiClient['getPosPackagingDisplay']>>>(`/api/return-packaging/pos-display/${variantId}`),
   listContainerTypesV4: () =>
     httpRequest<Awaited<ReturnType<ApiClient['listContainerTypesV4']>>>('/api/container-types?pageSize=200'),
   listPackagingTypesV4: () =>

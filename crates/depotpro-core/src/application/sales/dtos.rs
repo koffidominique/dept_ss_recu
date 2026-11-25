@@ -115,6 +115,23 @@ pub struct CreateSaleLineV4Input {
     #[serde(deserialize_with = "deserialize_qty_str")]
     pub quantity: String,
     pub discount_amount: Option<i64>,
+    // Snapshot fields for historical crate data
+    #[serde(default)]
+    pub crate_capacity_snapshot: Option<i64>,
+    #[serde(default)]
+    pub crate_capacity_verification_snapshot: Option<String>,
+    #[serde(default)]
+    pub crate_value_xof_snapshot: Option<i64>,
+    #[serde(default)]
+    pub crate_compatibility_group_snapshot: Option<i64>,
+    #[serde(default)]
+    pub bottles_equivalent_snapshot: Option<i64>,
+    #[serde(default)]
+    pub is_returnable_snapshot: Option<bool>,
+    #[serde(default)]
+    pub crate_received_quantity_snapshot: Option<i64>,
+    #[serde(default)]
+    pub crate_missing_quantity_snapshot: Option<i64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -168,6 +185,13 @@ pub struct CreateSaleV4Input {
     pub external_reference: Option<String>,
     #[serde(default)]
     pub received_returnables: Option<Vec<ReceivedReturnableInput>>,
+    // Snapshot fields for historical crate data at sale level
+    #[serde(default)]
+    pub crate_debt_snapshot_xof: Option<i64>,
+    #[serde(default)]
+    pub crate_received_snapshot_xof: Option<i64>,
+    #[serde(default)]
+    pub crate_return_composition_snapshot: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

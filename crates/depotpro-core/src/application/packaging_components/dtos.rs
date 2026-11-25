@@ -202,7 +202,7 @@ pub struct CrateTypeDto {
     pub code: String,
     pub name: String,
     pub producer: String,
-    pub capacity: i64,
+    pub capacity: Option<i64>,
     pub bottle_capacity_ml: i64,
     pub bottle_profile_id: i64,
     pub compatibility_group_id: Option<i64>,
@@ -214,6 +214,7 @@ pub struct CrateTypeDto {
     pub is_active: bool,
     pub created_at: String,
     pub updated_at: Option<String>,
+    pub capacity_verification_status: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -242,4 +243,62 @@ pub struct DisposablePackagingTypeDto {
     pub is_active: bool,
     pub created_at: String,
     pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct PackagingProfileDto {
+    pub id: i64,
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub packaging_material: String,
+    pub is_returnable: bool,
+    pub is_physically_tracked: bool,
+    pub tracking_mode: String,
+    pub capacity_units: Option<i64>,
+    pub capacity_unit_label: String,
+    pub compatible_group_id: Option<i64>,
+    pub default_value_xof: i64,
+    pub verification_status: String,
+    pub verification_source: Option<String>,
+    pub verification_date: Option<String>,
+    pub verified_by: Option<i64>,
+    pub verification_comment: Option<String>,
+    pub is_active: bool,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct VariantPackagingOptionDto {
+    pub id: i64,
+    pub variant_id: i64,
+    pub commercial_packaging_type_id: i64,
+    pub packaging_profile_id: Option<i64>,
+    pub units_per_package: i64,
+    pub is_returnable: bool,
+    pub is_default_sale: bool,
+    pub is_default_purchase: bool,
+    pub verification_status: String,
+    pub verification_source: Option<String>,
+    pub verification_date: Option<String>,
+    pub verified_by: Option<i64>,
+    pub verification_comment: Option<String>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct CatalogueVerificationLogDto {
+    pub id: i64,
+    pub entity_type: String,
+    pub entity_id: i64,
+    pub field_name: Option<String>,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub verification_status: String,
+    pub verification_source: Option<String>,
+    pub verified_by: i64,
+    pub verified_at: String,
+    pub comment: Option<String>,
 }

@@ -11,7 +11,7 @@ use super::{CrateTypeDto, CreateCrateTypeInput, UpdateCrateTypeInput};
 const SELECT_CRATE_TYPE_SQL: &str =
     "SELECT id, code, name, producer, capacity, bottle_capacity_ml, bottle_profile_id,
             compatibility_group_id, dimensions, weight_g, material, deposit_value,
-            description, is_active, created_at, created_at AS updated_at
+            description, is_active, created_at, created_at AS updated_at, capacity_verification_status
      FROM crate_types";
 
 pub async fn create_crate_type(
@@ -22,8 +22,8 @@ pub async fn create_crate_type(
 
     let (_guard, mut tx) = db.begin_write().await?;
     let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO crate_types (code, name, producer, capacity, bottle_capacity_ml, bottle_profile_id, compatibility_group_id, dimensions, weight_g, material, deposit_value, description, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO crate_types (code, name, producer, capacity, bottle_capacity_ml, bottle_profile_id, compatibility_group_id, dimensions, weight_g, material, deposit_value, description, is_active, capacity_verification_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id",
     )
     .bind(input.code.trim())
@@ -39,6 +39,7 @@ pub async fn create_crate_type(
     .bind(input.deposit_value)
     .bind(input.description)
     .bind(if input.is_active { 1 } else { 0 })
+    .bind(input.capacity_verification_status.as_deref().unwrap_or("to_verify"))
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -86,7 +87,7 @@ pub async fn update_crate_type(
 
     let existing = get_crate_type(db, crate_type_id).await?;
     let next_name = input.name.unwrap_or(existing.name);
-    let next_capacity = input.capacity.unwrap_or(existing.capacity);
+    let next_capacity = input.capacity.or(existing.capacity);
     let next_bottle_capacity_ml = input
         .bottle_capacity_ml
         .unwrap_or(existing.bottle_capacity_ml);
@@ -98,6 +99,9 @@ pub async fn update_crate_type(
     let next_material = input.material.unwrap_or(existing.material);
     let next_deposit_value = input.deposit_value.unwrap_or(existing.deposit_value);
     let next_description = input.description.or(existing.description);
+    let next_capacity_verification_status = input
+        .capacity_verification_status
+        .or(existing.capacity_verification_status);
     let next_active = input.is_active.unwrap_or(existing.is_active);
 
     let (_guard, mut tx) = db.begin_write().await?;
@@ -105,7 +109,7 @@ pub async fn update_crate_type(
         "UPDATE crate_types
          SET name = ?, capacity = ?, bottle_capacity_ml = ?, compatibility_group_id = ?,
              dimensions = ?, weight_g = ?, material = ?, deposit_value = ?,
-             description = ?, is_active = ?
+             description = ?, is_active = ?, capacity_verification_status = ?
          WHERE id = ?",
     )
     .bind(next_name.trim())
@@ -118,6 +122,7 @@ pub async fn update_crate_type(
     .bind(next_deposit_value)
     .bind(next_description)
     .bind(if next_active { 1 } else { 0 })
+    .bind(next_capacity_verification_status)
     .bind(crate_type_id)
     .execute(&mut *tx)
     .await?;

@@ -58,6 +58,27 @@ export class TauriApiClient implements ApiClient {
   listContainerTypesV4 = tauriCatalogApi.listContainerTypesV4;
   listPackagingTypesV4 = tauriCatalogApi.listPackagingTypesV4;
   listStockLocationsV4 = tauriCatalogApi.listStockLocationsV4;
+  listCrateTypes = tauriCatalogApi.listCrateTypes;
+  createCrateType = tauriCatalogApi.createCrateType;
+  updateCrateType = tauriCatalogApi.updateCrateType;
+  deleteCrateType = tauriCatalogApi.deleteCrateType;
+  // Packaging Profiles
+  listPackagingProfiles = tauriCatalogApi.listPackagingProfiles;
+  createPackagingProfile = tauriCatalogApi.createPackagingProfile;
+  updatePackagingProfile = tauriCatalogApi.updatePackagingProfile;
+  deletePackagingProfile = tauriCatalogApi.deletePackagingProfile;
+  // Variant Packaging Options
+  listVariantPackagingOptions = tauriCatalogApi.listVariantPackagingOptions;
+  createVariantPackagingOption = tauriCatalogApi.createVariantPackagingOption;
+  updateVariantPackagingOption = tauriCatalogApi.updateVariantPackagingOption;
+  deleteVariantPackagingOption = tauriCatalogApi.deleteVariantPackagingOption;
+  // Catalogue Verification Logs
+  listCatalogueVerificationLogs = tauriCatalogApi.listCatalogueVerificationLogs;
+  // Return Packaging Calculation
+  calculateLineReturnPackaging = tauriCatalogApi.calculateLineReturnPackaging;
+  calculateSaleReturnPackaging = tauriCatalogApi.calculateSaleReturnPackaging;
+  checkCrateMixCompatibility = tauriCatalogApi.checkCrateMixCompatibility;
+  getPosPackagingDisplay = tauriCatalogApi.getPosPackagingDisplay;
   listSalesUnits = tauriCatalogApi.listSalesUnits;
   createSalesUnit = tauriCatalogApi.createSalesUnit;
   updateSalesUnit = tauriCatalogApi.updateSalesUnit;

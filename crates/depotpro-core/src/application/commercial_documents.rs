@@ -3,6 +3,7 @@
 use crate::application::auth::{self, Permission, Role};
 use crate::error::{CoreError, CoreResult};
 use crate::infrastructure::db::DepotDb;
+use sqlx::Row;
 
 /// Ligne de commande fournisseur brute lue en base (tuples SQLx).
 type SupplierOrderLineRow = (String, String, i64, String, i64, i64, i64, String, String);
@@ -596,49 +597,53 @@ pub async fn get_document_detail(
                 .collect();
         }
         "sales_receipt" => {
+            // Fetch sale-level snapshot data
+            let sale_snapshot: Option<(i64, i64, Option<String>)> = sqlx::query_as(
+                "SELECT crate_debt_snapshot_xof, crate_received_snapshot_xof, crate_return_composition_snapshot
+                 FROM sales WHERE id = ?"
+            )
+            .bind(document_id)
+            .fetch_optional(&db.pool)
+            .await?;
+
+            let (crate_debt_snapshot_xof, crate_received_snapshot_xof, crate_return_composition_snapshot) = sale_snapshot
+                .map(|(debt, received, comp)| (debt, received, comp))
+                .unwrap_or((0, 0, None));
+
             notes = sqlx::query_scalar("SELECT notes FROM sales WHERE id = ?")
                 .bind(document_id)
                 .fetch_one(&db.pool)
                 .await?;
-            lines = sqlx::query_as::<
-                _,
-                (
-                    String,
-                    String,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    String,
-                    String,
-                ),
-            >(
+
+            // Fetch sale lines with snapshot data using manual row mapping
+            let sale_lines_rows = sqlx::query(
                 "SELECT product_name, packaging_name, quantity_milli,
                         COALESCE(sales_unit_label, packaging_name), coefficient_milli, base_quantity_milli,
-                        base_unit, unit_price, line_total, product_snapshot_json, packaging_snapshot_json
+                        base_unit, unit_price, line_total, product_snapshot_json, packaging_snapshot_json,
+                        crate_capacity_snapshot, crate_capacity_verification_snapshot, crate_value_xof_snapshot,
+                        crate_compatibility_group_snapshot, bottles_equivalent_snapshot,
+                        is_returnable_snapshot, crate_received_quantity_snapshot, crate_missing_quantity_snapshot
                  FROM sale_lines WHERE sale_id = ? ORDER BY id",
             )
             .bind(document_id)
             .fetch_all(&db.pool)
-            .await?
-            .into_iter()
-            .map(
-                |(
-                    label,
-                    packaging,
-                    quantity,
-                    unit,
-                    coefficient,
-                    base_quantity,
-                    base_unit,
-                    price,
-                    amount,
-                    product_snapshot,
-                    packaging_snapshot,
-                )| {
+            .await?;
+
+            lines = sale_lines_rows
+                .into_iter()
+                .map(|row| {
+                    let label: String = row.get("product_name");
+                    let packaging: String = row.get("packaging_name");
+                    let quantity: i64 = row.get("quantity_milli");
+                    let unit: String = row.get(3); // COALESCE column
+                    let coefficient: i64 = row.get("coefficient_milli");
+                    let base_quantity: i64 = row.get("base_quantity_milli");
+                    let base_unit: String = row.get("base_unit");
+                    let price: i64 = row.get("unit_price");
+                    let amount: i64 = row.get("line_total");
+                    let product_snapshot: String = row.get("product_snapshot_json");
+                    let packaging_snapshot: String = row.get("packaging_snapshot_json");
+
                     let detail = format!(
                         "Conditionnement : {} · conversion {} {unit} = {} {base_unit} · {} · {}",
                         packaging_contents_description(&packaging, &base_unit, coefficient),
@@ -655,91 +660,84 @@ pub async fn get_document_detail(
                         unit_price_xof: price,
                         amount_xof: amount,
                     }
-                },
-            )
-            .collect();
-            #[allow(clippy::type_complexity)]
-            let deposits: Vec<(String, String, i64, i64, String, i64, String)> = sqlx::query_as(
-                "SELECT COALESCE(json_extract(component.value, '$.kind'), rpt.kind, 'other'),
-                        COALESCE(json_extract(component.value, '$.name'), rpt.name, 'Détail non disponible sur cette opération historique'),
-                        di.pieces, di.returned_pieces, COALESCE(sl.product_name, ''),
-                        CASE
-                            WHEN di.status = 'returned' AND di.amount <= 0
-                                THEN di.pieces * COALESCE(NULLIF(di.unit_value, 0), rpt.deposit_value, 0)
-                            ELSE di.amount
-                        END,
-                        COALESCE(di.status, 'pending')
-                 FROM deposit_issues di
-                 LEFT JOIN sale_lines sl ON sl.id = di.sale_line_id
-                 LEFT JOIN json_each(sl.packaging_snapshot_json, '$.depositItems') component
-                      ON CAST(json_extract(component.value, '$.returnableId') AS INTEGER) = di.returnable_id
-                 LEFT JOIN returnable_packaging_types rpt ON rpt.id = di.returnable_id
-                 WHERE di.sale_id = ? ORDER BY di.id",
+                })
+                .collect();
+
+            // Build packaging lines from sale_lines snapshot data
+            let sale_line_snapshots = sqlx::query(
+                "SELECT crate_capacity_snapshot, crate_capacity_verification_snapshot, crate_value_xof_snapshot,
+                        crate_compatibility_group_snapshot, bottles_equivalent_snapshot,
+                        is_returnable_snapshot, crate_received_quantity_snapshot
+                 FROM sale_lines WHERE sale_id = ? AND is_returnable_snapshot = 1 ORDER BY id",
             )
             .bind(document_id)
             .fetch_all(&db.pool)
             .await?;
-            let mut returned_packaging_amount: i64 = 0;
-            let has_packaging = !deposits.is_empty();
-            packaging_lines = deposits
+
+packaging_lines = sale_line_snapshots
                 .into_iter()
-                .map(
-                    |(kind, name, expected, returned, detail, amount, di_status)| {
-                        if di_status == "returned" {
-                            returned_packaging_amount += amount;
-                            CommercialDocumentPackagingLine {
-                                label: format!("{name} (retour client reçu)"),
-                                kind,
-                                expected_quantity: 0,
-                                issued_quantity: Some(0),
-                                returned_quantity: Some(expected),
-                                status_label: "Retour reçu · hors total commande".to_string(),
-                                detail: Some(
-                                    "Réintégré au stock d'emballages vides du sous-dépôt"
-                                        .to_string(),
-                                ),
-                                amount: Some(amount),
-                            }
+                .map(|row| {
+                    let capacity: Option<i64> = row.get("crate_capacity_snapshot");
+                    let verification_status: Option<String> = row.get("crate_capacity_verification_snapshot");
+                    let crate_value: i64 = row.get("crate_value_xof_snapshot");
+                    let compat_group: Option<i64> = row.get("crate_compatibility_group_snapshot");
+                    let bottles_equiv: i64 = row.get("bottles_equivalent_snapshot");
+                    let _is_returnable: i64 = row.get("is_returnable_snapshot");
+                    let received_qty: i64 = row.get("crate_received_quantity_snapshot");
+
+                    let capacity_str = capacity.map(|c| c.to_string()).unwrap_or_else(|| "Non configuré".to_string());
+                    let status_suffix = verification_status.as_deref().map(|v| format!(" ({})", v)).unwrap_or_default();
+                    let compat_str = compat_group.map(|g| format!(" [Groupe {}]", g)).unwrap_or_default();
+
+                    let label = format!("Casier - cap. {}{}{}", capacity_str, status_suffix, compat_str);
+                    let expected = if capacity.unwrap_or(1) > 0 {
+                        (bottles_equiv / capacity.unwrap_or(1)).max(1)
+                    } else {
+                        1
+                    };
+                    let returned = received_qty;
+                    let missing = expected - returned;
+
+                    CommercialDocumentPackagingLine {
+                        label,
+                        kind: "crate".to_string(),
+                        expected_quantity: expected,
+                        issued_quantity: Some(expected),
+                        returned_quantity: Some(returned),
+                        status_label: if missing > 0 {
+                            format!("{} casier(s) à restituer", missing)
                         } else {
-                            let remaining = (expected - returned).max(0);
-                            CommercialDocumentPackagingLine {
-                                label: name,
-                                kind,
-                                expected_quantity: expected,
-                                issued_quantity: Some(expected),
-                                returned_quantity: Some(returned),
-                                status_label: if remaining > 0 {
-                                    format!("{remaining} à restituer sous 15 jours")
-                                } else {
-                                    "Restitution complète".to_string()
-                                },
-                                detail: if detail.is_empty() {
-                                    None
-                                } else {
-                                    Some(detail)
-                                },
-                                amount: Some(amount),
-                            }
-                        }
-                    },
-                )
+                            "Restitution complète".to_string()
+                        },
+                        detail: Some(format!(
+                            "Valeur casier: {} FCFA · {} bouteilles/casier{}",
+                            crate_value, capacity_str, compat_str
+                        )),
+                        amount: Some(crate_value * expected),
+                    }
+                })
                 .collect();
-            if has_packaging {
+
+            // Add summary note with snapshot financial data
+            if !packaging_lines.is_empty() {
                 let mut note_parts = Vec::new();
                 if let Some(existing) = notes.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                     note_parts.push(existing.to_string());
                 }
-                if returned_packaging_amount > 0 {
-                    note_parts.push(format!(
-                        "Montant retour emballages reçus (hors total commande) : {returned_packaging_amount} FCFA."
-                    ));
+                note_parts.push(format!(
+                    "Valeur totale casiers (snapshot): {} FCFA · Casiers reçus: {} FCFA",
+                    crate_debt_snapshot_xof, crate_received_snapshot_xof
+                ));
+                if let Some(comp) = crate_return_composition_snapshot.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                    note_parts.push(format!("Composition retour (snapshot): {}", comp));
                 }
                 note_parts.push(
-                    "Délai de retour d'emballages : 15 jours maximum. Le montant du retour d'emballages est suivi hors total commande ; à défaut de restitution dans les 15 jours, la valeur des emballages faisant défaut est exigible."
+                    "Délai de retour d'emballages : 15 jours maximum. Les valeurs des casiers sont figées au moment de la vente (snapshot)."
                         .to_string(),
                 );
                 notes = Some(note_parts.join("\n"));
             }
+
             payments = sqlx::query_as::<_, (String, i64)>(
                 "SELECT pm.label || ' · ' || p.reference || COALESCE(' · Txn ' || p.external_reference, ''), pp.amount
                  FROM payments p JOIN payment_parts pp ON pp.payment_id = p.id

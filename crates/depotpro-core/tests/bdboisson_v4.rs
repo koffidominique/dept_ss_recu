@@ -266,6 +266,14 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
                 sales_unit_id: None,
                 quantity: "2".to_string(),
                 discount_amount: None,
+                crate_capacity_snapshot: None,
+                crate_capacity_verification_snapshot: None,
+                crate_value_xof_snapshot: None,
+                crate_compatibility_group_snapshot: None,
+                bottles_equivalent_snapshot: None,
+                is_returnable_snapshot: None,
+                crate_received_quantity_snapshot: None,
+                crate_missing_quantity_snapshot: None,
             },
             sales::CreateSaleLineV4Input {
                 product_id: prod.id,
@@ -273,6 +281,14 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
                 sales_unit_id: Some(su_demi.id),
                 quantity: "1".to_string(),
                 discount_amount: None,
+                crate_capacity_snapshot: None,
+                crate_capacity_verification_snapshot: None,
+                crate_value_xof_snapshot: None,
+                crate_compatibility_group_snapshot: None,
+                bottles_equivalent_snapshot: None,
+                is_returnable_snapshot: None,
+                crate_received_quantity_snapshot: None,
+                crate_missing_quantity_snapshot: None,
             },
         ],
         payments: vec![sales::PaymentPartInput {
@@ -280,7 +296,11 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
             amount: 5_500, // 2*500 (1000) + 1*3100 (3100) + (900+500) consigne = 5500
         }],
         due_date: None,
-        ..Default::default()
+        external_reference: None,
+        received_returnables: None,
+        crate_debt_snapshot_xof: None,
+        crate_received_snapshot_xof: None,
+        crate_return_composition_snapshot: None,
     };
 
     // Seed moyen de paiement "cash" requis par le test (INSERT OR IGNORE : déjà présent par défaut)
@@ -328,4 +348,24 @@ async fn bdboisson_v4_end_to_end_catalog_and_pos() {
         .await
         .unwrap();
     assert!(deleted);
+}
+
+#[tokio::test]
+async fn test_migration_check() {
+    let db = DepotDb::connect(&temp_db_path("migration_check")).await.unwrap();
+    
+    let version: i64 = sqlx::query_scalar("SELECT MAX(version) FROM schema_version")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    println!("Latest migration version: {}", version);
+    
+    // Check if product_packagings has the new column
+    let has_col: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pragma_table_info('product_packagings') WHERE name = 'capacity_verification_source'"
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    println!("Has capacity_verification_source: {}", has_col);
 }

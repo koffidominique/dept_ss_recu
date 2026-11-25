@@ -3,7 +3,7 @@
 // ============================================================================
 
 use depotpro_core::application::auth::{self, Permission};
-use depotpro_core::application::product_catalogue;
+use depotpro_core::application::{catalogue, product_catalogue};
 use tauri::State;
 
 use super::verify_desktop_perm;
@@ -160,6 +160,19 @@ pub async fn get_catalogue_reference_price_history_pc(
     .await
     .map_err(|e| e.to_string())?;
     serde_json::to_value(list).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn import_catalog_seed_pc(
+    state: State<'_, DesktopState>,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    let actor = verify_desktop_perm(&state, &token, Permission::CatalogWrite).await?;
+    let db = state.db().await;
+    let result = auth::with_actor(actor, catalogue::import_catalog_seed(&db))
+        .await
+        .map_err(|e| e.to_string())?;
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

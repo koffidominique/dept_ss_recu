@@ -41,6 +41,7 @@ export function buildCartItemFromPackaging(
     item: {
       key: `${prod.id}-${pkg.id}`,
       productId: prod.id,
+      variantId: pkg.variant_id ?? null,
       productName: prod.name,
       reference: prod.reference,
       baseUnit: prod.base_unit,
@@ -88,6 +89,7 @@ export function buildCartItemFromSalesUnit(
     item: {
       key: `${prod.id}-su-${unit.id}`,
       productId: prod.id,
+      variantId: fallbackPkg.variant_id ?? null,
       productName: prod.name,
       reference: prod.reference,
       baseUnit: prod.base_unit,

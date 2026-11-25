@@ -33,12 +33,23 @@ pub async fn create_sale(db: &DepotDb, input: CreateSaleInput) -> CoreResult<Sal
                 sales_unit_id: None,
                 quantity: l.quantity,
                 discount_amount: l.discount_amount,
+                crate_capacity_snapshot: None,
+                crate_capacity_verification_snapshot: None,
+                crate_value_xof_snapshot: None,
+                crate_compatibility_group_snapshot: None,
+                bottles_equivalent_snapshot: None,
+                is_returnable_snapshot: None,
+                crate_received_quantity_snapshot: None,
+                crate_missing_quantity_snapshot: None,
             })
             .collect(),
         payments: input.payments,
         due_date: input.due_date,
         external_reference: input.external_reference,
         received_returnables: None,
+        crate_debt_snapshot_xof: None,
+        crate_received_snapshot_xof: None,
+        crate_return_composition_snapshot: None,
     };
     create_sale_v4(db, v4).await
 }
@@ -217,8 +228,8 @@ pub async fn create_sale_v4(db: &DepotDb, input: CreateSaleV4Input) -> CoreResul
     };
     let sale_ref = DepotDb::next_sequence(&mut tx, document_prefix).await?;
     let sale_id = sqlx::query(
-        "INSERT INTO sales (reference, request_key, client_id, sale_type, price_tier, subtotal_merchandise, discount_amount, total_merchandise, total_deposit, total_amount, paid_amount, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'validated', ?)",
+        "INSERT INTO sales (reference, request_key, client_id, sale_type, price_tier, subtotal_merchandise, discount_amount, total_merchandise, total_deposit, total_amount, paid_amount, status, notes, crate_debt_snapshot_xof, crate_received_snapshot_xof, crate_return_composition_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'validated', ?, ?, ?, ?)",
     )
     .bind(&sale_ref)
     .bind(&request_key)
@@ -232,6 +243,9 @@ pub async fn create_sale_v4(db: &DepotDb, input: CreateSaleV4Input) -> CoreResul
     .bind(total_amount.value())
     .bind(paid_amount.value())
     .bind(input.notes.as_deref().map(str::trim).filter(|s| !s.is_empty()))
+    .bind(input.crate_debt_snapshot_xof.unwrap_or(0))
+    .bind(input.crate_received_snapshot_xof.unwrap_or(0))
+    .bind(input.crate_return_composition_snapshot)
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();

@@ -84,6 +84,95 @@ export const tauriCatalogApi = {
       "create_brand_v4",
       { token: getStoredTauriToken(), payload: input },
     ),
+  listCrateTypes: (search?: string) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["listCrateTypes"]>>>(
+      "list_crate_types_pc",
+      { token: getStoredTauriToken(), search, active_only: true },
+    ),
+  createCrateType: (input: Parameters<ApiClient["createCrateType"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["createCrateType"]>>>(
+      "create_crate_type_pc",
+      { token: getStoredTauriToken(), payload: input },
+    ),
+  updateCrateType: (id: number, input: Parameters<ApiClient["updateCrateType"]>[1]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["updateCrateType"]>>>(
+      "update_crate_type_pc",
+      { token: getStoredTauriToken(), id, payload: input },
+    ),
+  deleteCrateType: (id: number) =>
+    tauriInvoke<void>("delete_crate_type_pc", {
+      token: getStoredTauriToken(),
+      id,
+    }),
+  // Packaging Profiles
+  listPackagingProfiles: (params?: { include_archived?: boolean; verification_status?: string }) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["listPackagingProfiles"]>>>(
+      "list_packaging_profiles_pc",
+      { token: getStoredTauriToken(), include_archived: params?.include_archived ?? false, verification_status: params?.verification_status },
+    ),
+  createPackagingProfile: (input: Parameters<ApiClient["createPackagingProfile"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["createPackagingProfile"]>>>(
+      "create_packaging_profile_pc",
+      { token: getStoredTauriToken(), payload: input },
+    ),
+  updatePackagingProfile: (id: number, input: Parameters<ApiClient["updatePackagingProfile"]>[1]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["updatePackagingProfile"]>>>(
+      "update_packaging_profile_pc",
+      { token: getStoredTauriToken(), id, payload: input },
+    ),
+  deletePackagingProfile: (id: number) =>
+    tauriInvoke<void>("delete_packaging_profile_pc", {
+      token: getStoredTauriToken(),
+      id,
+    }),
+  // Variant Packaging Options
+  listVariantPackagingOptions: (variantId: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["listVariantPackagingOptions"]>>>(
+      "list_variant_packaging_options_pc",
+      { token: getStoredTauriToken(), variant_id: variantId },
+    ),
+  createVariantPackagingOption: (input: Parameters<ApiClient["createVariantPackagingOption"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["createVariantPackagingOption"]>>>(
+      "create_variant_packaging_option_pc",
+      { token: getStoredTauriToken(), payload: input },
+    ),
+  updateVariantPackagingOption: (id: number, input: Parameters<ApiClient["updateVariantPackagingOption"]>[1]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["updateVariantPackagingOption"]>>>(
+      "update_variant_packaging_option_pc",
+      { token: getStoredTauriToken(), id, payload: input },
+    ),
+  deleteVariantPackagingOption: (id: number) =>
+    tauriInvoke<void>("delete_variant_packaging_option_pc", {
+      token: getStoredTauriToken(),
+      id,
+    }),
+  // Catalogue Verification Logs
+  listCatalogueVerificationLogs: (entityType: string, entityId: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["listCatalogueVerificationLogs"]>>>(
+      "list_catalogue_verification_logs_pc",
+      { token: getStoredTauriToken(), entity_type: entityType, entity_id: entityId },
+    ),
+  // Return Packaging Calculation
+  calculateLineReturnPackaging: (input: Parameters<ApiClient["calculateLineReturnPackaging"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["calculateLineReturnPackaging"]>>>(
+      "calculate_line_return_packaging_pc",
+      { token: getStoredTauriToken(), payload: input },
+    ),
+  calculateSaleReturnPackaging: (lines: Parameters<ApiClient["calculateSaleReturnPackaging"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["calculateSaleReturnPackaging"]>>>(
+      "calculate_sale_return_packaging_pc",
+      { token: getStoredTauriToken(), lines },
+    ),
+  checkCrateMixCompatibility: (variantIds: Parameters<ApiClient["checkCrateMixCompatibility"]>[0]) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["checkCrateMixCompatibility"]>>>(
+      "check_crate_mix_compatibility_pc",
+      { token: getStoredTauriToken(), variant_ids: variantIds },
+    ),
+  getPosPackagingDisplay: (variantId: number) =>
+    tauriInvoke<Awaited<ReturnType<ApiClient["getPosPackagingDisplay"]>>>(
+      "get_pos_packaging_display_pc",
+      { token: getStoredTauriToken(), variant_id: variantId },
+    ),
   listContainerTypesV4: () =>
     tauriInvoke<Awaited<ReturnType<ApiClient["listContainerTypesV4"]>>>(
       "list_container_types_v4",

@@ -1,0 +1,205 @@
+{
+  "version": "1.0",
+  "description": "Catalogue seed data for SOLIBRA and BRASSIVOIRE breweries - Côte d'Ivoire",
+  "breweries": [
+    {
+      "code": "BRW-SOLIBRA",
+      "name": "SOLIBRA",
+      "short_name": "SOLIBRA",
+      "country_code": "CI",
+      "address": "Treichville Zone 3, Rue des Brasseurs, Abidjan",
+      "phone": "+225 27 21 21 00 00",
+      "email": "contact@solibra.ci",
+      "website": "https://www.solibra.ci",
+      "is_active": true
+    },
+    {
+      "code": "BRW-BRASSIVOIRE",
+      "name": "BRASSIVOIRE",
+      "short_name": "Brassivoire",
+      "country_code": "CI",
+      "address": "Zone Industrielle PK24, Yopougon, Abidjan",
+      "phone": "+225 27 23 50 00 00",
+      "email": "contact@brassivoire.ci",
+      "website": "https://www.brassivoire.ci",
+      "is_active": true
+    },
+    {
+      "code": "BRW-AUTRES",
+      "name": "Autres fabricants & importateurs",
+      "short_name": "Autres",
+      "country_code": "CI",
+      "address": null,
+      "phone": null,
+      "email": null,
+      "website": null,
+      "is_active": true
+    }
+  ],
+  "brands": [
+    { "code": "BR-SOLIBRA", "name": "SOLIBRA", "country_of_origin": "Côte d'Ivoire", "brewery_code": "BRW-SOLIBRA", "is_active": true },
+    { "code": "BR-BRASSIVOIRE", "name": "BRASSIVOIRE", "country_of_origin": "Côte d'Ivoire", "brewery_code": "BRW-BRASSIVOIRE", "is_active": true },
+    { "code": "BR-HEINEKEN", "name": "Heineken", "country_of_origin": "Pays-Bas", "brewery_code": "BRW-BRASSIVOIRE", "is_active": true },
+    { "code": "BR-DESPERADOS", "name": "Desperados", "country_of_origin": "France", "brewery_code": "BRW-BRASSIVOIRE", "is_active": true },
+    { "code": "BR-RHINO", "name": "Rhino Energy Malt", "country_of_origin": "Côte d'Ivoire", "brewery_code": "BRW-BRASSIVOIRE", "is_active": true },
+    { "code": "BR-AUTRES", "name": "Autres marques", "country_of_origin": "Divers", "brewery_code": "BRW-AUTRES", "is_active": true }
+  ],
+  "categories": [
+    { "name": "Bières", "description": "Bières et boissons maltées", "slug": "bieres", "is_active": true },
+    { "name": "Boissons gazeuses", "description": "Sodas et boissons gazeuses", "slug": "boissons-gazeuses", "is_active": true },
+    { "name": "Boissons maltées", "description": "Boissons à base de malt sans alcool", "slug": "boissons-maltées", "is_active": true },
+    { "name": "Boissons énergisantes", "description": "Boissons énergisantes", "slug": "boissons-energisantes", "is_active": true },
+    { "name": "Vins et alcools", "description": "Vins, spiritueux et boissons alcoolisées", "slug": "vins-alcools", "is_active": true },
+    { "name": "Eaux et autres", "description": "Eaux minérales, jus et autres boissons", "slug": "eaux-autres", "is_active": true }
+  ],
+  "subcategories": [
+    { "name": "Bières locales", "description": "Bières produites en Côte d'Ivoire", "slug": "bieres-locales", "parent": "Bières", "is_active": true },
+    { "name": "Bières importées", "description": "Bières importées", "slug": "bieres-importees", "parent": "Bières", "is_active": true }
+  ],
+  "container_types": [
+    { "code": "CT-SOL-33-GLASS", "name": "Bouteille SOLIBRA 33cl verre", "is_returnable": true, "description": "Bouteille verre consignée SOLIBRA 33cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 330, "default_deposit_value": 100 },
+    { "code": "CT-SOL-30-GLASS", "name": "Bouteille SOLIBRA 30cl verre", "is_returnable": true, "description": "Bouteille verre consignée SOLIBRA 30cl (sucreries)", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 300, "default_deposit_value": 100 },
+    { "code": "CT-SOL-50-GLASS", "name": "Bouteille SOLIBRA 50cl verre", "is_returnable": true, "description": "Bouteille verre consignée SOLIBRA 50cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 500, "default_deposit_value": 125 },
+    { "code": "CT-SOL-65-GLASS", "name": "Bouteille SOLIBRA 65cl verre", "is_returnable": true, "description": "Bouteille verre consignée SOLIBRA 65cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 650, "default_deposit_value": 150 },
+    { "code": "CT-BRV-33-GLASS", "name": "Bouteille BRASSIVOIRE 33cl verre", "is_returnable": true, "description": "Bouteille verre consignée BRASSIVOIRE 33cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 330, "default_deposit_value": 100 },
+    { "code": "CT-BRV-60-GLASS", "name": "Bouteille BRASSIVOIRE 60cl verre", "is_returnable": true, "description": "Bouteille verre consignée BRASSIVOIRE 60cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 600, "default_deposit_value": 125 },
+    { "code": "CT-HEI-25-GLASS", "name": "Bouteille Heineken 25cl", "is_returnable": true, "description": "Bouteille verre consignée Heineken 25cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 250, "default_deposit_value": 100 },
+    { "code": "CT-HEI-33-GLASS", "name": "Bouteille Heineken 33cl", "is_returnable": true, "description": "Bouteille verre consignée Heineken 33cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 330, "default_deposit_value": 100 },
+    { "code": "CT-HEI-50-GLASS", "name": "Bouteille Heineken 50cl", "is_returnable": true, "description": "Bouteille verre consignée Heineken 50cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 500, "default_deposit_value": 125 },
+    { "code": "CT-HEI-50-CAN", "name": "Canette Heineken 50cl", "is_returnable": false, "description": "Canette aluminium Heineken 50cl", "is_active": true, "material": "aluminium", "is_recyclable": true, "default_volume_ml": 500, "default_deposit_value": 0 },
+    { "code": "CT-DES-25-GLASS", "name": "Bouteille Desperados 25cl", "is_returnable": true, "description": "Bouteille verre consignée Desperados 25cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 250, "default_deposit_value": 100 },
+    { "code": "CT-DES-33-GLASS", "name": "Bouteille Desperados 33cl", "is_returnable": true, "description": "Bouteille verre consignée Desperados 33cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 330, "default_deposit_value": 100 },
+    { "code": "CT-DES-50-CAN", "name": "Canette Desperados 50cl", "is_returnable": false, "description": "Canette aluminium Desperados 50cl", "is_active": true, "material": "aluminium", "is_recyclable": true, "default_volume_ml": 500, "default_deposit_value": 0 },
+    { "code": "CT-RHI-33-GLASS", "name": "Bouteille Rhino Energy 33cl", "is_returnable": true, "description": "Bouteille verre consignée Rhino Energy Malt 33cl", "is_active": true, "material": "glass", "is_recyclable": true, "default_volume_ml": 330, "default_deposit_value": 100 }
+  ],
+  "packaging_types": [
+    { "code": "PT-CRATE", "name": "Casier plastique", "default_name": "casier", "is_reusable": true, "is_returnable": true, "is_active": true },
+    { "code": "PT-HALF-CRATE", "name": "Demi-casier", "default_name": "casier", "is_reusable": true, "is_returnable": true, "is_active": true },
+    { "code": "PT-CARTON", "name": "Carton", "default_name": "carton", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-SIX-PACK", "name": "Pack 6 bouteilles", "default_name": "pack", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-TWELVE-PACK", "name": "Pack 12 bouteilles", "default_name": "pack", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-PACK", "name": "Pack plastique", "default_name": "pack", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-FILM", "name": "Film rétractable", "default_name": "pack", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-PALLET", "name": "Palette", "default_name": "casier", "is_reusable": true, "is_returnable": false, "is_active": true },
+    { "code": "PT-UNIT-BTL", "name": "Vente à l'unité (bouteille)", "default_name": "bouteille", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-UNIT-CAN", "name": "Vente à l'unité (canette)", "default_name": "canette", "is_reusable": false, "is_returnable": false, "is_active": true },
+    { "code": "PT-OTHER", "name": "Autre", "default_name": "carton", "is_reusable": false, "is_returnable": false, "is_active": true }
+  ],
+  "packaging_profiles": [
+    { "code": "PP-SOL-CR-24-33", "name": "Casier SOLIBRA 24x33cl", "description": "Casier plastique standard SOLIBRA pour bouteilles 33cl", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 24, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1500, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-SOL-CR-12-50", "name": "Casier SOLIBRA 12x50cl", "description": "Casier plastique standard SOLIBRA pour bouteilles 50cl", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 12, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1800, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-SOL-CR-12-65", "name": "Casier SOLIBRA 12x65cl", "description": "Casier plastique standard SOLIBRA pour bouteilles 65cl", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 12, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 2000, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-SOL-CR-20-50", "name": "Casier SOLIBRA 20x50cl (Racines)", "description": "Casier spécifique Racines 50cl - capacité 20 bouteilles", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 20, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 2200, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-BRV-CR-24-33", "name": "Casier BRASSIVOIRE 24x33cl", "description": "Casier plastique BRASSIVOIRE pour bouteilles 33cl", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": null, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1500, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-BRV-CR-12-60", "name": "Casier BRASSIVOIRE 12x60cl", "description": "Casier plastique BRASSIVOIRE pour bouteilles 60cl", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": null, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 2000, "verification_status": "needs_verification", "verification_source": "catalog_officiel", "is_active": true },
+    { "code": "PP-GEN-CR-24-33", "name": "Casier générique 24x33cl", "description": "Casier standard 24 bouteilles 33cl verre consigné", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 24, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1200, "verification_status": "verified", "verification_source": "mesure_physique", "is_active": true },
+    { "code": "PP-GEN-CR-12-50", "name": "Casier générique 12x50cl", "description": "Casier standard 12 bouteilles 50cl verre consigné", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 12, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1500, "verification_status": "verified", "verification_source": "mesure_physique", "is_active": true },
+    { "code": "PP-GEN-CR-12-65", "name": "Casier générique 12x65cl", "description": "Casier standard 12 bouteilles 65cl verre consigné", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 12, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1800, "verification_status": "verified", "verification_source": "mesure_physique", "is_active": true },
+    { "code": "PP-GEN-CR-20-50", "name": "Casier générique 20x50cl", "description": "Casier standard 20 bouteilles 50cl verre consigné (Racines)", "packaging_material": "plastic", "is_returnable": true, "is_physically_tracked": true, "tracking_mode": "crate_physical", "capacity_units": 20, "capacity_unit_label": "bouteille", "compatible_group_id": null, "default_value_xof": 1800, "verification_status": "verified", "verification_source": "mesure_physique", "is_active": true }
+  ],
+  "products": [
+    { "reference": "SOL-33-BL", "barcode": null, "name": "Solibra Lager 33cl", "brand_code": "BR-SOLIBRA", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-SOLIBRA", "description": "Bière blonde légère SOLIBRA 33cl", "base_unit": "bouteille", "volume_ml": 330, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 33cl verre consigné", "container_type_code": "CT-SOL-33-GLASS", "volume_ml": 330, "barcode": null, "sku": "SOL-33-BL-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-SOL-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1500, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-SOL-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 750, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "SOL-50-BL", "barcode": null, "name": "Solibra Lager 50cl", "brand_code": "BR-SOLIBRA", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-SOLIBRA", "description": "Bière blonde légère SOLIBRA 50cl", "base_unit": "bouteille", "volume_ml": 500, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 50cl verre consigné", "container_type_code": "CT-SOL-50-GLASS", "volume_ml": 500, "barcode": null, "sku": "SOL-50-BL-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-SOL-CR-12-50", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 125, "crate_deposit": 1800, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 6, "packaging_profile_code": "PP-SOL-CR-12-50", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 900, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "SOL-65-BL", "barcode": null, "name": "Solibra Lager 65cl", "brand_code": "BR-SOLIBRA", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-SOLIBRA", "description": "Bière blonde légère SOLIBRA 65cl (grande bouteille)", "base_unit": "bouteille", "volume_ml": 650, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 65cl verre consigné", "container_type_code": "CT-SOL-65-GLASS", "volume_ml": 650, "barcode": null, "sku": "SOL-65-BL-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-SOL-CR-12-65", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 150, "crate_deposit": 2000, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 6, "packaging_profile_code": "PP-SOL-CR-12-65", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 150, "crate_deposit": 1000, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 150, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "SOL-50-RAC", "barcode": null, "name": "Racines 50cl", "brand_code": "BR-SOLIBRA", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-SOLIBRA", "description": "Bière de terroir Racines 50cl - casier 20 bouteilles", "base_unit": "bouteille", "volume_ml": 500, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge local, maïs, houblon", "beverage_color": "Ambré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": true, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 50cl verre consigné (Racines)", "container_type_code": "CT-SOL-50-GLASS", "volume_ml": 500, "barcode": null, "sku": "SOL-50-RAC-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 20, "packaging_profile_code": "PP-SOL-CR-20-50", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 125, "crate_deposit": 2200, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 10, "packaging_profile_code": "PP-SOL-CR-20-50", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 1100, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "BRV-33-LAG", "barcode": null, "name": "Brassivoire Lager 33cl", "brand_code": "BR-BRASSIVOIRE", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-BRASSIVOIRE", "description": "Bière blonde BRASSIVOIRE 33cl", "base_unit": "bouteille", "volume_ml": 330, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon", "beverage_color": "Doré clair", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 33cl verre consigné", "container_type_code": "CT-BRV-33-GLASS", "volume_ml": 330, "barcode": null, "sku": "BRV-33-LAG-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-BRV-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1500, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-BRV-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 750, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "BRV-60-LAG", "barcode": null, "name": "Brassivoire Lager 60cl", "brand_code": "BR-BRASSIVOIRE", "category": "Bières locales", "subcategory": "Bières locales", "brewery_code": "BRW-BRASSIVOIRE", "description": "Bière blonde BRASSIVOIRE 60cl", "base_unit": "bouteille", "volume_ml": 600, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon", "beverage_color": "Doré clair", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 60cl verre consigné", "container_type_code": "CT-BRV-60-GLASS", "volume_ml": 600, "barcode": null, "sku": "BRV-60-LAG-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-BRV-CR-12-60", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 125, "crate_deposit": 2000, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 6, "packaging_profile_code": "PP-BRV-CR-12-60", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 1000, "verification_status": "needs_verification" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "HEI-25", "barcode": null, "name": "Heineken 25cl", "brand_code": "BR-HEINEKEN", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Heineken Premium Lager 25cl", "base_unit": "bouteille", "volume_ml": 250, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 25cl verre consigné", "container_type_code": "CT-HEI-25-GLASS", "volume_ml": 250, "barcode": null, "sku": "HEI-25-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1200, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 600, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "HEI-33", "barcode": null, "name": "Heineken 33cl", "brand_code": "BR-HEINEKEN", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Heineken Premium Lager 33cl", "base_unit": "bouteille", "volume_ml": 330, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 33cl verre consigné", "container_type_code": "CT-HEI-33-GLASS", "volume_ml": 330, "barcode": null, "sku": "HEI-33-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1200, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 600, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "HEI-50", "barcode": null, "name": "Heineken 50cl", "brand_code": "BR-HEINEKEN", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Heineken Premium Lager 50cl", "base_unit": "bouteille", "volume_ml": 500, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 50cl verre consigné", "container_type_code": "CT-HEI-50-GLASS", "volume_ml": 500, "barcode": null, "sku": "HEI-50-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-12-50", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 125, "crate_deposit": 1500, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 6, "packaging_profile_code": "PP-GEN-CR-12-50", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 750, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 125, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "HEI-50-CAN", "barcode": null, "name": "Heineken Canette 50cl", "brand_code": "BR-HEINEKEN", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Heineken Premium Lager canette 50cl", "base_unit": "canette", "volume_ml": 500, "alcohol_degree_milli": 50, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, houblon", "beverage_color": "Doré", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Canette 50cl aluminium", "container_type_code": "CT-HEI-50-CAN", "volume_ml": 500, "barcode": null, "sku": "HEI-50-CAN", "packagings": [
+        { "packaging_type_code": "PT-TWELVE-PACK", "units_per_package": 12, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" },
+        { "packaging_type_code": "PT-SIX-PACK", "units_per_package": 6, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-CAN", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "DES-25", "barcode": null, "name": "Desperados 25cl", "brand_code": "BR-DESPERADOS", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Desperados Tequila Flavored Beer 25cl", "base_unit": "bouteille", "volume_ml": 250, "alcohol_degree_milli": 59, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon, arôme tequila", "beverage_color": "Doré pâle", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 25cl verre consigné", "container_type_code": "CT-DES-25-GLASS", "volume_ml": 250, "barcode": null, "sku": "DES-25-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1200, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 600, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "DES-33", "barcode": null, "name": "Desperados 33cl", "brand_code": "BR-DESPERADOS", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Desperados Tequila Flavored Beer 33cl", "base_unit": "bouteille", "volume_ml": 330, "alcohol_degree_milli": 59, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon, arôme tequila", "beverage_color": "Doré pâle", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 33cl verre consigné", "container_type_code": "CT-DES-33-GLASS", "volume_ml": 330, "barcode": null, "sku": "DES-33-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1200, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 600, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "DES-50-CAN", "barcode": null, "name": "Desperados Canette 50cl", "brand_code": "BR-DESPERADOS", "category": "Bières importées", "subcategory": "Bières importées", "brewery_code": "BRW-BRASSIVOIRE", "description": "Desperados Tequila Flavored Beer canette 50cl", "base_unit": "canette", "volume_ml": 500, "alcohol_degree_milli": 59, "is_alcoholic": true, "ingredients": "Eau, malt d'orge, maïs, houblon, arôme tequila", "beverage_color": "Doré pâle", "storage_temp": "5-8°C", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Canette 50cl aluminium", "container_type_code": "CT-DES-50-CAN", "volume_ml": 500, "barcode": null, "sku": "DES-50-CAN", "packagings": [
+        { "packaging_type_code": "PT-TWELVE-PACK", "units_per_package": 12, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" },
+        { "packaging_type_code": "PT-SIX-PACK", "units_per_package": 6, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-CAN", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": false, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 0, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]},
+    { "reference": "RHI-33", "barcode": null, "name": "Rhino Energy Malt 33cl", "brand_code": "BR-RHINO", "category": "Boissons maltées", "subcategory": null, "brewery_code": "BRW-BRASSIVOIRE", "description": "Boisson maltée énergisante Rhino 33cl", "base_unit": "bouteille", "volume_ml": 330, "alcohol_degree_milli": 0, "is_alcoholic": false, "ingredients": "Eau, malt d'orge, sucre, vitamines, caféine", "beverage_color": "Ambré foncé", "storage_temp": "Ambiant", "shelf_life_days": 365, "is_perishable": false, "track_batches": false, "track_expiry": true, "allow_credit_sale": true, "allow_unit_sale": true, "allow_mixed_sale": true, "status": "active", "variants": [
+      { "name": "Bouteille 33cl verre consigné", "container_type_code": "CT-RHI-33-GLASS", "volume_ml": 330, "barcode": null, "sku": "RHI-33-GLASS", "packagings": [
+        { "packaging_type_code": "PT-CRATE", "units_per_package": 24, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": true, "is_default_purchase": true, "bottle_deposit": 100, "crate_deposit": 1200, "verification_status": "verified" },
+        { "packaging_type_code": "PT-HALF-CRATE", "units_per_package": 12, "packaging_profile_code": "PP-GEN-CR-24-33", "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 600, "verification_status": "verified" },
+        { "packaging_type_code": "PT-UNIT-BTL", "units_per_package": 1, "packaging_profile_code": null, "is_returnable": true, "is_default_sale": false, "is_default_purchase": false, "bottle_deposit": 100, "crate_deposit": 0, "verification_status": "verified" }
+      ]}
+    ]}
+  ],
+  "stock_locations": [
+    { "code": "LOC-MAIN", "name": "Dépôt principal", "location_type": "depot", "is_default": true, "is_active": true },
+    { "code": "LOC-SHOP", "name": "Magasin de vente", "location_type": "shop", "is_default": false, "is_active": true },
+    { "code": "LOC-COLD", "name": "Chambre froide", "location_type": "cold_room", "is_default": false, "is_active": true }
+  ]
+}

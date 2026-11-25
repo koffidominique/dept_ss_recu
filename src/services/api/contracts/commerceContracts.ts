@@ -9,9 +9,13 @@ import type {
   ClientPackagingBalance,
   ContainerTypeRef,
   CreditPolicy,
+  CrateType,
+  CrateTypeInput,
   DashboardData,
   DeleteProductResult,
   DepositRuleRef,
+  PackagingProfile,
+  PackagingProfileInput,
   PackagingTypeRef,
   PaginatedResult,
   PaymentReceiptSnapshot,
@@ -31,6 +35,15 @@ import type {
   SupplierDebt,
   UserAccount,
   UserRole,
+  VariantPackagingOption,
+  CreateVariantPackagingOptionInput,
+  UpdateVariantPackagingOptionInput,
+  CatalogueVerificationLog,
+  LineReturnPackagingInput,
+  LineReturnPackagingResult,
+  SaleReturnPackagingResult,
+  CrateMixCompatibilityResult,
+  PosPackagingDisplay,
 } from "../../../types/erp.ts";
 import type {
   CreateSaleReturnPayload,
@@ -112,6 +125,27 @@ export interface CatalogApiClient {
     breweryId?: number | null;
     countryOfOrigin?: string;
   }): Promise<BrandRef>;
+  listCrateTypes(search?: string): Promise<PaginatedResult<CrateType>>;
+  createCrateType(input: CrateTypeInput): Promise<CrateType>;
+  updateCrateType(id: number, input: Partial<CrateTypeInput>): Promise<CrateType>;
+  deleteCrateType(id: number): Promise<void>;
+  // Packaging Profiles
+  listPackagingProfiles(params?: { include_archived?: boolean; verification_status?: string }): Promise<PaginatedResult<PackagingProfile>>;
+  createPackagingProfile(input: PackagingProfileInput): Promise<PackagingProfile>;
+  updatePackagingProfile(id: number, input: Partial<PackagingProfileInput>): Promise<PackagingProfile>;
+  deletePackagingProfile(id: number): Promise<void>;
+  // Variant Packaging Options
+  listVariantPackagingOptions(variantId: number): Promise<VariantPackagingOption[]>;
+  createVariantPackagingOption(input: CreateVariantPackagingOptionInput): Promise<VariantPackagingOption>;
+  updateVariantPackagingOption(id: number, input: UpdateVariantPackagingOptionInput): Promise<VariantPackagingOption>;
+  deleteVariantPackagingOption(id: number): Promise<void>;
+  // Catalogue Verification Logs
+  listCatalogueVerificationLogs(entityType: string, entityId: number): Promise<CatalogueVerificationLog[]>;
+  // Return Packaging Calculation
+  calculateLineReturnPackaging(input: LineReturnPackagingInput): Promise<LineReturnPackagingResult>;
+  calculateSaleReturnPackaging(lines: LineReturnPackagingInput[]): Promise<SaleReturnPackagingResult>;
+  checkCrateMixCompatibility(variantIds: number[]): Promise<CrateMixCompatibilityResult>;
+  getPosPackagingDisplay(variantId: number): Promise<PosPackagingDisplay>;
   listContainerTypesV4(): Promise<PaginatedResult<ContainerTypeRef>>;
   listPackagingTypesV4(): Promise<PackagingTypeRef[]>;
   listStockLocationsV4(): Promise<StockLocationRef[]>;

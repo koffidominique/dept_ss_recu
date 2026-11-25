@@ -86,8 +86,8 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         })
         .to_string();
         let line_id = sqlx::query(
-            "INSERT INTO sale_lines (sale_id, product_id, packaging_id, variant_id, sales_unit_id, sales_unit_label, product_name, packaging_name, base_unit, coefficient_milli, quantity_milli, base_quantity_milli, unit_price, discount_amount, line_total, cost_num, cost_den, product_snapshot_json, packaging_snapshot_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO sale_lines (sale_id, product_id, packaging_id, variant_id, sales_unit_id, sales_unit_label, product_name, packaging_name, base_unit, coefficient_milli, quantity_milli, base_quantity_milli, unit_price, discount_amount, line_total, cost_num, cost_den, product_snapshot_json, packaging_snapshot_json, crate_capacity_snapshot, crate_capacity_verification_snapshot, crate_value_xof_snapshot, crate_compatibility_group_snapshot, bottles_equivalent_snapshot, is_returnable_snapshot, crate_received_quantity_snapshot, crate_missing_quantity_snapshot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(ctx.sale_id)
         .bind(line.product_id)
@@ -108,6 +108,14 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         .bind(&line.cost_den)
         .bind(&product_snapshot_json)
         .bind(&packaging_snapshot_json)
+        .bind(line.crate_capacity_snapshot)
+        .bind(line.crate_capacity_verification_snapshot.clone())
+        .bind(line.crate_value_xof_snapshot)
+        .bind(line.crate_compatibility_group_snapshot)
+        .bind(line.bottles_equivalent_snapshot)
+        .bind(line.is_returnable_snapshot)
+        .bind(line.crate_received_quantity_snapshot)
+        .bind(line.crate_missing_quantity_snapshot)
         .execute(&mut **tx)
         .await?
         .last_insert_rowid();
@@ -141,9 +149,16 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         crate::application::inventory::sync_stock_balance_tx(tx, line.product_id, next_stock)
             .await?;
 
+        // Determine tracking unit for the main product movement
+        let tracking_unit = if line.is_returnable_snapshot == 1 {
+            "crate"
+        } else {
+            "unit"
+        };
+
         sqlx::query(
-            "INSERT INTO stock_movements (product_id, variant_id, movement_type, quantity_milli, stock_before_milli, stock_after_milli, reason, reference_document)
-             VALUES (?, ?, 'sale_out', ?, ?, ?, ?, ?)",
+            "INSERT INTO stock_movements (product_id, variant_id, movement_type, quantity_milli, stock_before_milli, stock_after_milli, reason, reference_document, tracking_unit, returnable_packaging_id)
+             VALUES (?, ?, 'sale_out', ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(line.product_id)
         .bind(line.variant_id)
@@ -158,8 +173,60 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 .unwrap_or(&line.packaging_name)
         ))
         .bind(ctx.sale_ref)
+        .bind(tracking_unit)
+        .bind(None::<i64>)
         .execute(&mut **tx)
         .await?;
+
+        // Track crate/bottle movements for returnable items using deposit_items
+        if line.is_returnable_snapshot == 1 && !line.deposit_items.is_empty() {
+            for (returnable_id, pieces, _unit_val, _amt) in &line.deposit_items {
+                let returnable_kind: String = sqlx::query_scalar(
+                    "SELECT kind FROM returnable_packaging_types WHERE id = ?"
+                )
+                .bind(returnable_id)
+                .fetch_one(&mut **tx)
+                .await?;
+
+                let tracking_unit = if returnable_kind == "crate" { "crate" } else { "bottle" };
+
+                let before = sqlx::query_scalar::<_, i64>(
+                    "SELECT COALESCE(quantity, 0) FROM returnable_stock_balances WHERE packaging_id = ?"
+                )
+                .bind(returnable_id)
+                .fetch_optional(&mut **tx)
+                .await?
+                .unwrap_or(0);
+
+                let after = before - pieces;
+
+                sqlx::query(
+                    "INSERT INTO returnable_stock_movements (request_key, packaging_id, movement_type, quantity, stock_before, stock_after, reason, reference_document, tracking_unit)
+                     VALUES (?, ?, 'exit', ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(ctx.request_key)
+                .bind(returnable_id)
+                .bind(pieces)
+                .bind(before)
+                .bind(after)
+                .bind(format!("Vente {} - sortie {}", ctx.sale_ref, tracking_unit))
+                .bind(ctx.sale_ref)
+                .bind(tracking_unit)
+                .execute(&mut **tx)
+                .await?;
+
+                // Update returnable stock balance
+                sqlx::query(
+                    "INSERT INTO returnable_stock_balances (packaging_id, quantity) VALUES (?, ?)
+                     ON CONFLICT(packaging_id) DO UPDATE SET quantity = ?",
+                )
+                .bind(returnable_id)
+                .bind(after)
+                .bind(after)
+                .execute(&mut **tx)
+                .await?;
+            }
+        }
 
         for (rid, pieces, unit_val, amt) in &line.deposit_items {
             let (policy_id, return_delay_days): (Option<i64>, i64) = sqlx::query_as(

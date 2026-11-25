@@ -18,6 +18,7 @@ export interface CartItemTierPrices {
 export interface CartItem {
   key: string;
   productId: number;
+  variantId?: number | null;
   productName: string;
   reference: string;
   baseUnit: string;

@@ -58,6 +58,27 @@ export class HttpApiClient implements ApiClient {
   listContainerTypesV4 = httpCatalogApi.listContainerTypesV4;
   listPackagingTypesV4 = httpCatalogApi.listPackagingTypesV4;
   listStockLocationsV4 = httpCatalogApi.listStockLocationsV4;
+  listCrateTypes = httpCatalogApi.listCrateTypes;
+  createCrateType = httpCatalogApi.createCrateType;
+  updateCrateType = httpCatalogApi.updateCrateType;
+  deleteCrateType = httpCatalogApi.deleteCrateType;
+  // Packaging Profiles
+  listPackagingProfiles = httpCatalogApi.listPackagingProfiles;
+  createPackagingProfile = httpCatalogApi.createPackagingProfile;
+  updatePackagingProfile = httpCatalogApi.updatePackagingProfile;
+  deletePackagingProfile = httpCatalogApi.deletePackagingProfile;
+  // Variant Packaging Options
+  listVariantPackagingOptions = httpCatalogApi.listVariantPackagingOptions;
+  createVariantPackagingOption = httpCatalogApi.createVariantPackagingOption;
+  updateVariantPackagingOption = httpCatalogApi.updateVariantPackagingOption;
+  deleteVariantPackagingOption = httpCatalogApi.deleteVariantPackagingOption;
+  // Catalogue Verification Logs
+  listCatalogueVerificationLogs = httpCatalogApi.listCatalogueVerificationLogs;
+  // Return Packaging Calculation
+  calculateLineReturnPackaging = httpCatalogApi.calculateLineReturnPackaging;
+  calculateSaleReturnPackaging = httpCatalogApi.calculateSaleReturnPackaging;
+  checkCrateMixCompatibility = httpCatalogApi.checkCrateMixCompatibility;
+  getPosPackagingDisplay = httpCatalogApi.getPosPackagingDisplay;
   listSalesUnits = httpCatalogApi.listSalesUnits;
   createSalesUnit = httpCatalogApi.createSalesUnit;
   updateSalesUnit = httpCatalogApi.updateSalesUnit;

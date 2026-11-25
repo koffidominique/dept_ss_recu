@@ -140,6 +140,14 @@ async fn make_sale_input(
             sales_unit_id: None,
             quantity: "1".to_string(),
             discount_amount: Some(0),
+            crate_capacity_snapshot: None,
+            crate_capacity_verification_snapshot: None,
+            crate_value_xof_snapshot: None,
+            crate_compatibility_group_snapshot: None,
+            bottles_equivalent_snapshot: None,
+            is_returnable_snapshot: None,
+            crate_received_quantity_snapshot: None,
+            crate_missing_quantity_snapshot: None,
         }],
         payments: vec![PaymentPartInput {
             method_code: "cash".to_string(),
@@ -148,6 +156,9 @@ async fn make_sale_input(
         received_returnables: Some(received),
         notes: None,
         external_reference: None,
+        crate_debt_snapshot_xof: None,
+        crate_received_snapshot_xof: None,
+        crate_return_composition_snapshot: None,
     }
 }
 
@@ -496,6 +507,14 @@ async fn test_partial_sale_return_settles_deposit_issues_and_client_balances() {
                 sales_unit_id: None,
                 quantity: "2".to_string(),
                 discount_amount: Some(0),
+                crate_capacity_snapshot: None,
+                crate_capacity_verification_snapshot: None,
+                crate_value_xof_snapshot: None,
+                crate_compatibility_group_snapshot: None,
+                bottles_equivalent_snapshot: None,
+                is_returnable_snapshot: None,
+                crate_received_quantity_snapshot: None,
+                crate_missing_quantity_snapshot: None,
             }],
             payments: vec![PaymentPartInput {
                 method_code: "cash".to_string(),
@@ -504,6 +523,9 @@ async fn test_partial_sale_return_settles_deposit_issues_and_client_balances() {
             received_returnables: None,
             notes: None,
             external_reference: None,
+            crate_debt_snapshot_xof: None,
+            crate_received_snapshot_xof: None,
+            crate_return_composition_snapshot: None,
         };
 
         let created = create_sale_v4(&db, input).await.unwrap();

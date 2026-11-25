@@ -27,6 +27,7 @@ mod product_variants;
 mod product_variants_update;
 mod sales_units;
 mod sales_units_update;
+mod seed_import;
 mod supplier_prices;
 mod units_of_measure;
 
@@ -100,6 +101,7 @@ pub use product_variants::{create_product_variant, list_product_variants};
 pub use product_variants_update::{delete_product_variant, update_product_variant};
 pub use sales_units::{create_sales_unit, list_sales_units};
 pub use sales_units_update::{delete_sales_unit, update_sales_unit};
+pub use seed_import::{import_catalog_seed, SeedImportResult};
 pub use supplier_prices::{
     create_supplier_price, delete_supplier_price, list_supplier_prices, update_supplier_price,
 };

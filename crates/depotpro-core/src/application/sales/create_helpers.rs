@@ -35,6 +35,15 @@ pub(crate) struct PreparedSaleLine {
     pub cost_num: Option<String>,
     pub cost_den: Option<String>,
     pub deposit_items: Vec<(i64, i64, i64, i64)>,
+    // Crate snapshot fields
+    pub crate_capacity_snapshot: Option<i64>,
+    pub crate_capacity_verification_snapshot: Option<String>,
+    pub crate_value_xof_snapshot: i64,
+    pub crate_compatibility_group_snapshot: Option<i64>,
+    pub bottles_equivalent_snapshot: i64,
+    pub is_returnable_snapshot: i64,
+    pub crate_received_quantity_snapshot: i64,
+    pub crate_missing_quantity_snapshot: i64,
 }
 
 pub(crate) struct PreparedSaleLines {
@@ -238,6 +247,30 @@ pub(crate) async fn prepare_sale_lines_tx(
             total_deposit = total_deposit.checked_add(Money(dep_line), "Total consignes")?;
         }
 
+        // Fetch crate snapshot data from variant_packaging_options and packaging_profiles
+        let (crate_capacity, crate_verification, crate_value, crate_compat_group, is_returnable) = if let Some(vid) = resolved.variant_id {
+            let crate_data: Option<(Option<i64>, Option<String>, i64, Option<i64>, i64)> = sqlx::query_as(
+                "SELECT pp.capacity_units, pp.verification_status, pp.default_value_xof, pp.compatible_group_id, 
+                        CASE WHEN vpo.is_default_sale = 1 AND pp.is_returnable = 1 THEN 1 ELSE 0 END as is_returnable
+                 FROM variant_packaging_options vpo
+                 JOIN packaging_profiles pp ON pp.id = vpo.packaging_profile_id
+                 WHERE vpo.variant_id = ? AND vpo.commercial_packaging_type_id = (
+                     SELECT packaging_type_id FROM product_packagings WHERE id = ?
+                 ) AND vpo.verification_status != 'inactive' AND pp.is_active = 1
+                 LIMIT 1"
+            )
+            .bind(vid)
+            .bind(resolved.pkg_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+            crate_data.unwrap_or((None, None, 0, None, 0))
+        } else {
+            (None, None, 0, None, 0)
+        };
+
+        let base_qty_units = base_qty.milli_units / 1000; // Convert to whole units
+        let bottles_equivalent = base_qty_units;
+
         let current_deduction = product_deductions.entry(pid).or_insert(0);
         *current_deduction = current_deduction
             .checked_add(base_qty.milli_units)
@@ -261,6 +294,14 @@ pub(crate) async fn prepare_sale_lines_tx(
             cost_num,
             cost_den,
             deposit_items,
+            crate_capacity_snapshot: crate_capacity,
+            crate_capacity_verification_snapshot: crate_verification,
+            crate_value_xof_snapshot: crate_value,
+            crate_compatibility_group_snapshot: crate_compat_group,
+            bottles_equivalent_snapshot: bottles_equivalent,
+            is_returnable_snapshot: is_returnable,
+            crate_received_quantity_snapshot: 0,
+            crate_missing_quantity_snapshot: 0,
         });
     }
 

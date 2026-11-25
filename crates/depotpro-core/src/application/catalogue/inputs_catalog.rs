@@ -125,7 +125,7 @@ pub struct CreateCrateTypeInput {
     pub code: String,
     pub name: String,
     pub producer: String,
-    pub capacity: i64,
+    pub capacity: Option<i64>,
     pub bottle_capacity_ml: i64,
     pub bottle_profile_id: i64,
     pub compatibility_group_id: Option<i64>,
@@ -134,6 +134,7 @@ pub struct CreateCrateTypeInput {
     pub material: Option<String>,
     pub deposit_value: Option<i64>,
     pub description: Option<String>,
+    pub capacity_verification_status: Option<String>,
     #[serde(default, deserialize_with = "deserialize_opt_bool_or_int")]
     pub is_active: Option<bool>,
 }
@@ -153,6 +154,7 @@ pub struct UpdateCrateTypeInput {
     pub material: Option<String>,
     pub deposit_value: Option<i64>,
     pub description: Option<Option<String>>,
+    pub capacity_verification_status: Option<String>,
     #[serde(default, deserialize_with = "deserialize_opt_bool_or_int")]
     pub is_active: Option<bool>,
 }
