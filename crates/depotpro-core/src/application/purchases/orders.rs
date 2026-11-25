@@ -128,38 +128,82 @@ pub(crate) async fn persist_purchase_document_snapshot_tx(
     let lines_subtotal: i64 = lines.iter().map(|l| l.line_total).sum();
     let pdf_lines = lines
         .iter()
-        .map(|l| DocumentPdfLine {
-            label: format!("{} ({})", l.product_name, l.packaging_name),
-            sublabel: Some(format!(
+        .map(|l| {
+            let prod_snap: serde_json::Value =
+                serde_json::from_str(&l.product_snapshot_json).unwrap_or_default();
+            let brand = prod_snap.get("brand").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let brewery = prod_snap.get("brewery").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let variant = prod_snap.get("variant").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            let volume_ml = prod_snap.get("volumeMl").and_then(|v| v.as_i64()).filter(|v| *v > 0);
+            let format_label = match (variant, volume_ml) {
+                (Some(v), Some(ml)) => Some(format!("{v} {ml}ml")),
+                (Some(v), None) => Some(v.to_string()),
+                (None, Some(ml)) => Some(format!("{ml}ml")),
+                (None, None) => None,
+            };
+            let mut label_parts: Vec<String> = Vec::new();
+            if let Some(b) = brewery.or(brand) { label_parts.push(b.to_string()); }
+            label_parts.push(l.product_name.clone());
+            if let Some(f) = &format_label { label_parts.push(f.clone()); }
+            let label = label_parts.join(" - ");
+
+            let per_unit = if l.coefficient_milli > 0 && l.coefficient_milli % 1000 == 0 {
+                Some(l.coefficient_milli / 1000)
+            } else {
+                None
+            };
+            let packaging_info = match per_unit {
+                Some(n) if n > 1 => format!("{} {} {}s", l.packaging_name, n, l.base_unit),
+                _ => l.packaging_name.clone(),
+            };
+            let mut sub = format!(
                 "1 {} = {} {}",
                 l.packaging_name,
                 format_milli(l.coefficient_milli),
                 l.base_unit
-            )),
-            quantity: format!(
-                "{} {}",
-                format_milli(l.ordered_quantity_milli),
-                l.packaging_name
-            ),
-            unit_price: Some(l.unit_price),
-            total: Some(l.line_total),
-            packaging_info: Some(l.packaging_name.clone()),
-            ..Default::default()
+            );
+            if let (Some(b), Some(m)) = (brand, brewery) {
+                if b != m { sub = format!("{sub} · Marque: {b}"); }
+            }
+
+            DocumentPdfLine {
+                label,
+                sublabel: Some(sub),
+                quantity: format!(
+                    "{} {}",
+                    format_milli(l.ordered_quantity_milli),
+                    l.packaging_name
+                ),
+                unit_price: Some(l.unit_price),
+                total: Some(l.line_total),
+                packaging_info: Some(packaging_info),
+                ..Default::default()
+            }
         })
         .collect::<Vec<_>>();
 
     let pdf_packaging = reqs
         .iter()
-        .map(|r| DocumentPdfPackagingLine {
-            label: format!("{} ({})", r.name, r.code),
-            kind: r.kind.clone(),
-            expected_quantity: r.required_pieces,
-            issued_quantity: None,
-            returned_quantity: None,
-            unit_deposit_xof: None,
-            status_label: "Emballages vides à préparer pour remise fournisseur au REC".to_string(),
-            detail: Some(format!("{} pièce(s) / unité commandée", r.pieces_per_pack)),
-            amount: None,
+        .map(|r| {
+            let gap = (r.required_pieces - r.issued_pieces).max(0);
+            let status_label = if r.issued_pieces <= 0 {
+                "À remettre au fournisseur".to_string()
+            } else if gap <= 0 {
+                "Remise complète".to_string()
+            } else {
+                "Remise partielle".to_string()
+            };
+            DocumentPdfPackagingLine {
+                label: format!("{} ({})", r.name, r.code),
+                kind: r.kind.clone(),
+                expected_quantity: r.required_pieces,
+                issued_quantity: Some(r.issued_pieces),
+                returned_quantity: None,
+                unit_deposit_xof: None,
+                status_label,
+                detail: Some(format!("{} pièce(s) / unité commandée", r.pieces_per_pack)),
+                amount: None,
+            }
         })
         .collect::<Vec<_>>();
 
