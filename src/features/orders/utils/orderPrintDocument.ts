@@ -85,7 +85,10 @@ export function buildOrderReceiptDocument(
         .filter(Boolean)
         .join(" · "),
       quantity: `${formatQty(line.requested_quantity)}`,
-      packagingInfo: perUnit > 1 ? `${unitLabel} (${perUnit})` : packagingContentsLabel(unitLabel, line.base_unit, perUnit * 1000),
+      packagingInfo:
+        perUnit > 1
+          ? `${unitLabel} ${perUnit} ${line.base_unit}${perUnit > 1 ? 's' : ''}`
+          : unitLabel,
       unitPrice: line.unit_price_xof,
       discount: line.discount_xof,
       total: line.line_total_xof,
