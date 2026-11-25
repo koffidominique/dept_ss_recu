@@ -30,6 +30,17 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
     ctx: &SalePersistCtx<'_>,
     lines: &[PreparedSaleLine],
 ) -> CoreResult<()> {
+    // Identifiants des lignes inserees, dans l'ordre recu : `line_index` du
+    // retour designe une position dans ce meme ordre.
+    let mut inserted_line_ids: Vec<i64> = Vec::with_capacity(lines.len());
+    // Meme information, mais rangee par conditionnement. Un retour saisi sur
+    // une ligne de demi-casier doit crediter les bouteilles DE CE
+    // conditionnement, alors que la consigne de casier est portee par la
+    // premiere ligne du panachage (`first_line_idx`). L'ordre d'insertion ne
+    // suffit donc pas : il faut retrouver le conditionnement d'origine.
+    let mut line_id_by_packaging: std::collections::HashMap<i64, Vec<i64>> =
+        std::collections::HashMap::new();
+
     for line in lines {
         let (brand, brewery_name, variant_name, volume_ml): (
             Option<String>,
@@ -100,6 +111,11 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
         .execute(&mut **tx)
         .await?
         .last_insert_rowid();
+        inserted_line_ids.push(line_id);
+        line_id_by_packaging
+            .entry(line.packaging_id)
+            .or_default()
+            .push(line_id);
 
         // Mise à jour atomique : rejette la vente si le stock n'est plus suffisant
         // au moment de l'écriture (protection contre les ventes simultanées).
@@ -210,7 +226,48 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
     // Confirmation de réception des emballages retours : réduction du compte emballage client
     // et réintégration physique dans le stock d'emballages vides du sous-dépôt (hors total commande).
     if let Some(received) = ctx.received_returnables {
-        let mut aggregated: Vec<(i64, i64)> = Vec::new();
+        // Dépendances de saisie.
+        //
+        // Un conditionnement « casier » émet DEUX composants consignés : le
+        // casier (1) et les bouteilles qu'il contient (24, 12 pour un
+        // demi-casier). Rendre « 1 emballage » n'est ni un casier seul ni des
+        // bouteilles seules : c'est le casier ET les bouteilles qu'il
+        // contenait. L'opérateur ne saisit donc que des casiers ; les
+        // bouteilles se déduisent ici, à partir des composants du
+        // conditionnement vendu.
+        //
+        // La consigne de casier, elle, est portée par la PREMIÈRE ligne du
+        // panachage (`first_line_idx`) et non par celle sur laquelle
+        // l'opérateur saisit. On ne peut donc pas dériver les bouteilles du
+        // coefficient de la ligne : il faut retrouver le conditionnement.
+        //
+        // Chaque entrée agrégée porte l'identifiant de ligne à apurer en
+        // priorité (`line_id`), éventuellement `None` (retour global).
+        let mut aggregated: Vec<(i64, i64, Option<i64>)> = Vec::new();
+        // Ajoute une restitution a l'agregat, en distinguant la ligne visee :
+        // le meme type d'emballage peut etre rendu sur deux lignes differentes,
+        // et ce sont deux dettes distinctes a apurer.
+        fn push_line(
+            aggregated: &mut Vec<(i64, i64, Option<i64>)>,
+            rid: i64,
+            pieces: i64,
+            line_id: Option<i64>,
+        ) -> CoreResult<()> {
+            if let Some(existing) = aggregated
+                .iter_mut()
+                .find(|(r, _, l)| *r == rid && *l == line_id)
+            {
+                existing.1 = existing.1.checked_add(pieces).ok_or_else(|| {
+                    CoreError::Validation(
+                        "Débordement du nombre d'emballages retournés.".to_string(),
+                    )
+                })?;
+            } else {
+                aggregated.push((rid, pieces, line_id));
+            }
+            Ok(())
+        }
+
         for rr in received {
             if rr.pieces < 0 {
                 return Err(CoreError::Validation(
@@ -220,18 +277,112 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
             if rr.pieces == 0 {
                 continue;
             }
-            if let Some(existing) = aggregated
-                .iter_mut()
-                .find(|(rid, _)| *rid == rr.returnable_id)
-            {
-                existing.1 = existing.1.checked_add(rr.pieces).ok_or_else(|| {
-                    CoreError::Validation(
-                        "Débordement du nombre d'emballages retournés.".to_string(),
+
+            // Ligne ciblée : `line_index` désigne la ligne du panier. On
+            // récupère son conditionnement, puis l'identifiant inséré
+            // correspondant. Le conditionnement, pas la position : la
+            // résolution se replie sur la position si l'index n'est pas
+            // exploitable.
+            let (target_packaging_id, target_qty, target_line_id) = match rr.line_index {
+                Some(idx) => {
+                    let line = lines.get(idx).ok_or_else(|| {
+                        CoreError::Validation(format!(
+                            "Ligne de vente {} introuvable pour le retour d'emballages.",
+                            idx + 1
+                        ))
+                    })?;
+                    // Le conditionnement est la clé fiable ; l'index n'est
+                    // qu'un moyen de le désigner depuis le client.
+                    let line_id = line_id_by_packaging
+                        .get(&line.packaging_id)
+                        .and_then(|ids| ids.first())
+                        .copied()
+                        // Repli : si le conditionnement n'a pas été retrouvé
+                        // (ligne sans emballage consigné), on garde au moins
+                        // la ligne réellement insérée à cette position.
+                        .or_else(|| inserted_line_ids.get(idx).copied());
+                    (Some(line.packaging_id), Some(line.qty_milli), line_id)
+                }
+                None => (None, None, None),
+            };
+
+            let pushed_kind: Option<String> =
+                sqlx::query_scalar("SELECT kind FROM returnable_packaging_types WHERE id = ?")
+                    .bind(rr.returnable_id)
+                    .fetch_optional(&mut **tx)
+                    .await?;
+
+            // Plafond : on ne rend pas plus d'emballages qu'on n'en a sorti sur
+            // cette ligne. L'écran borne déjà, mais le serveur est l'autorité,
+            // et un client HTTP peut l'appeler directement.
+            //
+            // Le plafond porte sur la quantité de CASIERS quand on rend un
+            // casier, et sur la quantité de BOUTEILLES quand on rend un
+            // emballage bouteille : une ligne de 2 casiers contient 48
+            // bouteilles, et rendre 48 bouteilles doit rester possible même si
+            // cela dépasse « 2 ».
+            if let (Some(qty), Some(kind)) = (target_qty, pushed_kind.as_deref()) {
+                // Nombre de pièces physiques par unité vendue pour ce type :
+                // 1 pour un casier, N pour les bouteilles qu'il contient.
+                let per_unit = if kind == "bottle" {
+                    sqlx::query_scalar::<_, i64>(
+                        "SELECT dpc.pieces_per_pack
+                         FROM deposit_packaging_components dpc
+                         WHERE dpc.packaging_id = ? AND dpc.returnable_id = ?",
                     )
-                })?;
-            } else {
-                aggregated.push((rr.returnable_id, rr.pieces));
+                    .bind(target_packaging_id)
+                    .bind(rr.returnable_id)
+                    .fetch_optional(&mut **tx)
+                    .await?
+                    .unwrap_or(0)
+                } else {
+                    1
+                };
+                let sold_units = qty / 1000;
+                let cap = sold_units.checked_mul(per_unit).unwrap_or(sold_units);
+                if rr.pieces > cap {
+                    return Err(CoreError::Validation(format!(
+                        "Retour supérieur à la quantité vendue sur la ligne {} \
+                         ({} emballage(s) rendus pour {} vendus).",
+                        rr.line_index.map(|i| i + 1).unwrap_or(0),
+                        rr.pieces,
+                        cap
+                    )));
+                }
             }
+
+            // Composant bouteille du conditionnement visé : une seule
+            // requête donne le type et le nombre par casier.
+            let bottle_component: Option<(i64, i64)> = sqlx::query_as(
+                "SELECT dpc.returnable_id, dpc.pieces_per_pack
+                 FROM deposit_packaging_components dpc
+                 JOIN returnable_packaging_types rpt ON rpt.id = dpc.returnable_id
+                 WHERE dpc.packaging_id = ? AND rpt.kind = 'bottle'
+                 LIMIT 1",
+            )
+            .bind(target_packaging_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+
+            // Si la saisie porte sur un casier, les bouteilles suivent.
+            // La saisie directe d'un type bouteille reste possible : c'est le
+            // retour global, historique, qui n'a pas de conditionnement.
+            // Filet de sécurité : sans ligne désignée, on ne dérive rien.
+            // Deviner à partir du premier conditionnement venu créditerait un
+            // emballage qui n'a peut-être jamais été remis, et l'erreur serait
+            // invisible pour l'opérateur.
+            if target_packaging_id.is_some() && pushed_kind.as_deref() == Some("crate") {
+                if let Some((bottle_rid, per_pack)) = bottle_component {
+                    let bottles = rr.pieces.checked_mul(per_pack).ok_or_else(|| {
+                        CoreError::Validation(
+                            "Débordement du nombre de bouteilles rendues.".to_string(),
+                        )
+                    })?;
+                    push_line(&mut aggregated, bottle_rid, bottles, target_line_id)?;
+                }
+            }
+
+            push_line(&mut aggregated, rr.returnable_id, rr.pieces, target_line_id)?;
         }
 
         if !aggregated.is_empty() {
@@ -242,7 +393,7 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 )
             })?;
 
-            for (returnable_id, pieces) in aggregated {
+            for (returnable_id, pieces, target_line_id) in aggregated {
                 let rt_row: Option<(String, i64)> = sqlx::query_as(
                     "SELECT name, deposit_value FROM returnable_packaging_types WHERE id = ?",
                 )
@@ -292,18 +443,30 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 )
                 .await?;
 
-                // Apurer en FIFO les obligations d'emballages ouvertes des ventes antérieures du client
+                // Apurement des obligations ouvertes.
+                //
+                // Ordre : d'abord la ligne DESIGNEE par la saisie, puis les
+                // ventes antérieures en FIFO.
+                //
+                // Sans cette priorité, un client qui rend les casiers de sa
+                // ligne 2 verrait sa dette de la ligne 1 s'éteindre — et sa
+                // fiche de suivi afficherait une dette sur une ligne dont il
+                // vient justement de rendre les casiers. Le total resterait
+                // juste ; c'est le détail par ligne qui mentirait.
                 let mut remaining_to_settle = pieces;
                 let open_prior: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
                     "SELECT id, pieces, returned_pieces, lost_pieces + destroyed_pieces + converted_pieces
                      FROM deposit_issues
                      WHERE client_id = ? AND returnable_id = ? AND sale_id != ?
                        AND status IN ('pending', 'partially_returned')
-                     ORDER BY COALESCE(due_date, '9999-12-31') ASC, id ASC",
+                     ORDER BY CASE WHEN sale_line_id = ? THEN 0 ELSE 1 END,
+                              COALESCE(due_date, '9999-12-31') ASC,
+                              id ASC",
                 )
                 .bind(cid)
                 .bind(returnable_id)
                 .bind(ctx.sale_id)
+                .bind(target_line_id)
                 .fetch_all(&mut **tx)
                 .await?;
 
@@ -339,9 +502,10 @@ pub(crate) async fn persist_sale_lines_and_deposits_tx(
                 let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
                 sqlx::query(
                     "INSERT INTO deposit_issues (sale_id, sale_line_id, client_id, returnable_id, pieces, returned_pieces, unit_value, amount, due_date, policy_id, status)
-                     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, NULL, 'returned')",
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'returned')",
                 )
                 .bind(ctx.sale_id)
+                .bind(target_line_id)
                 .bind(cid)
                 .bind(returnable_id)
                 .bind(pieces)
