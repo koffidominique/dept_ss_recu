@@ -14,8 +14,15 @@ use super::summary_section::draw_summary_section;
 use super::{DocumentPdfInput, DocumentPdfLine};
 
 pub fn render_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> Vec<u8> {
-    if doc.doc_type == "REÇU DE COMMANDE" {
-        return super::receipt_renderer::render_order_receipt_pdf(company, doc);
+    if matches!(
+        doc.doc_type.as_str(),
+        "REÇU DE COMMANDE"
+            | "BON DE COMMANDE"
+            | "BON DE COMMANDE FOURNISSEUR"
+            | "BON DE RÉCEPTION"
+            | "BON DE RÉCEPTION FOURNISSEUR"
+    ) {
+        return super::receipt_renderer::render_commercial_document_pdf(company, doc);
     }
     let mut pages: Vec<Vec<String>> = Vec::new();
     let mut y: f64 = PAGE_H - MARGIN;

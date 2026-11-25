@@ -2,20 +2,28 @@ import type { AppSettings } from '../../types/erp.ts';
 import { formatDate, formatDateTime, formatFcfa } from '../../utils/format.ts';
 import type { PrintableDocumentData } from './DocumentPrintModal.tsx';
 
-function companyDetails(company: AppSettings | undefined) {
-  return [
-    company?.business_activity,
-    company?.address,
-    [company?.commune, company?.quartier, company?.city, company?.country].filter(Boolean).join(', '),
-    company?.phone ? `Tél. ${company.phone}` : null,
-    company?.whatsapp && company.whatsapp !== company.phone ? `WhatsApp ${company.whatsapp}` : null,
-    company?.email,
-    company?.rccm ? `RCCM : ${company.rccm}` : null,
-    company?.ncc ? `NCC : ${company.ncc}` : null,
-  ].filter(Boolean).join(' · ');
+const NAVY = '#1F2937';
+const ORANGE = '#C65309';
+const GREEN = '#00805A';
+
+function val(v: string | null | undefined, fallback = '—'): string {
+  return v && v.trim() ? v.trim() : fallback;
 }
 
-function matchPaymentChannel(doc: PrintableDocumentData, key: string): boolean {
+function companyLocation(company: AppSettings | undefined): string {
+  return [company?.commune, company?.quartier, company?.city, company?.country]
+    .filter((v) => v && v.trim())
+    .join(' / ');
+}
+
+function companyPhones(company: AppSettings | undefined): string {
+  const parts = [company?.phone, company?.whatsapp]
+    .filter((v, i, arr) => v && v.trim() && arr.indexOf(v) === i)
+    .map((v) => v!.trim());
+  return parts.join(' / ');
+}
+
+function isChecked(doc: PrintableDocumentData, key: string): boolean {
   const hay = [
     doc.plannedPaymentChannel,
     doc.plannedPaymentMethod,
@@ -24,571 +32,515 @@ function matchPaymentChannel(doc: PrintableDocumentData, key: string): boolean {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-  if (key === 'cash') return hay.includes('cash') || hay.includes('esp');
+  if (key === 'cash') return /cash|esp[eè]ce/.test(hay);
   if (key === 'wave') return hay.includes('wave');
   if (key === 'orange_money') return hay.includes('orange');
   if (key === 'mtn_money') return hay.includes('mtn');
   if (key === 'moov_money') return hay.includes('moov');
-  if (key === 'credit') return hay.includes('credit') || hay.includes('crédit') || hay.includes('autre') || hay.includes('other') || hay.includes('mixed');
+  if (key === 'other') return /autre|other|cr[eé]dit|ch[eè]que|virement|mixed/.test(hay);
   return false;
 }
 
-export function PrintableDocumentSheet({
-  doc,
+function Checkbox({ checked, label }: { checked: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[9px] text-slate-800">
+      <span
+        className="inline-grid h-3.5 w-3.5 place-items-center border border-slate-700 text-[9px] font-bold leading-none"
+        style={{ color: checked ? GREEN : 'transparent' }}
+      >
+        {checked ? '✓' : ''}
+      </span>
+      {label}
+    </span>
+  );
+}
+
+function Box({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={`border border-[#D1D5DB] bg-white ${className}`}>
+      <div className="border-b border-[#D1D5DB] px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-wide" style={{ color: ORANGE }}>
+        {title}
+      </div>
+      <div className="px-2.5 py-2 text-[9px] leading-[1.45] text-slate-800">{children}</div>
+    </section>
+  );
+}
+
+function DocHeader({
   company,
+  doc,
+  title,
+  subtitle,
 }: {
-  doc: PrintableDocumentData;
   company: AppSettings | undefined;
+  doc: PrintableDocumentData;
+  title: string;
+  subtitle?: string;
 }) {
-  const isOrderReceipt = doc.docType === 'REÇU DE COMMANDE';
-  const isPaymentReceipt = doc.docType === 'REÇU DE PAIEMENT';
-  const isCustomerReceipt = ['REÇU DE VENTE', 'REÇU DE COMMANDE'].includes(doc.docType);
-  const isPurchaseOrder = doc.docType === 'BON DE COMMANDE' || doc.docType === 'BON DE COMMANDE FOURNISSEUR';
-  const isPurchaseReceipt = doc.docType === 'BON DE RÉCEPTION' || doc.docType === 'BON DE RÉCEPTION FOURNISSEUR';
-  const secondaryName = doc.secondaryPartyName || company?.company_name || 'Sous-dépôt';
-  const secondaryDetails = doc.secondaryPartyDetails || companyDetails(company);
-  const senderTitle = (isPurchaseOrder || isPurchaseReceipt) ? 'FOURNISSEUR' : (doc.partyTitle || 'CLIENT');
-  const receiverTitle = doc.secondaryPartyTitle || (isPurchaseOrder ? 'LIVRER À' : 'DESTINATAIRE');
-  const clientSignatures = isCustomerReceipt || isPaymentReceipt || doc.partyTitle?.toLowerCase().includes('client');
-
-  if (isOrderReceipt) {
-    const notes = (doc.notes || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-    const cashier =
-      doc.cashierName ||
-      notes.find((line) => line.startsWith('Émis par :'))?.replace('Émis par :', '').trim() ||
-      'Caissier / Opérateur';
-    const operationalNotes = notes.filter(
-      (line) => !/^(Émis par :|Commande source :|Statut de la commande :|Mode de règlement prévu :|Statut du paiement :)/.test(line),
-    );
-    const drinkLines = doc.lines.filter((line) => !line.label.startsWith('Emballage :'));
-    const isDelivery =
-      doc.deliveryMode === 'delivery' ||
-      Boolean(doc.courierName) ||
-      Boolean(doc.deliveryFeeXof && doc.deliveryFeeXof > 0) ||
-      (Boolean(doc.secondaryPartyDetails) && doc.secondaryPartyDetails !== 'À retirer au sous-dépôt' && doc.secondaryPartyDetails !== 'Enlèvement sur place (au sous-dépôt)');
-
-    const extRefs = doc.externalReferences?.length
-      ? doc.externalReferences.join(', ')
-      : null;
-
-    const depotLocation = [company?.commune, company?.quartier, company?.city, company?.country]
-      .filter(Boolean)
-      .join(' / ');
-
-    return (
-      <article className="order-receipt-sheet bg-white px-5 py-5 text-slate-800 sm:px-7">
-        <header className="order-receipt-header">
-          <div className="order-receipt-brand">
-            {company?.logo_path ? (
-              <img src={company.logo_path} alt="Logo du sous-dépôt" />
-            ) : (
-              <div className="order-receipt-logo-placeholder">LOGO DU DÉPÔT</div>
-            )}
-            <div className="min-w-0">
-              <h1>{company?.company_name || 'SOUS-DÉPÔT DE BOISSONS'}</h1>
-              {company?.business_activity && <p className="font-semibold">{company.business_activity}</p>}
-              {company?.address && <p>Adresse : {company.address}</p>}
-              {depotLocation && <p>Localisation : {depotLocation}</p>}
-              {(company?.phone || company?.whatsapp) && (
-                <p>
-                  {company?.phone ? `Tél : ${company.phone}` : ''}
-                  {company?.phone && company?.whatsapp ? ' · ' : ''}
-                  {company?.whatsapp ? `WhatsApp : ${company.whatsapp}` : ''}
-                </p>
-              )}
-              {(company?.rccm || company?.ncc || company?.email) && (
-                <p>
-                  {[
-                    company?.rccm ? `RCCM : ${company.rccm}` : null,
-                    company?.ncc ? `NCC : ${company.ncc}` : null,
-                    company?.email || null,
-                  ].filter(Boolean).join(' · ')}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="order-receipt-number order-receipt-number--right">
-            <strong className="text-green-700 border-green-300 border rounded px-3 py-1 text-sm font-bold">
-              REÇU DE COMMANDE
-            </strong>
-            <small className="text-sm">
-              {doc.version && doc.version > 1
-                ? `VERSION CORRIGÉE V${doc.version}`
-                : 'DOCUMENT OFFICIEL'}
-            </small>
-            <span className="font-bold">
-              N° Reçu : <b>{doc.reference}</b>
-            </span>
-            {doc.orderReference && <span>Réf. Commande : {doc.orderReference}</span>}
-            <span>Date / Heure : {formatDateTime(doc.date)}</span>
-            <span>Caissier / Agent : {cashier}</span>
-            {doc.statusLabel && <span>Statut : <b>{doc.statusLabel}</b></span>}
-          </div>
-        </header>
-
-        {doc.revisionReason && (
-          <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-[8.5px] font-semibold text-amber-900">
-            Révision propriétaire (V{doc.version}) — Motif : {doc.revisionReason}
+  const location = companyLocation(company);
+  const phones = companyPhones(company);
+  const refLabel = doc.docType.includes('COMMANDE FOURNISSEUR')
+    ? 'N° BC'
+    : doc.docType.includes('RÉCEPTION')
+      ? 'N° BR'
+      : 'N° Reçu';
+  return (
+    <header className="grid grid-cols-[88px_1fr_220px] gap-3 border-b-2 pb-2.5" style={{ borderColor: ORANGE }}>
+      <div className="flex items-start justify-center">
+        {company?.logo_path ? (
+          <img src={company.logo_path} alt="Logo" className="h-[84px] w-[84px] object-contain border border-dashed border-slate-300" />
+        ) : (
+          <div className="grid h-[84px] w-[84px] place-items-center border border-dashed border-slate-400 px-1 text-center text-[8px] font-bold uppercase leading-tight text-slate-500">
+            Emplacement
+            <br />
+            Logo
+            <br />
+            <span className="font-normal">(Cachet / Visuel)</span>
           </div>
         )}
-
-        <div className="order-receipt-party-grid">
-          <section>
-            <h2>INFORMATIONS CLIENT</h2>
-            <p className="font-bold text-[10px]">
-              {doc.partyName || '—'}
-              {doc.customerEstablishment ? ` · ${doc.customerEstablishment}` : ''}
-            </p>
-            {doc.customerCategory && <p>Catégorie : {doc.customerCategory}</p>}
-            {doc.partyPhone && <p>Téléphone : {doc.partyPhone}</p>}
-            {(doc.customerLocation || doc.partyDetails) && (
-              <p>Quartier / Zone : {doc.customerLocation || doc.partyDetails}</p>
-            )}
-            {doc.deliveryLandmark && <p>Point de repère : {doc.deliveryLandmark}</p>}
-          </section>
-          <section>
-            <h2>LOGISTIQUE &amp; LIVRAISON</h2>
-            <p className="font-semibold">
-              [{!isDelivery ? 'x' : ' '}] Enlèvement au Dépôt &nbsp;&nbsp; [{isDelivery ? 'x' : ' '}] Livraison à Domicile
-            </p>
-            <p>Adresse / Zone : {doc.secondaryPartyDetails || 'À retirer au sous-dépôt'}</p>
-            {doc.courierName && <p>Livreur / Tricycle : <b>{doc.courierName}</b></p>}
-            <p>
-              Date / Heure prévue :{' '}
-              {doc.plannedDeliveryTime || (doc.deliveryDate ? formatDate(doc.deliveryDate) : 'Non précisée')}
-            </p>
-          </section>
+      </div>
+      <div className="min-w-0">
+        <div className="text-[15px] font-black uppercase leading-tight" style={{ color: ORANGE }}>
+          {val(company?.company_name, '[NOM DU SOUS-DÉPÔT DE BOISSONS]')}
         </div>
-
-        {/* Orange separation line */}
-        <div className="mt-4 border-orange-500 border-b border-2 pb-4">
-
+        <div className="mt-0.5 text-[9px] font-semibold text-slate-700">
+          {val(company?.business_activity, 'Distribution & Vente de Boissons (Gros / Demi-Gros / Détail)')}
         </div>
+        <div className="mt-1 space-y-0.5 text-[8.5px] text-slate-700">
+          <div><span className="font-semibold">Commune / Quartier :</span> {val(location, '..........................................................')}</div>
+          {company?.address ? <div><span className="font-semibold">Adresse :</span> {company.address}</div> : null}
+          <div><span className="font-semibold">Tél / WhatsApp :</span> {val(phones, '+225 .... ........ / ...........')}</div>
+          <div>
+            <span className="font-semibold">RCCM :</span> {val(company?.rccm, 'CI-ABJ-...........')}
+            {'  |  '}
+            <span className="font-semibold">NCC :</span> {val(company?.ncc, '....................')}
+          </div>
+        </div>
+      </div>
+      <div className="border-2 px-2.5 py-2" style={{ borderColor: GREEN, background: '#F0FDF8' }}>
+        <div className="text-center text-[12px] font-black uppercase tracking-wide" style={{ color: GREEN }}>{title}</div>
+        {subtitle ? <div className="text-center text-[8px] font-semibold uppercase text-slate-500">{subtitle}</div> : null}
+        <div className="mt-2 space-y-1 text-[8.5px] text-slate-800">
+          <div className="flex justify-between gap-2"><span className="font-semibold">{refLabel} :</span><span className="font-bold text-right">{doc.reference}</span></div>
+          {doc.linkedDocumentRef && doc.linkedDocumentRef !== doc.reference ? (
+            <div className="flex justify-between gap-2"><span className="font-semibold">Réf. liée :</span><span className="text-right">{doc.linkedDocumentRef}</span></div>
+          ) : null}
+          <div className="flex justify-between gap-2"><span className="font-semibold">Date :</span><span>{formatDate(doc.date)}</span></div>
+          <div className="flex justify-between gap-2"><span className="font-semibold">Heure :</span><span>{new Date(doc.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ')}</span></div>
+          <div className="flex justify-between gap-2"><span className="font-semibold">Opérateur :</span><span className="text-right">{val(doc.cashierName, '—')}</span></div>
+          {doc.statusLabel ? <div className="flex justify-between gap-2"><span className="font-semibold">Statut :</span><span className="font-bold text-right" style={{ color: GREEN }}>{doc.statusLabel}</span></div> : null}
+        </div>
+      </div>
+    </header>
+  );
+}
 
-        <section className="order-receipt-products">
-          <h2 className="text-orange-700 border-b border-orange-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">
-            DÉTAIL DES BOISSONS COMMANDÉES
-          </h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-orange-300 bg-orange-50 text-orange-800 uppercase text-xs font-bold">
-                <th scope="col" className="p-2 text-left">N°</th>
-                <th scope="col" className="p-2 text-left">Désignation Boisson & Format</th>
-                <th scope="col" className="p-2 text-center">Conditionnement</th>
-                <th scope="col" className="p-2 text-center">Qté</th>
-                <th scope="col" className="p-2 text-right">P.U. (FCFA)</th>
-                <th scope="col" className="p-2 text-right">Total (FCFA)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: Math.max(10, drinkLines.length) }, (_, index) => {
-                const line = drinkLines[index];
-                return (
-                  <tr key={line ? `${line.label}-${index}` : `blank-${index}`} className={!line ? 'order-receipt-empty-row' : undefined}>
-                    <td>{index + 1}</td>
-                    <td>
-                      {line && <>
-                        <span className="font-semibold">{line.label}</span>
-                        {line.sublabel && <span className="block text-[7.5px] text-slate-500">{line.sublabel}</span>}
-                      </>}
+function PaymentModes({ doc }: { doc: PrintableDocumentData }) {
+  const refs = doc.externalReferences?.filter(Boolean).join(' ; ');
+  return (
+    <section className="border border-[#D1D5DB] bg-[#FAFAFA] px-2.5 py-2 text-[9px]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="font-extrabold uppercase" style={{ color: ORANGE }}>Mode de règlement :</span>
+        <Checkbox checked={isChecked(doc, 'cash')} label="Espèces" />
+        <Checkbox checked={isChecked(doc, 'wave')} label="Wave" />
+        <Checkbox checked={isChecked(doc, 'orange_money')} label="Orange Money" />
+        <Checkbox checked={isChecked(doc, 'mtn_money')} label="MTN MoMo" />
+        <Checkbox checked={isChecked(doc, 'moov_money')} label="Moov Money" />
+        <Checkbox checked={isChecked(doc, 'other')} label="Autre" />
+      </div>
+      <div className="mt-1.5 text-[8.5px] text-slate-700">
+        <span className="font-semibold">Réf. Transaction Mobile Money / Observation :</span> {refs || '........................................................................................'}
+      </div>
+    </section>
+  );
+}
+
+function Signatures({ leftTitle, rightTitle, rightName }: { leftTitle: string; rightTitle: string; rightName?: string | null }) {
+  return (
+    <section className="grid grid-cols-2 gap-4">
+      <div className="min-h-[72px] border border-[#D1D5DB] px-2.5 py-2">
+        <div className="text-[9px] font-extrabold text-slate-800">{leftTitle}</div>
+      </div>
+      <div className="min-h-[72px] border border-[#D1D5DB] px-2.5 py-2">
+        <div className="text-[9px] font-extrabold text-slate-800">{rightTitle}</div>
+        {rightName ? <div className="mt-6 text-[8px] text-slate-500">Nom : {rightName}</div> : null}
+      </div>
+    </section>
+  );
+}
+
+function SummaryBox({ rows }: { rows: PrintableDocumentData['summaryRows'] }) {
+  return (
+    <section className="border border-[#D1D5DB]">
+      <div className="border-b border-[#D1D5DB] px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-wide" style={{ color: ORANGE }}>
+        Décompte financier (en FCFA)
+      </div>
+      <div>
+        {rows.map((row, i) => {
+          const isNet = row.tone === 'success' || /net à payer/i.test(row.label);
+          const isDue = row.tone === 'danger' || /reste à payer/i.test(row.label);
+          return (
+            <div
+              key={`${row.label}-${i}`}
+              className={`flex items-center justify-between gap-3 border-b border-[#E5E7EB] px-2.5 py-1.5 text-[9px] last:border-b-0 ${isNet ? 'font-extrabold text-white' : isDue ? 'font-extrabold' : 'text-slate-800'}`}
+              style={isNet ? { background: GREEN } : isDue ? { background: '#FEF2F2', color: '#DC2626' } : undefined}
+            >
+              <span>{row.label}</span>
+              <span className="font-mono-num whitespace-nowrap">{row.value}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProductTable({
+  doc,
+  minRows = 10,
+  columns,
+}: {
+  doc: PrintableDocumentData;
+  minRows?: number;
+  columns: { key: string; label: string; align?: 'left' | 'center' | 'right'; width?: string }[];
+}) {
+  const rows = doc.lines;
+  const totalRows = Math.max(minRows, rows.length);
+  return (
+    <section>
+      <table className="w-full border-collapse text-[8.5px]">
+        <thead>
+          <tr style={{ background: NAVY, color: '#fff' }}>
+            {columns.map((c) => (
+              <th key={c.key} className={`border border-[#374151] px-1.5 py-1.5 font-bold uppercase ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left'}`} style={c.width ? { width: c.width } : undefined}>
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: totalRows }).map((_, i) => {
+            const line = rows[i];
+            return (
+              <tr key={i} className={i % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'}>
+                {columns.map((c) => {
+                  let content: React.ReactNode = '';
+                  if (c.key === 'no') content = i + 1;
+                  else if (c.key === 'designation') content = line ? (<><div className="font-semibold text-slate-900">{line.label}</div>{line.sublabel ? <div className="text-[7.5px] text-slate-500">{line.sublabel}</div> : null}</>) : '';
+                  else if (c.key === 'conditionnement') content = line?.packagingInfo || '';
+                  else if (c.key === 'qty') content = line?.quantity || '';
+                  else if (c.key === 'pu') content = line?.unitPrice == null ? '' : formatFcfa(line.unitPrice);
+                  else if (c.key === 'total') content = line?.total == null ? '' : formatFcfa(line.total);
+                  else if (c.key === 'ordered') content = line?.orderedQuantity || line?.quantity || '';
+                  else if (c.key === 'received') content = line?.quantity || '';
+                  else if (c.key === 'missing') content = line?.missingQuantity || '—';
+                  else if (c.key === 'damaged') content = line?.damagedQuantity || line?.refusedQuantity || '—';
+                  return (
+                    <td key={c.key} className={`border border-[#D1D5DB] px-1.5 py-1 align-top ${c.align === 'right' ? 'text-right font-mono-num' : c.align === 'center' ? 'text-center font-mono-num' : 'text-left'} ${c.key === 'no' ? 'text-center text-slate-500' : ''}`} style={{ height: 24 }}>
+                      {content}
                     </td>
-                    <td>{line?.packagingInfo || ''}</td>
-                    <td className="font-mono-num font-semibold">{line?.quantity || ''}</td>
-                    <td className="font-mono-num">{line?.unitPrice == null ? '' : formatFcfa(line.unitPrice)}</td>
-                    <td className="font-mono-num font-semibold">{line?.total == null ? '' : formatFcfa(line.total)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
-        <div className="order-receipt-bottom-grid">
-          <div className="space-y-2">
-            <section className="order-receipt-packaging">
-              <h2 className="text-green-700 border-b border-green-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">SUIVI DES CASIERS & BOUTEILLES VIDES (CONSIGNES)</h2>
-              {doc.packagingLines?.length ? (
-                <>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Type d&apos;emballage</th>
-                        <th>Sortis</th>
-                        <th>Rendus</th>
-                        <th>Solde dû</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {doc.packagingLines.map((line, index) => (
-                        <tr key={`${line.label}-${index}`}>
-                          <td>
-                            {line.label}
-                            <small>{line.statusLabel}</small>
-                          </td>
-                          <td className="text-center font-mono-num">{line.issuedQuantity ?? line.expectedQuantity}</td>
-                          <td className="text-center font-mono-num">{line.returnedQuantity ?? 0}</td>
-                          <td className="text-center font-mono-num font-semibold">
-                            {Math.max(0, (line.issuedQuantity ?? line.expectedQuantity) - (line.returnedQuantity ?? 0))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p className="mt-1 rounded border border-amber-200 bg-amber-50/70 p-1.5 text-[7.5px] font-medium text-amber-900">
-                    Délai de retour des emballages consignés : <b>15 jours maximum</b> à compter de l’émission. Le montant des retours d’emballages est comptabilisé <b>hors total commande</b>.
-                  </p>
-                </>
-              ) : (
-                <p className="rounded border border-slate-200 p-2 text-[8px] text-slate-500">
-                  Aucun emballage consigné sur cette commande.
-                </p>
-              )}
-            </section>
-            {operationalNotes.length > 0 && (
-              <p className="order-receipt-notes rounded border border-slate-200 p-2">
-                <b>Observations :</b> {operationalNotes.join(' · ')}
-              </p>
+function PackagingTable({ doc, title, note, variant }: { doc: PrintableDocumentData; title: string; note?: string; variant: 'customer' | 'supplier-order' | 'supplier-receipt' }) {
+  const lines = doc.packagingLines || [];
+  const rows = Math.max(4, lines.length);
+  return (
+    <section className="border border-[#D1D5DB]">
+      <div className="border-b border-[#D1D5DB] px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-wide" style={{ color: ORANGE }}>
+        {title}
+      </div>
+      <table className="w-full border-collapse text-[8.5px]">
+        <thead>
+          <tr style={{ background: '#FEF3C7', color: '#92400E' }}>
+            <th className="border border-[#D1D5DB] px-1.5 py-1 text-left font-bold uppercase">Type d&apos;emballage</th>
+            {variant === 'supplier-receipt' ? (
+              <>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Exigé</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Remis</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Écart</th>
+              </>
+            ) : variant === 'supplier-order' ? (
+              <>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Requis</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Préparé</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[70px]">Manquant</th>
+              </>
+            ) : (
+              <>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[64px]">Sortis</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[64px]">Rendus</th>
+                <th className="border border-[#D1D5DB] px-1.5 py-1 text-center font-bold uppercase w-[64px]">Solde Dû</th>
+              </>
             )}
-          </div>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }).map((_, i) => {
+            const l = lines[i];
+            const expected = l?.expectedQuantity ?? 0;
+            const issued = l?.issuedQuantity ?? null;
+            const returned = l?.returnedQuantity ?? null;
+            const solde = l ? Math.max(0, (issued ?? expected) - (returned ?? 0)) : '';
+            const gap = l ? Math.max(0, expected - (issued ?? 0)) : '';
+            return (
+              <tr key={i} className={i % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'}>
+                <td className="border border-[#D1D5DB] px-1.5 py-1">{l?.label || ''}{l?.detail ? <span className="block text-[7px] text-slate-500">{l.detail}</span> : null}</td>
+                {variant === 'supplier-receipt' ? (
+                  <>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? expected : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? (issued ?? '—') : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{gap}</td>
+                  </>
+                ) : variant === 'supplier-order' ? (
+                  <>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? expected : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? (issued ?? 0) : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? Math.max(0, expected - (issued ?? 0)) : ''}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? (issued ?? expected) : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num">{l ? (returned ?? 0) : ''}</td>
+                    <td className="border border-[#D1D5DB] px-1.5 py-1 text-center font-mono-num font-semibold">{solde}</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {note ? <div className="border-t border-[#D1D5DB] px-2.5 py-1 text-[7.5px] italic text-slate-600">{note}</div> : null}
+    </section>
+  );
+}
 
-          <section className="order-receipt-finance">
-            <h2 className="text-orange-700 border-b border-orange-300 border-b px-2 py-1 text-xs font-bold uppercase tracking-wider">DÉCOMPTE FINANCIER (FCFA)</h2>
-            <div className="order-receipt-summary">
-              {doc.summaryRows.map((row, index) => {
-                const isNet = row.tone === 'success' || /net à (payer|percevoir)/i.test(row.label);
-                const isDue = row.tone === 'danger' || /reste à payer/i.test(row.label);
-                return (
-                  <div
-                    key={`${row.label}-${index}`}
-                    className={`${isNet ? 'is-total' : ''} ${isDue ? 'is-due' : ''}`}
-                  >
-                    <span>{row.label}</span>
-                    <b className="font-mono-num">{row.value}</b>
-                  </div>
-                );
-              })}
+function Footer({ text }: { text: string }) {
+  return (
+    <footer className="border-t border-[#D1D5DB] pt-2 text-center text-[8px] italic text-slate-500">
+      {text}
+    </footer>
+  );
+}
+
+export function PrintableDocumentSheet({ doc, company: companyProp }: { doc: PrintableDocumentData; company: AppSettings | undefined }) {
+  const company = doc.companySnapshot || companyProp;
+  const isCustomerOrder = doc.docType === 'REÇU DE COMMANDE';
+  const isPurchaseOrder = doc.docType === 'BON DE COMMANDE' || doc.docType === 'BON DE COMMANDE FOURNISSEUR';
+  const isPurchaseReceipt = doc.docType === 'BON DE RÉCEPTION' || doc.docType === 'BON DE RÉCEPTION FOURNISSEUR';
+
+  if (isCustomerOrder) {
+    const isDelivery = doc.deliveryMode === 'delivery' || Boolean(doc.courierName) || Boolean(doc.deliveryFeeXof && doc.deliveryFeeXof > 0);
+    const notes = (doc.notes || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const filteredNotes = notes.filter((l) => !/^(Émis par :|Commande source :|Statut de la commande :|Mode de règlement prévu :|Statut du paiement :)/.test(l));
+    return (
+      <article className="document-sheet mx-auto w-full max-w-[794px] bg-white px-6 py-5 text-slate-900" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <DocHeader company={company} doc={doc} title="REÇU DE COMMANDE" />
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Box title="Informations du client">
+            <div className="font-bold text-[10px]">{val(doc.partyName)}</div>
+            <div className="text-[8px] text-slate-500">(Maquis, Cave, Bar, Restaurant, Particulier, Événement)</div>
+            {doc.customerCategory ? <div className="mt-1"><span className="font-semibold">Type :</span> {doc.customerCategory}</div> : null}
+            <div className="mt-1"><span className="font-semibold">Contact (+225) :</span> {val(doc.partyPhone, '....................................')}</div>
+            <div><span className="font-semibold">Quartier / Repère :</span> {val(doc.customerLocation || doc.partyDetails, '....................................')}</div>
+            {doc.deliveryLandmark ? <div><span className="font-semibold">Point de repère :</span> {doc.deliveryLandmark}</div> : null}
+          </Box>
+          <Box title="Mode de retrait / livraison">
+            <div className="space-y-1">
+              <Checkbox checked={!isDelivery} label="Enlèvement sur place (au sous-dépôt)" />
+              <div><Checkbox checked={isDelivery} label="Livraison à domicile / sur site" /></div>
             </div>
-          </section>
+            <div className="mt-2 space-y-0.5">
+              <div><span className="font-semibold">Livreur / Tricycle :</span> {val(doc.courierName, '....................................')}</div>
+              <div><span className="font-semibold">Date / Heure prévue :</span> {val(doc.plannedDeliveryTime || (doc.deliveryDate ? formatDate(doc.deliveryDate) : null), '..... / ..... / 20..... à ..... h .....')}</div>
+              {doc.secondaryPartyDetails && isDelivery ? <div><span className="font-semibold">Adresse :</span> {doc.secondaryPartyDetails}</div> : null}
+            </div>
+          </Box>
         </div>
 
-        <section className="order-receipt-payment">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-orange-700">
-            <b>MODE DE RÈGLEMENT / CANAL PRÉVU</b>
-            {extRefs && <span>Réf. Mobile Money / Externe : <b>{extRefs}</b></span>}
-          </div>
-          <div className="order-receipt-payment-channels">
-            <span>[{matchPaymentChannel(doc, 'cash') ? 'x' : ' '}] Espèces</span>
-            <span>[{matchPaymentChannel(doc, 'wave') ? 'x' : ' '}] Wave</span>
-            <span>[{matchPaymentChannel(doc, 'orange_money') ? 'x' : ' '}] Orange Money</span>
-            <span>[{matchPaymentChannel(doc, 'mtn_money') ? 'x' : ' '}] MTN Money</span>
-            <span>[{matchPaymentChannel(doc, 'moov_money') ? 'x' : ' '}] Moov Money</span>
-            <span>[{matchPaymentChannel(doc, 'credit') ? 'x' : ' '}] Crédit / Autre</span>
-          </div>
-          {doc.payments?.length ? (
-            <div className="mt-1.5 border-t border-slate-200 pt-1 space-y-0.5">
-              {doc.payments.map((payment, index) => (
-                <div key={`${payment.label}-${index}`} className="flex justify-between gap-3">
-                  <span>{payment.label}</span>
-                  <b className="font-mono-num">{formatFcfa(payment.amount)}</b>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-1 text-[8px] text-slate-500">
-              Aucun règlement effectif enregistré à l&apos;émission de ce reçu.
-            </div>
-          )}
-        </section>
+        <div className="mt-3">
+          <div className="mb-1 text-[9px] font-extrabold uppercase" style={{ color: ORANGE }}>Détail des boissons commandées</div>
+          <ProductTable
+            doc={doc}
+            minRows={10}
+            columns={[
+              { key: 'no', label: 'N°', align: 'center', width: '34px' },
+              { key: 'designation', label: 'Désignation de la boisson & format (CL)' },
+              { key: 'conditionnement', label: 'Conditionnement (Casier / Pack)', align: 'center', width: '120px' },
+              { key: 'qty', label: 'Qté', align: 'center', width: '54px' },
+              { key: 'pu', label: 'Prix unitaire (FCFA)', align: 'right', width: '95px' },
+              { key: 'total', label: 'Montant total (FCFA)', align: 'right', width: '100px' },
+            ]}
+          />
+        </div>
 
-        <section className="order-receipt-signatures">
-          <div>
-            <b>VISA DU CLIENT</b>
-            <p className="mt-4 text-[8px] text-slate-500">Nom &amp; Signature (bon pour accord &amp; quantités)</p>
-          </div>
-          <div>
-            <b>VISA DU CAISSIER / DÉPÔT</b>
-            <p className="mt-4 text-[8px] text-slate-500">{cashier} · Cachet &amp; Signature</p>
-          </div>
-        </section>
+        <div className="mt-3 grid grid-cols-[1fr_270px] gap-3 items-start">
+          <PackagingTable
+            doc={doc}
+            variant="customer"
+            title="Suivi des casiers & emballages réutilisables (consignes)"
+            note="* Tout emballage non restitué à la livraison est facturé au tarif de consigne en vigueur."
+          />
+          <SummaryBox rows={doc.summaryRows} />
+        </div>
 
-        <footer className="mt-8">
-          Merci pour votre confiance ! Veuillez vérifier vos quantités et emballages avant de quitter le dépôt.
-        </footer>
+        <div className="mt-3">
+          <PaymentModes doc={doc} />
+        </div>
 
-        {/* Page 2: Thank you message */}
-        <div className="mt-8 page-break-inside-avoid second-page">
-          <div className="max-w-2xl mx-auto px-5 py-10 text-center">
-            <p className="text-2xl text-green-700 font-bold mb-6">
-              Merci pour votre confiance&nbsp;!
-            </p>
-            <p className="text-slate-600 text-lg mb-8">
-              Veuillez vérifier vos quantités et emballages avant de quitter le dépôt.
-            </p>
-            <div className="border border-slate-300 p-4 rounded mb-6">
-              <h3 className="text-orange-700 text-xs font-bold uppercase tracking-wider mb-3">
-                RÉFÉRENCE RAPIDE
-              </h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="font-bold text-slate-600">N° Reçu</p>
-                  <p className="font-mono-num font-bold">{doc.reference}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-slate-600">Montant Total</p>
-                  <p className="font-mono-num font-bold text-orange-700">
-                    {doc.summaryRows.find(
-                      (r) =>
-                        /NET À PAYER|TOTAL/i.test(r.label) &&
-                        !/hors total|total liquide|total marchandises/i.test(r.label)
-                    )?.value || '—'}
-                  </p>
-                </div>
-              </div>
-            </div>
+        {filteredNotes.length ? (
+          <div className="mt-2 border border-[#D1D5DB] px-2.5 py-1.5 text-[8px] text-slate-600">
+            <span className="font-semibold">Observations :</span> {filteredNotes.join(' · ')}
           </div>
+        ) : null}
+
+        <div className="mt-3">
+          <Signatures
+            leftTitle="Signature & Cachet du Sous-Dépôt :"
+            rightTitle="Signature du Client (Bon pour accord & réception) :"
+          />
+        </div>
+
+        <div className="mt-3">
+          <Footer text="Merci pour votre confiance ! Veuillez vérifier vos quantités et emballages avant de quitter le dépôt." />
         </div>
       </article>
     );
   }
 
+  if (isPurchaseOrder) {
+    return (
+      <article className="document-sheet mx-auto w-full max-w-[794px] bg-white px-6 py-5 text-slate-900" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <DocHeader company={company} doc={doc} title="Bon de commande fournisseur" subtitle="Approvisionnement sous-dépôt" />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Box title="Fournisseur">
+            <div className="font-bold text-[10px]">{val(doc.partyName)}</div>
+            {doc.partyPhone ? <div><span className="font-semibold">Téléphone :</span> {doc.partyPhone}</div> : null}
+            {doc.partyDetails ? <div className="whitespace-pre-line"><span className="font-semibold">Adresse / Infos :</span> {doc.partyDetails}</div> : null}
+          </Box>
+          <Box title="Conditions de commande">
+            <div><span className="font-semibold">Date prévue :</span> {doc.deliveryDate ? formatDate(doc.deliveryDate) : '—'}</div>
+            <div><span className="font-semibold">Conditions paiement :</span> {val(doc.paymentTermsLabel, '—')}</div>
+            <div><span className="font-semibold">Conditions commerciales :</span> {val(doc.commercialConditions, '—')}</div>
+            <div><span className="font-semibold">Réf. liée :</span> {val(doc.linkedDocumentRef, '—')}</div>
+          </Box>
+        </div>
+        <div className="mt-3">
+          <div className="mb-1 text-[9px] font-extrabold uppercase" style={{ color: ORANGE }}>Produits commandés</div>
+          <ProductTable
+            doc={doc}
+            minRows={8}
+            columns={[
+              { key: 'no', label: 'N°', align: 'center', width: '34px' },
+              { key: 'designation', label: 'Brasserie / Marque / Désignation' },
+              { key: 'conditionnement', label: 'Conditionnement', align: 'center', width: '120px' },
+              { key: 'qty', label: 'Qté commandée', align: 'center', width: '80px' },
+              { key: 'pu', label: 'Prix unitaire (FCFA)', align: 'right', width: '95px' },
+              { key: 'total', label: 'Montant total (FCFA)', align: 'right', width: '100px' },
+            ]}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-[1fr_270px] gap-3 items-start">
+          <PackagingTable
+            doc={doc}
+            variant="supplier-order"
+            title="Casiers vides à remettre au fournisseur"
+            note="Échange physique selon compatibilité des casiers. Aucun mouvement de stock à la commande."
+          />
+          <SummaryBox rows={doc.summaryRows} />
+        </div>
+        {doc.notes ? <div className="mt-2 border border-[#D1D5DB] px-2.5 py-1.5 text-[8px] text-slate-600"><span className="font-semibold">Observations :</span> {doc.notes}</div> : null}
+        <div className="mt-3"><Signatures leftTitle="Signature du responsable du sous-dépôt :" rightTitle="Signature / Visa du fournisseur :" rightName={doc.cashierName} /></div>
+        <div className="mt-3"><Footer text="Bon de commande fournisseur — document d'approvisionnement. La réception physique fait foi pour l'entrée en stock." /></div>
+      </article>
+    );
+  }
+
+  if (isPurchaseReceipt) {
+    return (
+      <article className="document-sheet mx-auto w-full max-w-[794px] bg-white px-6 py-5 text-slate-900" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <DocHeader company={company} doc={doc} title="Bon de réception fournisseur" subtitle="Contrôle d'entrée physique" />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Box title="Fournisseur / Référence">
+            <div className="font-bold text-[10px]">{val(doc.partyName)}</div>
+            <div><span className="font-semibold">Bon de commande :</span> {val(doc.linkedDocumentRef || doc.orderReference, '—')}</div>
+            {doc.partyPhone ? <div><span className="font-semibold">Téléphone :</span> {doc.partyPhone}</div> : null}
+            {doc.partyDetails ? <div className="whitespace-pre-line">{doc.partyDetails}</div> : null}
+          </Box>
+          <Box title="Réception">
+            <div><span className="font-semibold">Réceptionnaire :</span> {val(doc.cashierName, '—')}</div>
+            <div><span className="font-semibold">Statut :</span> {val(doc.statusLabel, '—')}</div>
+            <div><span className="font-semibold">Date :</span> {formatDateTime(doc.date)}</div>
+          </Box>
+        </div>
+        <div className="mt-3">
+          <div className="mb-1 text-[9px] font-extrabold uppercase" style={{ color: ORANGE }}>Contrôle des produits reçus</div>
+          <ProductTable
+            doc={doc}
+            minRows={8}
+            columns={[
+              { key: 'no', label: 'N°', align: 'center', width: '34px' },
+              { key: 'designation', label: 'Désignation / Format' },
+              { key: 'ordered', label: 'Commandé', align: 'center', width: '72px' },
+              { key: 'received', label: 'Reçu', align: 'center', width: '72px' },
+              { key: 'missing', label: 'Manquant', align: 'center', width: '72px' },
+              { key: 'damaged', label: 'Endommagé/Refusé', align: 'center', width: '90px' },
+            ]}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-[1fr_270px] gap-3 items-start">
+          <PackagingTable
+            doc={doc}
+            variant="supplier-receipt"
+            title="Contrôle des casiers vides remis"
+            note="Échange physique : les casiers remis au fournisseur ne constituent pas une dette financière client."
+          />
+          <SummaryBox rows={doc.summaryRows} />
+        </div>
+        {doc.notes ? <div className="mt-2 border border-[#D1D5DB] px-2.5 py-1.5 text-[8px] text-slate-600"><span className="font-semibold">Observations / Anomalies :</span> {doc.notes}</div> : null}
+        <div className="mt-3"><Signatures leftTitle="Visa réceptionnaire dépôt :" rightTitle="Signature livreur / fournisseur :" rightName={doc.cashierName} /></div>
+        <div className="mt-3"><Footer text="Bon de réception fournisseur — la validation déclenche le mouvement de stock réel. L'impression ne rejoue pas la réception." /></div>
+      </article>
+    );
+  }
+
+  // Fallback: keep old generic layout for other document types for now
+  const isPaymentReceipt = doc.docType === 'REÇU DE PAIEMENT';
+  const companyDetails = [company?.business_activity, company?.address, companyLocation(company), company?.phone ? `Tél. ${company.phone}` : null, company?.rccm ? `RCCM : ${company.rccm}` : null, company?.ncc ? `NCC : ${company.ncc}` : null].filter(Boolean).join(' · ');
   return (
-    <article className="document-sheet space-y-5 bg-white px-7 py-7 text-black sm:px-10 sm:py-9">
-      <header className="flex items-start justify-between gap-5">
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-black uppercase leading-none tracking-tight sm:text-3xl">
-            {isPurchaseOrder ? 'BON DE COMMANDE FOURNISSEUR' : isPurchaseReceipt ? 'BON DE RÉCEPTION FOURNISSEUR' : doc.docType}
-          </h1>
-          <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            {isPaymentReceipt
-              ? 'Justificatif officiel d’encaissement client (trésorerie / mobile money / espèces)'
-              : isCustomerReceipt
-                ? 'Reçu client · Détail des marchandises et des emballages remis'
-                : isPurchaseOrder
-                  ? 'Demande d’approvisionnement fournisseur · Ne modifie pas le stock'
-                  : isPurchaseReceipt
-                    ? 'Contrôle d’entrée physique en stock & échange d’emballages vides'
-                    : 'Document commercial'}
-          </p>
-        </div>
-        <div className="flex max-w-[48%] items-start gap-3 text-right">
-          {company?.logo_path ? (
-            <img src={company.logo_path} alt={company.company_name || 'Logo'} className="h-14 w-14 shrink-0 object-contain" />
-          ) : (
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-slate-950 text-lg font-black text-white">
-              {(company?.company_name || 'DP').slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <div>
-            <div className="font-display text-base font-extrabold uppercase leading-tight">{company?.company_name || 'DEPOTPRO'}</div>
-            {company?.company_legal_name && <div className="mt-0.5 text-[11px] text-slate-600">{company.company_legal_name}</div>}
-            <div className="mt-1 max-w-64 text-[10px] leading-relaxed text-slate-600">{companyDetails(company) || 'Coordonnées à compléter dans les paramètres'}</div>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-2 divide-x divide-white bg-black text-white sm:grid-cols-3">
-        <div className="px-3 py-2.5">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-300">N° document</div>
-          <div className="mt-0.5 font-mono-num text-base font-bold">{doc.reference}</div>
-          {doc.linkedDocumentRef && doc.linkedDocumentRef !== doc.reference && (
-            <div className="mt-0.5 text-[10px] text-slate-300">Réf. liée : {doc.linkedDocumentRef}</div>
-          )}
-        </div>
-        <div className="px-3 py-2.5">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Date d’émission</div>
-          <div className="mt-0.5 text-sm font-bold">{formatDateTime(doc.date)}</div>
-          {doc.deliveryDate && <div className="mt-0.5 text-[10px]">Livraison prévue : {formatDate(doc.deliveryDate)}</div>}
-        </div>
-        <div className="px-3 py-2.5">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Émis / Contrôlé par</div>
-          <div className="mt-0.5 text-sm font-bold">{doc.cashierName || 'Opérateur dépôt'}</div>
-          {doc.statusLabel && <div className="mt-0.5 text-[10px] uppercase">{doc.statusLabel}</div>}
-        </div>
+    <article className="document-sheet mx-auto w-full max-w-[794px] bg-white px-6 py-5 text-slate-900" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <DocHeader company={company} doc={doc} title={doc.docType} />
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Box title={doc.partyTitle || 'Tiers'}><div className="font-bold">{val(doc.partyName)}</div><div className="whitespace-pre-line">{val(doc.partyDetails, '')}</div></Box>
+        <Box title={doc.secondaryPartyTitle || 'Émetteur'}><div className="font-bold">{val(company?.company_name)}</div><div className="whitespace-pre-line">{companyDetails}</div></Box>
       </div>
-
-      <section className="grid grid-cols-2 gap-4">
-        <div className="min-h-24 border border-black">
-          <h2 className="bg-black px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white">{senderTitle}</h2>
-          <div className="space-y-1 px-3 py-2 text-xs">
-            <div className="font-bold">{doc.partyName || '—'}</div>
-            {doc.partyDetails && <div className="whitespace-pre-line leading-relaxed text-slate-700">{doc.partyDetails}</div>}
-            {doc.partyPhone && !doc.partyDetails?.includes(doc.partyPhone) && <div>Tél. {doc.partyPhone}</div>}
-          </div>
+      {!isPaymentReceipt ? (
+        <div className="mt-3">
+          <ProductTable doc={doc} minRows={5} columns={[
+            { key: 'no', label: 'N°', align: 'center', width: '34px' },
+            { key: 'designation', label: 'Description' },
+            { key: 'qty', label: 'Qté', align: 'center', width: '70px' },
+            { key: 'pu', label: 'P.U. (FCFA)', align: 'right', width: '95px' },
+            { key: 'total', label: 'Total (FCFA)', align: 'right', width: '100px' },
+          ]} />
         </div>
-        <div className="min-h-24 border border-black">
-          <h2 className="bg-black px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white">{receiverTitle}</h2>
-          <div className="space-y-1 px-3 py-2 text-xs">
-            <div className="font-bold">{secondaryName}</div>
-            {secondaryDetails && <div className="whitespace-pre-line leading-relaxed text-slate-700">{secondaryDetails}</div>}
-            {doc.paymentTermsLabel && <div>Conditions : {doc.paymentTermsLabel}</div>}
-            {doc.externalReferences?.length ? (
-              <div className="font-mono-num font-semibold text-blue-700">
-                Réf. Txn externe : {doc.externalReferences.join(', ')}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
-
-      {!isPaymentReceipt && (
-        <div className="overflow-hidden border border-black">
-          <table className="w-full border-collapse text-left text-xs">
-            <thead className="bg-black text-white">
-              <tr>
-                <th scope="col" className="w-[15%] px-2 py-2 text-center font-bold uppercase">Qté</th>
-                <th scope="col" className="px-2 py-2 font-bold uppercase">Description</th>
-                <th scope="col" className="w-[18%] px-2 py-2 text-right font-bold uppercase">Prix unitaire</th>
-                <th scope="col" className="w-[19%] px-2 py-2 text-right font-bold uppercase">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doc.lines.length ? doc.lines.map((line, index) => (
-                <tr key={`${line.label}-${index}`} className="border-t border-black align-top">
-                  <td className="border-r border-black px-2 py-2 text-center font-mono-num">{line.quantity}</td>
-                  <td className="border-r border-black px-2 py-2">
-                    <div className="font-semibold">{line.label}</div>
-                    {line.sublabel && <div className="mt-0.5 whitespace-pre-line text-[10px] leading-relaxed text-slate-600">{line.sublabel}</div>}
-                    {(line.missingQuantity || line.damagedQuantity || line.refusedQuantity || line.discrepancyReason) && (
-                      <div className="mt-1 rounded bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-800">
-                        {[
-                          line.missingQuantity ? `Manquant : ${line.missingQuantity}` : null,
-                          line.damagedQuantity ? `Endommagé : ${line.damagedQuantity}` : null,
-                          line.refusedQuantity ? `Refusé : ${line.refusedQuantity}` : null,
-                          line.discrepancyReason ? `Motif : ${line.discrepancyReason}` : null,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border-r border-black px-2 py-2 text-right font-mono-num">{line.unitPrice == null ? '—' : formatFcfa(line.unitPrice)}</td>
-                  <td className="px-2 py-2 text-right font-mono-num font-semibold">{line.total == null ? '—' : formatFcfa(line.total)}</td>
-                </tr>
-              )) : <tr className="border-t border-black"><td colSpan={4} className="px-3 py-6 text-center text-slate-500">Aucune ligne</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {doc.packagingLines && doc.packagingLines.length > 0 && (
-        <section className="border border-slate-400 p-3 text-xs">
-          <h2 className="mb-2 font-bold uppercase">
-            {isPurchaseOrder
-              ? 'Emballages vides à préparer'
-              : isPurchaseReceipt
-                ? 'Emballages vides remis au fournisseur'
-                : isCustomerReceipt || doc.docType === 'FACTURE'
-                  ? 'Emballages consignés & retours client (délai : 15 jours max)'
-                  : 'Emballages physiques / consignes'}
-          </h2>
-          <div className="divide-y divide-slate-200">
-            {doc.packagingLines.map((line, index) => {
-              const isClientReturnOnly =
-                line.expectedQuantity === 0 && (line.returnedQuantity ?? 0) > 0;
-              return (
-                <div key={`${line.label}-${index}`} className="grid grid-cols-[1fr_auto] gap-2 py-2">
-                  <div>
-                    <div className="font-semibold">
-                      {line.label} ·{' '}
-                      {line.kind === 'bottle'
-                        ? 'bouteilles'
-                        : line.kind === 'crate'
-                          ? 'casiers'
-                          : 'autre'}
-                    </div>
-                    {line.detail && <div className="text-[10px] text-slate-600">{line.detail}</div>}
-                    <div className="text-[10px] font-medium text-slate-700">{line.statusLabel}</div>
-                  </div>
-                  <div className="text-right font-mono-num">
-                    {isClientReturnOnly ? (
-                      <>
-                        <div className="font-semibold text-emerald-700">
-                          Retour reçu : {line.returnedQuantity} pcs
-                        </div>
-                        {line.amount != null && (
-                          <div className="text-[10px] text-emerald-700">
-                            {formatFcfa(line.amount)} (hors total)
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <div>Attendu : {line.expectedQuantity}</div>
-                        {line.issuedQuantity != null && <div>Remis : {line.issuedQuantity}</div>}
-                        {line.returnedQuantity != null && (
-                          <div>
-                            Retourné : {line.returnedQuantity} · Solde :{' '}
-                            {Math.max(0, line.expectedQuantity - line.returnedQuantity)}
-                          </div>
-                        )}
-                        {line.amount != null && <div>{formatFcfa(line.amount)}</div>}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {(isCustomerReceipt || doc.docType === 'FACTURE') && (
-            <p className="mt-2 border-t border-slate-200 pt-1.5 text-[10px] font-medium text-slate-700">
-              Délai de retour des emballages consignés : 15 jours maximum à compter de l’émission. Le montant des retours d’emballages est comptabilisé hors total commande.
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-[1.2fr_0.8fr]">
-        <div className="border border-black">
-          <h2 className="bg-black px-3 py-2 text-xs font-bold text-white">Observations et conditions</h2>
-          <div className="min-h-24 whitespace-pre-line px-3 py-3 text-xs leading-relaxed text-slate-700">
-            {[doc.commercialConditions, doc.notes, doc.missingPackagingNote].filter(Boolean).join('\n') || (isPurchaseOrder
-              ? 'Merci de confirmer la disponibilité et le délai de livraison. Toute réception physique sera contrôlée séparément.'
-              : 'Merci pour votre confiance.')}
-          </div>
-        </div>
-        <div className="space-y-2 self-start px-1 py-1 text-xs">
-          {(doc.summaryRows || []).map((row, index) => {
-            const emphasis =
-              row.bold ||
-              (!/hors total/i.test(row.label) &&
-                /total|reste à payer|montant encaissé|net commande/i.test(row.label));
-            return (
-              <div key={`${row.label}-${index}`} className={`flex justify-between gap-3 ${emphasis ? 'border-t border-black pt-2 text-sm font-bold' : ''} ${row.tone === 'danger' ? 'text-red-700' : row.tone === 'success' ? 'text-emerald-700' : row.tone === 'warning' ? 'text-amber-700' : ''}`}>
-                <span>{row.label}</span><span className="shrink-0 text-right font-mono-num">{row.value}</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {doc.payments && doc.payments.length > 0 && (
-        <section className="border border-slate-400 p-3 text-xs">
-          <h2 className="mb-2 font-bold uppercase">Règlements enregistrés</h2>
-          {doc.payments.map((payment, index) => <div key={`${payment.label}-${index}`} className="flex justify-between border-t border-slate-200 py-1"><span>{payment.label}</span><span className="font-mono-num font-semibold">{formatFcfa(payment.amount)}</span></div>)}
-        </section>
-      )}
-
-      <section className="grid grid-cols-2 gap-5 pt-1 text-xs">
-        <div className="min-h-24 border border-slate-400 px-3 py-2">
-          <div className="font-bold">{clientSignatures ? (isPaymentReceipt ? 'Signature du payeur / client' : 'Reçu par le client') : (isPurchaseOrder || isPurchaseReceipt) ? 'Visa du fournisseur' : 'Le tiers'}</div>
-          <div className="mt-2 space-y-3 text-slate-600"><div>Nom : __________________________</div><div>Date et signature : __________________________</div></div>
-        </div>
-        <div className="min-h-24 border border-slate-400 px-3 py-2">
-          <div className="font-bold">{isPurchaseOrder ? 'Émis par le sous-dépôt' : isPurchaseReceipt ? 'Réceptionné par le sous-dépôt' : isPaymentReceipt ? 'Caissier / Responsable encaissement' : 'Responsable du sous-dépôt'}</div>
-          <div className="mt-2 space-y-3 text-slate-600"><div>Nom : {doc.cashierName || '__________________________'}</div><div>Date et cachet : __________________________</div></div>
-        </div>
-      </section>
-
-      <footer className="border-t border-slate-300 pt-3 text-center text-[10px] italic text-slate-500">
-        {doc.docType === 'REÇU DE VENTE'
-          ? 'Reçu de vente détaillé ; les marchandises, emballages remis, règlements et solde sont indiqués séparément.'
-          : isPaymentReceipt
-            ? 'Reçu de paiement officiel ; seul ce justificatif atteste de la somme encaissée. La référence interne du paiement ne correspond pas à la référence de transaction du prestataire Mobile Money.'
-            : isPurchaseOrder
-              ? 'Bon de commande fournisseur émis sous réserve de validation et de contrôle quantitatif à la réception.'
-              : isPurchaseReceipt
-                ? 'Bon de réception physique lié au bon de commande indiqué ; les emballages remis sont un échange matériel.'
-                : `${company?.company_name || 'DEPOTPRO'} · Document généré à partir des données commerciales enregistrées.`}
-        <div className="mt-1 not-italic">Réf. {doc.reference} · {company?.company_name || 'DEPOTPRO'}</div>
-      </footer>
+      ) : null}
+      <div className="mt-3 grid grid-cols-[1fr_270px] gap-3 items-start">
+        <div className="border border-[#D1D5DB] px-2.5 py-2 text-[8.5px] text-slate-700 min-h-[80px]"><span className="font-bold uppercase" style={{ color: ORANGE }}>Observations</span><div className="mt-1 whitespace-pre-line">{[doc.commercialConditions, doc.notes, doc.missingPackagingNote].filter(Boolean).join('\n') || '—'}</div></div>
+        <SummaryBox rows={doc.summaryRows} />
+      </div>
+      {doc.payments?.length ? <div className="mt-3"><PaymentModes doc={doc} /></div> : null}
+      <div className="mt-3"><Signatures leftTitle="Signature tiers :" rightTitle="Signature responsable :" rightName={doc.cashierName} /></div>
+      <div className="mt-3"><Footer text={`${company?.company_name || 'DEPOTPRO'} · Document généré à partir des données commerciales enregistrées.`} /></div>
     </article>
   );
 }

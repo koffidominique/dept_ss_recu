@@ -1,4 +1,4 @@
-// Rendu A4 fidèle au modèle CI : REÇU DE COMMANDE (Dépôt / Sous-Dépôt de boissons)
+// Rendu A4 des documents commerciaux DEPOTPRO (référence: reçu de commande CI)
 use crate::application::reports::AppSettingsDto;
 
 use super::encoding_and_layout::{format_date_french, wrap_text};
@@ -7,14 +7,18 @@ use super::primitives::{
     draw_rect_fill_stroke, draw_text, draw_text_right, start_page, CONTENT_W, MARGIN, PAGE_H,
     RIGHT,
 };
-use super::{DocumentPdfInput, DocumentPdfLine};
+use super::{DocumentPdfInput, DocumentPdfLine, DocumentPdfPackagingLine};
 
-const ORANGE: (f64, f64, f64) = (0.78, 0.30, 0.035);
-const GREEN: (f64, f64, f64) = (0.0, 0.48, 0.34);
-const NAVY: (f64, f64, f64) = (0.12, 0.16, 0.23);
-const GRAY: (f64, f64, f64) = (0.38, 0.42, 0.49);
-const LIGHT: (f64, f64, f64) = (0.96, 0.97, 0.98);
-const BORDER: (f64, f64, f64) = (0.78, 0.81, 0.85);
+const ORANGE: (f64, f64, f64) = (0.776, 0.325, 0.035); // #C65309
+const GREEN: (f64, f64, f64) = (0.0, 0.502, 0.353); // #00805A
+const NAVY: (f64, f64, f64) = (0.122, 0.161, 0.216); // #1F2937
+const GRAY: (f64, f64, f64) = (0.278, 0.333, 0.412); // #475569
+const LIGHT: (f64, f64, f64) = (0.973, 0.980, 0.988); // #F8FAFC
+const BORDER: (f64, f64, f64) = (0.820, 0.835, 0.859); // #D1D5DB
+const YELLOW_BG: (f64, f64, f64) = (0.996, 0.953, 0.780); // #FEF3C7
+const YELLOW_TXT: (f64, f64, f64) = (0.573, 0.251, 0.055);
+const RED_BG: (f64, f64, f64) = (0.996, 0.949, 0.949); // #FEF2F2
+const RED_TXT: (f64, f64, f64) = (0.863, 0.149, 0.149);
 
 fn amount(value: i64) -> String {
     let digits = value.abs().to_string();
@@ -25,1271 +29,528 @@ fn amount(value: i64) -> String {
         }
         grouped.push(ch);
     }
-    if value < 0 {
-        format!("- {grouped}")
-    } else {
-        grouped
-    }
+    if value < 0 { format!("- {grouped}") } else { grouped }
 }
 
 fn time_part(date: &str) -> String {
-    let time = date
-        .split_once('T')
-        .or_else(|| date.split_once(' '))
-        .map(|(_, time)| time)
-        .unwrap_or("");
+    let time = date.split_once('T').or_else(|| date.split_once(' ')).map(|(_, t)| t).unwrap_or("");
     let time = time.trim_end_matches('Z');
     let time = time.split(['+', '-']).next().unwrap_or(time);
-    if time.len() >= 5 {
-        format!("{} h {}", &time[..2], &time[3..5])
-    } else {
-        "—".to_string()
+    if time.len() >= 5 { format!("{} h {}", &time[..2], &time[3..5]) } else { "—".to_string() }
+}
+
+fn doc_title(doc: &DocumentPdfInput) -> &str {
+    match doc.doc_type.as_str() {
+        "BON DE COMMANDE" | "BON DE COMMANDE FOURNISSEUR" => "BON DE COMMANDE FOURNISSEUR",
+        "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR" => "BON DE RÉCEPTION FOURNISSEUR",
+        _ => "REÇU DE COMMANDE",
     }
 }
 
-fn draw_brand_header(
-    cmds: &mut Vec<String>,
-    company: &AppSettingsDto,
-    doc: &DocumentPdfInput,
-    logo: Option<&super::primitives::PdfJpegImage>,
-    first_page: bool,
-) {
-    let x = MARGIN;
-    if first_page {
-        if let Some(image) = logo {
-            let side = 86.0;
-            let scale = side / f64::from(image.width.max(image.height));
-            let w = f64::from(image.width) * scale;
-            let h = f64::from(image.height) * scale;
-            draw_rect_fill_stroke(cmds, x, 719.0, side, side, (1.0, 1.0, 1.0), BORDER, 0.8);
-            draw_logo_image(cmds, x + (side - w) / 2.0, 719.0 + (side - h) / 2.0, w, h);
-        } else {
-            draw_rect_fill_stroke(cmds, x, 719.0, 86.0, 86.0, LIGHT, (0.60, 0.65, 0.72), 0.8);
-            draw_text(cmds, x + 15.0, 766.0, "EMPLACEMENT", 8.0, true, GRAY);
-            draw_text(cmds, x + 23.0, 754.0, "LOGO", 10.0, true, GRAY);
-            draw_text(cmds, x + 13.0, 741.0, "(Cachet / Visuel)", 6.0, false, GRAY);
-        }
-
-        let brand_x = x + 98.0;
-        let name = if company.company_name.trim().is_empty() {
-            "NOM DU SOUS-DÉPÔT DE BOISSONS"
-        } else {
-            company.company_name.trim()
-        };
-        let title_lines = wrap_text(name, 200.0, 13.5, true);
-        let mut title_y = 794.0;
-        for line in title_lines.iter().take(2) {
-            draw_text(cmds, brand_x, title_y, line, 13.5, true, ORANGE);
-            title_y -= 14.5;
-        }
-        draw_line(
-            cmds,
-            brand_x,
-            title_y + 3.0,
-            395.0,
-            title_y + 3.0,
-            ORANGE,
-            0.8,
-        );
-
-        let mut info_y = title_y - 8.0;
-        let mut infos = Vec::new();
-        if let Some(act) = company
-            .business_activity
-            .as_deref()
-            .filter(|v| !v.trim().is_empty())
-        {
-            infos.push(format!("Activité : {}", act.trim()));
-        }
-        let commune_quartier = [
-            company.commune.as_deref(),
-            company.quartier.as_deref(),
-            company.city.as_deref(),
-            company.address.as_deref(),
-        ]
-        .into_iter()
-        .flatten()
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-        .collect::<Vec<_>>()
-        .join(" / ");
-        if !commune_quartier.is_empty() {
-            infos.push(format!("Commune / Quartier : {commune_quartier}"));
-        }
-        let phones = [company.phone.as_deref(), company.whatsapp.as_deref()]
-            .into_iter()
-            .flatten()
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .collect::<Vec<_>>()
-            .join(" / ");
-        if !phones.is_empty() {
-            infos.push(format!("Tél / WhatsApp : {phones}"));
-        }
-        let rccm_ncc = [
-            company
-                .rccm
-                .as_deref()
-                .filter(|v| !v.trim().is_empty())
-                .map(|v| format!("RCCM : {}", v.trim())),
-            company
-                .ncc
-                .as_deref()
-                .filter(|v| !v.trim().is_empty())
-                .map(|v| format!("NCC : {}", v.trim())),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join("  |  ");
-        if !rccm_ncc.is_empty() {
-            infos.push(rccm_ncc);
-        } else if let Some(legal) = company
-            .company_legal_name
-            .as_deref()
-            .filter(|v| !v.trim().is_empty())
-        {
-            infos.push(format!("Raison sociale : {}", legal.trim()));
-        }
-        for info in infos.iter().take(5) {
-            let wrapped = wrap_text(info, 200.0, 6.8, false);
-            if let Some(line) = wrapped.first() {
-                draw_text(cmds, brand_x, info_y, line, 6.8, false, NAVY);
-            }
-            info_y -= 9.5;
-        }
-
-        let bx = 406.0;
-        draw_rect_fill_stroke(cmds, bx, 710.0, 149.0, 95.0, (0.95, 1.0, 0.98), GREEN, 1.4);
-        draw_text(cmds, bx + 12.0, 791.0, "REÇU DE COMMANDE", 9.6, true, GREEN);
-        let ver_badge = doc
-            .version
-            .filter(|v| *v > 1)
-            .map(|v| format!(" · v{v}"))
-            .unwrap_or_default();
-        draw_text(
-            cmds,
-            bx + 10.0,
-            778.0,
-            &format!("N° Reçu : {}{}", doc.reference, ver_badge),
-            6.8,
-            true,
-            NAVY,
-        );
-        draw_text(
-            cmds,
-            bx + 10.0,
-            767.0,
-            &format!("Date : {}", format_date_french(&doc.date)),
-            6.8,
-            false,
-            NAVY,
-        );
-        draw_text(
-            cmds,
-            bx + 10.0,
-            756.0,
-            &format!("Heure : {}", time_part(&doc.date)),
-            6.8,
-            false,
-            NAVY,
-        );
-        draw_text(
-            cmds,
-            bx + 10.0,
-            745.0,
-            &format!(
-                "Caissier(ère) : {}",
-                doc.cashier_name.as_deref().unwrap_or("—")
-            ),
-            6.8,
-            false,
-            NAVY,
-        );
-        draw_text(
-            cmds,
-            bx + 10.0,
-            733.0,
-            &format!(
-                "Réf. Cmd : {}",
-                doc.order_reference.as_deref().unwrap_or("—")
-            ),
-            6.5,
-            true,
-            NAVY,
-        );
-        draw_text(
-            cmds,
-            bx + 10.0,
-            721.0,
-            &format!("Statut : {}", doc.status_label.as_deref().unwrap_or("—")),
-            6.5,
-            true,
-            GREEN,
-        );
-        draw_line(cmds, MARGIN, 704.0, RIGHT, 704.0, ORANGE, 1.4);
-    } else {
-        draw_text(
-            cmds,
-            MARGIN,
-            PAGE_H - 32.0,
-            &format!("{} · REÇU {} · SUITE", company.company_name, doc.reference),
-            9.0,
-            true,
-            NAVY,
-        );
-        draw_line(
-            cmds,
-            MARGIN,
-            PAGE_H - 39.0,
-            RIGHT,
-            PAGE_H - 39.0,
-            ORANGE,
-            1.0,
-        );
+fn ref_label(doc: &DocumentPdfInput) -> &str {
+    match doc.doc_type.as_str() {
+        "BON DE COMMANDE" | "BON DE COMMANDE FOURNISSEUR" => "N° BC",
+        "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR" => "N° BR",
+        _ => "N° Reçu",
     }
+}
+
+fn is_supplier_doc(doc: &DocumentPdfInput) -> bool {
+    matches!(doc.doc_type.as_str(), "BON DE COMMANDE" | "BON DE COMMANDE FOURNISSEUR" | "BON DE RÉCEPTION" | "BON DE RÉCEPTION FOURNISSEUR")
+}
+
+fn draw_brand_header(cmds: &mut Vec<String>, company: &AppSettingsDto, doc: &DocumentPdfInput, logo: Option<&super::primitives::PdfJpegImage>, first_page: bool) {
+    if !first_page {
+        draw_text(cmds, MARGIN, PAGE_H - 32.0, &format!("{} · {} · Suite", company.company_name, doc.reference), 9.0, true, NAVY);
+        draw_line(cmds, MARGIN, PAGE_H - 39.0, RIGHT, PAGE_H - 39.0, ORANGE, 1.0);
+        return;
+    }
+    // Logo
+    if let Some(image) = logo {
+        let side = 82.0;
+        let scale = side / f64::from(image.width.max(image.height));
+        let w = f64::from(image.width) * scale;
+        let h = f64::from(image.height) * scale;
+        draw_rect_fill_stroke(cmds, MARGIN, 724.0, side, side, (1.0, 1.0, 1.0), BORDER, 0.8);
+        draw_logo_image(cmds, MARGIN + (side - w) / 2.0, 724.0 + (side - h) / 2.0, w, h);
+    } else {
+        draw_rect_fill_stroke(cmds, MARGIN, 724.0, 82.0, 82.0, (1.0, 1.0, 1.0), (0.6, 0.65, 0.72), 0.8);
+        draw_text(cmds, MARGIN + 14.0, 770.0, "EMPLACEMENT", 7.5, true, GRAY);
+        draw_text(cmds, MARGIN + 27.0, 759.0, "LOGO", 9.5, true, GRAY);
+        draw_text(cmds, MARGIN + 12.0, 747.0, "(Cachet / Visuel)", 5.8, false, GRAY);
+    }
+
+    let bx = MARGIN + 94.0;
+    let name = if company.company_name.trim().is_empty() { "[NOM DU SOUS-DÉPÔT DE BOISSONS]" } else { company.company_name.trim() };
+    let title_lines = wrap_text(name, 210.0, 13.0, true);
+    let mut ty = 796.0;
+    for line in title_lines.iter().take(2) { draw_text(cmds, bx, ty, line, 13.0, true, ORANGE); ty -= 14.0; }
+    draw_line(cmds, bx, ty + 3.0, 395.0, ty + 3.0, ORANGE, 0.8);
+    let mut iy = ty - 8.0;
+    let activity = company.business_activity.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("Distribution & Vente de Boissons (Gros / Demi-Gros / Détail)");
+    draw_text(cmds, bx, iy, &format!("Activité : {}", activity), 6.8, false, NAVY); iy -= 10.0;
+    let loc = [company.commune.as_deref(), company.quartier.as_deref(), company.city.as_deref(), company.country.as_deref()].into_iter().flatten().filter(|s| !s.trim().is_empty()).collect::<Vec<_>>().join(" / ");
+    draw_text(cmds, bx, iy, &format!("Commune / Quartier : {}", if loc.is_empty() { ".........................................................." } else { &loc }), 6.6, false, NAVY); iy -= 10.0;
+    if let Some(addr) = company.address.as_deref().filter(|s| !s.trim().is_empty()) { draw_text(cmds, bx, iy, &format!("Adresse : {}", addr), 6.6, false, NAVY); iy -= 10.0; }
+    let phones = [company.phone.as_deref(), company.whatsapp.as_deref()].into_iter().flatten().filter(|s| !s.trim().is_empty()).collect::<Vec<_>>();
+    let phones = { let mut u = Vec::new(); for p in phones { if !u.contains(&p) { u.push(p); } } u.join(" / ") };
+    draw_text(cmds, bx, iy, &format!("Tél / WhatsApp : {}", if phones.is_empty() { "+225 .... ........ / ..........." } else { &phones }), 6.6, false, NAVY); iy -= 10.0;
+    let rccm = company.rccm.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("CI-ABJ-...........");
+    let ncc = company.ncc.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("....................");
+    draw_text(cmds, bx, iy, &format!("RCCM : {}  |  NCC : {}", rccm, ncc), 6.4, false, NAVY);
+
+    // Right box
+    let rx = 408.0; let rw = 147.0; let rh = 92.0; let ry = 714.0;
+    draw_rect_fill_stroke(cmds, rx, ry, rw, rh, (0.941, 0.992, 0.973), GREEN, 1.4);
+    let title = doc_title(doc);
+    let title_lines = wrap_text(title, rw - 16.0, 9.5, true);
+    let mut tby = 793.0;
+    for l in title_lines.iter().take(2) { draw_text(cmds, rx + 8.0, tby, l, 9.5, true, GREEN); tby -= 11.0; }
+    let mut by = tby - 2.0;
+    draw_text(cmds, rx + 8.0, by, &format!("{} : {}", ref_label(doc), doc.reference), 6.8, true, NAVY); by -= 10.5;
+    if let Some(linked) = doc.linked_document_ref.as_deref().or(doc.order_reference.as_deref()).filter(|s| !s.trim().is_empty() && *s != doc.reference) {
+        draw_text(cmds, rx + 8.0, by, &format!("Réf. liée : {}", linked), 6.4, false, NAVY); by -= 10.0;
+    }
+    draw_text(cmds, rx + 8.0, by, &format!("Date : {}", format_date_french(&doc.date)), 6.6, false, NAVY); by -= 10.0;
+    draw_text(cmds, rx + 8.0, by, &format!("Heure : {}", time_part(&doc.date)), 6.6, false, NAVY); by -= 10.0;
+    draw_text(cmds, rx + 8.0, by, &format!("Opérateur : {}", doc.cashier_name.as_deref().unwrap_or("—")), 6.6, false, NAVY); by -= 10.0;
+    if let Some(st) = doc.status_label.as_deref().filter(|s| !s.trim().is_empty()) {
+        draw_text(cmds, rx + 8.0, by, &format!("Statut : {}", st), 6.4, true, GREEN);
+    }
+
+    draw_line(cmds, MARGIN, 706.0, RIGHT, 706.0, ORANGE, 1.5);
+}
+
+fn draw_section_box(cmds: &mut Vec<String>, x: f64, top: f64, w: f64, h: f64, title: &str) {
+    draw_rect_fill_stroke(cmds, x, top - h, w, h, (1.0, 1.0, 1.0), BORDER, 0.7);
+    draw_text(cmds, x + 8.0, top - 12.0, &title.to_uppercase(), 7.8, true, ORANGE);
+    draw_line(cmds, x + 6.0, top - 17.0, x + w - 6.0, top - 17.0, BORDER, 0.5);
 }
 
 fn draw_checkbox(cmds: &mut Vec<String>, x: f64, y: f64, checked: bool, label: &str) {
-    draw_rect_fill_stroke(cmds, x, y - 2.0, 8.0, 8.0, (1.0, 1.0, 1.0), NAVY, 0.6);
+    draw_rect_fill_stroke(cmds, x, y - 2.5, 8.0, 8.0, (1.0, 1.0, 1.0), NAVY, 0.6);
     if checked {
-        draw_line(cmds, x + 1.5, y + 1.0, x + 3.5, y - 1.0, GREEN, 1.2);
-        draw_line(cmds, x + 3.5, y - 1.0, x + 7.0, y + 4.5, GREEN, 1.2);
+        draw_line(cmds, x + 1.5, y + 0.5, x + 3.3, y - 1.3, GREEN, 1.1);
+        draw_line(cmds, x + 3.3, y - 1.3, x + 6.8, y + 4.0, GREEN, 1.1);
     }
-    draw_text(cmds, x + 12.0, y + 1.5, label, 6.4, false, NAVY);
+    draw_text(cmds, x + 11.0, y + 1.0, label, 6.3, false, NAVY);
 }
 
-fn draw_party_boxes(cmds: &mut Vec<String>, doc: &DocumentPdfInput) {
-    let top = 698.0;
-    let h = 76.0;
-    let left_x = MARGIN;
-    let left_w = 264.0;
-    let right_x = left_x + left_w + 10.0;
-    let right_w = CONTENT_W - left_w - 10.0;
-    draw_rect_fill_stroke(
-        cmds,
-        left_x,
-        top - h,
-        left_w,
-        h,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.7,
-    );
-    draw_rect_fill_stroke(
-        cmds,
-        right_x,
-        top - h,
-        right_w,
-        h,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.7,
-    );
+fn normalize_method(label: &str) -> String { label.to_lowercase() }
 
-    draw_text(
-        cmds,
-        left_x + 9.0,
-        top - 13.0,
-        "INFORMATIONS DU CLIENT",
-        8.0,
-        true,
-        ORANGE,
-    );
-    draw_line(
-        cmds,
-        left_x + 8.0,
-        top - 18.0,
-        left_x + left_w - 8.0,
-        top - 18.0,
-        BORDER,
-        0.5,
-    );
-    let client_display = doc
-        .customer_establishment
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .map(|est| {
-            format!(
-                "{} — {}",
-                doc.party_name.as_deref().unwrap_or("—"),
-                est.trim()
-            )
-        })
-        .unwrap_or_else(|| doc.party_name.as_deref().unwrap_or("—").to_string());
-    draw_text(
-        cmds,
-        left_x + 9.0,
-        top - 30.0,
-        &format!("Nom / Établissement : {client_display}"),
-        7.0,
-        true,
-        NAVY,
-    );
-    let cat_text = doc
-        .customer_category
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .map(|c| format!("Type : {c}"))
-        .unwrap_or_else(|| "(Maquis, Cave, Bar, Restaurant, Particulier, Événement)".to_string());
-    draw_text(cmds, left_x + 9.0, top - 41.0, &cat_text, 5.8, false, GRAY);
-    draw_text(
-        cmds,
-        left_x + 9.0,
-        top - 53.0,
-        &format!(
-            "Contact (+225) : {}",
-            doc.party_phone.as_deref().unwrap_or("—")
-        ),
-        6.5,
-        false,
-        NAVY,
-    );
-    let loc_text = doc
-        .customer_location
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .or(doc.party_details.as_deref())
-        .unwrap_or("—");
-    let loc_lines = wrap_text(
-        &format!("Quartier / Repère : {loc_text}"),
-        left_w - 18.0,
-        6.4,
-        false,
-    );
-    if let Some(first) = loc_lines.first() {
-        draw_text(cmds, left_x + 9.0, top - 65.0, first, 6.4, false, NAVY);
+fn method_checked(doc: &DocumentPdfInput, key: &str) -> bool {
+    let actual: Vec<String> = doc.payments.as_deref().unwrap_or(&[]).iter().map(|p| normalize_method(&p.label)).collect();
+    let planned = doc.planned_payment_channel.as_deref().or(doc.planned_payment_method.as_deref()).map(normalize_method).unwrap_or_default();
+    let hay = if actual.is_empty() { vec![planned] } else { actual };
+    let has = |pat: &str| hay.iter().any(|h| h.contains(pat));
+    match key {
+        "cash" => has("cash") || has("esp"),
+        "wave" => has("wave"),
+        "orange" => has("orange"),
+        "mtn" => has("mtn"),
+        "moov" => has("moov"),
+        "other" => has("autre") || has("credit") || has("crédit") || has("cheque") || has("chèque") || has("virement"),
+        _ => false,
     }
+}
 
-    draw_text(
-        cmds,
-        right_x + 9.0,
-        top - 13.0,
-        "MODE DE RETRAIT / LIVRAISON",
-        8.0,
-        true,
-        ORANGE,
-    );
-    draw_line(
-        cmds,
-        right_x + 8.0,
-        top - 18.0,
-        right_x + right_w - 8.0,
-        top - 18.0,
-        BORDER,
-        0.5,
-    );
-    let is_delivery = doc
-        .delivery_mode
-        .as_deref()
-        .map(|m| m.eq_ignore_ascii_case("delivery"))
-        .unwrap_or_else(|| {
-            doc.delivery_date.is_some()
-                || doc
-                    .secondary_party_details
-                    .as_deref()
-                    .map(|t| {
-                        !t.to_lowercase().contains("enlèvement")
-                            && !t.to_lowercase().contains("au sous-dépôt")
-                    })
-                    .unwrap_or(false)
-        });
-    draw_checkbox(
-        cmds,
-        right_x + 9.0,
-        top - 30.0,
-        !is_delivery,
-        "Enlèvement sur place (au sous-dépôt)",
-    );
-    draw_checkbox(
-        cmds,
-        right_x + 9.0,
-        top - 42.0,
-        is_delivery,
-        "Livraison à domicile / sur site",
-    );
-    let courier = doc
-        .courier_name
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or(if is_delivery {
-            "À assigner"
+fn draw_party_boxes(cmds: &mut Vec<String>, doc: &DocumentPdfInput, top: f64) -> f64 {
+    let h = 74.0;
+    let gap = 10.0;
+    let lw = (CONTENT_W - gap) * 0.52;
+    let rw = CONTENT_W - gap - lw;
+    let lx = MARGIN;
+    let rx = MARGIN + lw + gap;
+
+    if is_supplier_doc(doc) {
+        draw_section_box(cmds, lx, top, lw, h, if doc.doc_type.contains("RÉCEPTION") { "Fournisseur / Référence" } else { "Fournisseur" });
+        draw_text(cmds, lx + 8.0, top - 30.0, &format!("Nom : {}", doc.party_name.as_deref().unwrap_or("—")), 7.0, true, NAVY);
+        draw_text(cmds, lx + 8.0, top - 41.0, &format!("Téléphone : {}", doc.party_phone.as_deref().unwrap_or("—")), 6.5, false, NAVY);
+        let details = doc.party_details.as_deref().unwrap_or("—");
+        let dl = wrap_text(&format!("Adresse / Infos : {}", details), lw - 16.0, 6.3, false);
+        if let Some(l) = dl.first() { draw_text(cmds, lx + 8.0, top - 52.0, l, 6.3, false, NAVY); }
+        if doc.doc_type.contains("RÉCEPTION") {
+            if let Some(linked) = doc.linked_document_ref.as_deref().or(doc.order_reference.as_deref()) {
+                draw_text(cmds, lx + 8.0, top - 63.0, &format!("Bon de commande : {}", linked), 6.3, true, NAVY);
+            }
+        }
+        draw_section_box(cmds, rx, top, rw, h, if doc.doc_type.contains("RÉCEPTION") { "Réception" } else { "Conditions de commande" });
+        if doc.doc_type.contains("RÉCEPTION") {
+            draw_text(cmds, rx + 8.0, top - 30.0, &format!("Réceptionnaire : {}", doc.cashier_name.as_deref().unwrap_or("—")), 6.6, false, NAVY);
+            draw_text(cmds, rx + 8.0, top - 41.0, &format!("Statut : {}", doc.status_label.as_deref().unwrap_or("—")), 6.6, false, NAVY);
+            draw_text(cmds, rx + 8.0, top - 52.0, &format!("Date : {}", format_date_french(&doc.date)), 6.6, false, NAVY);
         } else {
-            "— (retrait sur place)"
-        });
-    draw_text(
-        cmds,
-        right_x + 9.0,
-        top - 54.0,
-        &format!("Livreur / Tricycle : {courier}"),
-        6.4,
-        false,
-        NAVY,
-    );
-    let date_time = match (
-        doc.delivery_date.as_deref(),
-        doc.planned_delivery_time.as_deref(),
-    ) {
-        (Some(d), Some(t)) if !d.is_empty() && !t.is_empty() => {
-            format!("{} à {}", format_date_french(d), t)
+            draw_text(cmds, rx + 8.0, top - 30.0, &format!("Date prévue : {}", doc.delivery_date.as_deref().map(format_date_french).unwrap_or_else(|| "—".to_string())), 6.5, false, NAVY);
+            draw_text(cmds, rx + 8.0, top - 41.0, &format!("Conditions paiement : {}", doc.payment_terms_label.as_deref().unwrap_or("—")), 6.3, false, NAVY);
+            let cc = doc.commercial_conditions.as_deref().unwrap_or("—");
+            let ccl = wrap_text(&format!("Conditions commerciales : {}", cc), rw - 16.0, 6.0, false);
+            if let Some(l) = ccl.first() { draw_text(cmds, rx + 8.0, top - 52.0, l, 6.0, false, NAVY); }
+            draw_text(cmds, rx + 8.0, top - 63.0, &format!("Réf. liée : {}", doc.linked_document_ref.as_deref().unwrap_or("—")), 6.3, false, NAVY);
         }
-        (Some(d), _) if !d.is_empty() => format_date_french(d),
-        (_, Some(t)) if !t.is_empty() => t.to_string(),
-        _ => doc
-            .delivery_landmark
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .unwrap_or("—")
-            .to_string(),
-    };
-    draw_text(
-        cmds,
-        right_x + 9.0,
-        top - 66.0,
-        &format!("Date / Heure prévue : {date_time}"),
-        6.4,
-        false,
-        NAVY,
-    );
+        return top - h;
+    }
+
+    // Client / delivery
+    draw_section_box(cmds, lx, top, lw, h, "Informations du client");
+    let client_name = doc.party_name.as_deref().unwrap_or("—");
+    draw_text(cmds, lx + 8.0, top - 30.0, &format!("Nom / Établissement : {}", client_name), 7.0, true, NAVY);
+    let cat = doc.customer_category.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("(Maquis, Cave, Bar, Restaurant, Particulier, Événement)");
+    draw_text(cmds, lx + 8.0, top - 40.0, &format!("Type : {}", cat), 5.8, false, GRAY);
+    draw_text(cmds, lx + 8.0, top - 51.0, &format!("Contact (+225) : {}", doc.party_phone.as_deref().unwrap_or("....................................")), 6.4, false, NAVY);
+    let loc = doc.customer_location.as_deref().or(doc.party_details.as_deref()).unwrap_or("....................................");
+    let locl = wrap_text(&format!("Quartier / Repère : {}", loc), lw - 16.0, 6.2, false);
+    if let Some(l) = locl.first() { draw_text(cmds, lx + 8.0, top - 62.0, l, 6.2, false, NAVY); }
+
+    draw_section_box(cmds, rx, top, rw, h, "Mode de retrait / livraison");
+    let is_delivery = doc.delivery_mode.as_deref().map(|m| m.eq_ignore_ascii_case("delivery")).unwrap_or(false)
+        || doc.courier_name.as_deref().filter(|s| !s.trim().is_empty()).is_some()
+        || doc.delivery_fee_xof.unwrap_or(0) > 0;
+    draw_checkbox(cmds, rx + 8.0, top - 30.0, !is_delivery, "Enlèvement sur place (au sous-dépôt)");
+    draw_checkbox(cmds, rx + 8.0, top - 41.0, is_delivery, "Livraison à domicile / sur site");
+    draw_text(cmds, rx + 8.0, top - 53.0, &format!("Livreur / Tricycle : {}", doc.courier_name.as_deref().unwrap_or("....................................")), 6.2, false, NAVY);
+    let dt = doc.planned_delivery_time.as_deref().filter(|s| !s.trim().is_empty()).map(|s| s.to_string())
+        .or_else(|| doc.delivery_date.as_deref().map(format_date_french))
+        .unwrap_or_else(|| "..... / ..... / 20..... à ..... h .....".to_string());
+    let dtl = wrap_text(&format!("Date / Heure prévue : {}", dt), rw - 16.0, 6.2, false);
+    if let Some(l) = dtl.first() { draw_text(cmds, rx + 8.0, top - 64.0, l, 6.2, false, NAVY); }
+    top - h
 }
 
-fn draw_products_header(cmds: &mut Vec<String>, top: f64) {
-    let y = top - 28.0;
-    draw_rect_fill(cmds, MARGIN, y, CONTENT_W, 28.0, NAVY);
-    // 6 colonnes exactes : N° | DÉSIGNATION & FORMAT (CL) | CONDITIONNEMENT | QTÉ | PRIX UNITAIRE (FCFA) | MONTANT TOTAL (FCFA)
-    let cols = [
-        MARGIN,
-        MARGIN + 26.0,
-        MARGIN + 230.0,
-        MARGIN + 325.0,
-        MARGIN + 365.0,
-        MARGIN + 438.0,
-        RIGHT,
-    ];
-    for x in cols.iter().skip(1).take(5) {
-        draw_line(cmds, *x, y, *x, top, (0.65, 0.68, 0.73), 0.5);
-    }
-    draw_text(
-        cmds,
-        MARGIN + 8.0,
-        top - 17.0,
-        "N°",
-        7.0,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 32.0,
-        top - 12.0,
-        "DÉSIGNATION DE LA BOISSON &",
-        6.2,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 92.0,
-        top - 22.0,
-        "FORMAT (CL)",
-        6.2,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 238.0,
-        top - 12.0,
-        "CONDITIONNEMENT",
-        6.0,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 250.0,
-        top - 22.0,
-        "(CASIER / PACK)",
-        5.6,
-        false,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 338.0,
-        top - 17.0,
-        "QTÉ",
-        6.6,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 371.0,
-        top - 12.0,
-        "PRIX UNITAIRE",
-        6.0,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 388.0,
-        top - 22.0,
-        "(FCFA)",
-        5.8,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 444.0,
-        top - 12.0,
-        "MONTANT TOTAL",
-        5.8,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-    draw_text(
-        cmds,
-        MARGIN + 467.0,
-        top - 22.0,
-        "(FCFA)",
-        5.8,
-        true,
-        (1.0, 1.0, 1.0),
-    );
-}
+struct Col { label: &'static str, x: f64, w: f64, align_right: bool, align_center: bool }
 
-fn draw_product_row(
-    cmds: &mut Vec<String>,
-    row_top: f64,
-    index: usize,
-    line: Option<&DocumentPdfLine>,
-) {
-    let row_h = 19.5;
-    let bottom = row_top - row_h;
-    draw_rect_fill(
-        cmds,
-        MARGIN,
-        bottom,
-        CONTENT_W,
-        row_h,
-        if index.is_multiple_of(2) {
-            LIGHT
-        } else {
-            (1.0, 1.0, 1.0)
-        },
-    );
-    let cols = [
-        MARGIN,
-        MARGIN + 26.0,
-        MARGIN + 230.0,
-        MARGIN + 325.0,
-        MARGIN + 365.0,
-        MARGIN + 438.0,
-        RIGHT,
-    ];
-    for x in cols.iter().skip(1).take(5) {
-        draw_line(cmds, *x, bottom, *x, row_top, BORDER, 0.45);
-    }
-    draw_line(cmds, MARGIN, bottom, RIGHT, bottom, BORDER, 0.45);
-    draw_text(
-        cmds,
-        MARGIN + 9.0,
-        row_top - 13.0,
-        &format!("{}", index + 1),
-        7.0,
-        false,
-        NAVY,
-    );
-    if let Some(line) = line {
-        let label = wrap_text(&line.label, 196.0, 6.5, true);
-        if let Some(text) = label.first() {
-            draw_text(cmds, MARGIN + 31.0, row_top - 12.5, text, 6.5, true, NAVY);
-        }
-        let cond = line
-            .packaging_info
-            .as_deref()
-            .or(line.sublabel.as_deref())
-            .unwrap_or("—");
-        let cond_wrapped = wrap_text(cond, 86.0, 5.7, false);
-        if let Some(text) = cond_wrapped.first() {
-            draw_text(cmds, MARGIN + 235.0, row_top - 12.5, text, 5.7, false, GRAY);
-        }
-        draw_text_right(
-            cmds,
-            MARGIN + 361.0,
-            row_top - 13.0,
-            &line.quantity,
-            6.1,
-            false,
-            NAVY,
-        );
-        draw_text_right(
-            cmds,
-            MARGIN + 433.0,
-            row_top - 13.0,
-            &line
-                .unit_price
-                .map(amount)
-                .unwrap_or_else(|| "—".to_string()),
-            6.1,
-            false,
-            NAVY,
-        );
-        draw_text_right(
-            cmds,
-            RIGHT - 5.0,
-            row_top - 13.0,
-            &line.total.map(amount).unwrap_or_else(|| "—".to_string()),
-            6.2,
-            true,
-            NAVY,
-        );
-    }
-}
-
-fn draw_packaging_and_finance(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput) -> f64 {
-    let left_x = MARGIN;
-    let left_w = 260.0;
-    let right_x = MARGIN + 270.0;
-    let right_w = CONTENT_W - 270.0;
-    draw_text(
-        cmds,
-        left_x,
-        top,
-        "SUIVI DES CASIERS & BOUTEILLES VIDES (CONSIGNES)",
-        6.8,
-        true,
-        ORANGE,
-    );
-    draw_text(
-        cmds,
-        right_x,
-        top,
-        "DÉCOMPTE FINANCIER (EN FCFA)",
-        7.0,
-        true,
-        ORANGE,
-    );
-    draw_line(
-        cmds,
-        left_x,
-        top - 4.0,
-        left_x + left_w,
-        top - 4.0,
-        BORDER,
-        0.6,
-    );
-    draw_line(
-        cmds,
-        right_x,
-        top - 4.0,
-        right_x + right_w,
-        top - 4.0,
-        BORDER,
-        0.6,
-    );
-
-    let table_top = top - 9.0;
-    draw_rect_fill(
-        cmds,
-        left_x,
-        table_top - 16.0,
-        left_w,
-        16.0,
-        (1.0, 0.95, 0.78),
-    );
-    draw_text(
-        cmds,
-        left_x + 4.0,
-        table_top - 11.0,
-        "Type d'emballage",
-        5.8,
-        true,
-        ORANGE,
-    );
-    draw_text(
-        cmds,
-        left_x + 144.0,
-        table_top - 11.0,
-        "Sortis",
-        5.8,
-        true,
-        ORANGE,
-    );
-    draw_text(
-        cmds,
-        left_x + 182.0,
-        table_top - 11.0,
-        "Rendus",
-        5.8,
-        true,
-        ORANGE,
-    );
-    draw_text(
-        cmds,
-        left_x + 220.0,
-        table_top - 11.0,
-        "Solde Dû",
-        5.8,
-        true,
-        ORANGE,
-    );
-    let mut y = table_top - 16.0;
-    if doc.packaging_lines.is_empty() {
-        draw_line(
-            cmds,
-            left_x,
-            y - 20.0,
-            left_x + left_w,
-            y - 20.0,
-            BORDER,
-            0.5,
-        );
-        draw_text(
-            cmds,
-            left_x + 5.0,
-            y - 13.0,
-            "Aucun emballage consigné sur cette commande",
-            6.0,
-            false,
-            GRAY,
-        );
-        y -= 20.0;
+fn product_columns(doc: &DocumentPdfInput) -> Vec<Col> {
+    if doc.doc_type.contains("RÉCEPTION") {
+        vec![
+            Col { label: "N°", x: MARGIN, w: 24.0, align_right: false, align_center: true },
+            Col { label: "DÉSIGNATION / FORMAT", x: MARGIN+24.0, w: 190.0, align_right: false, align_center: false },
+            Col { label: "COMMANDÉ", x: MARGIN+214.0, w: 60.0, align_right: false, align_center: true },
+            Col { label: "REÇU", x: MARGIN+274.0, w: 60.0, align_right: false, align_center: true },
+            Col { label: "MANQUANT", x: MARGIN+334.0, w: 60.0, align_right: false, align_center: true },
+            Col { label: "ENDOM./REFUSÉ", x: MARGIN+394.0, w: CONTENT_W-394.0+MARGIN, align_right: false, align_center: true },
+        ]
+    } else if is_supplier_doc(doc) {
+        vec![
+            Col { label: "N°", x: MARGIN, w: 24.0, align_right: false, align_center: true },
+            Col { label: "DÉSIGNATION / FORMAT", x: MARGIN+24.0, w: 210.0, align_right: false, align_center: false },
+            Col { label: "CONDITIONNEMENT", x: MARGIN+234.0, w: 90.0, align_right: false, align_center: true },
+            Col { label: "QTÉ", x: MARGIN+324.0, w: 50.0, align_right: false, align_center: true },
+            Col { label: "P.U. (FCFA)", x: MARGIN+374.0, w: 70.0, align_right: true, align_center: false },
+            Col { label: "MONTANT TOTAL", x: MARGIN+444.0, w: CONTENT_W-444.0+MARGIN, align_right: true, align_center: false },
+        ]
     } else {
-        for (idx, item) in doc.packaging_lines.iter().enumerate() {
-            let row_height = 24.0;
-            let row_y = y - row_height;
-            if idx % 2 == 1 {
-                draw_rect_fill(cmds, left_x, row_y, left_w, row_height, LIGHT);
-            }
-            draw_line(cmds, left_x, row_y, left_x + left_w, row_y, BORDER, 0.45);
-            let label = wrap_text(&item.label, 128.0, 5.8, false);
-            if let Some(text) = label.first() {
-                draw_text(cmds, left_x + 4.0, y - 9.0, text, 5.8, true, NAVY);
-            }
-            let out_qty = item.issued_quantity.unwrap_or(item.expected_quantity);
-            let ret_qty = item.returned_quantity.unwrap_or(0);
-            let solde = (out_qty - ret_qty).max(0);
-            draw_text_right(
-                cmds,
-                left_x + 168.0,
-                y - 9.0,
-                &out_qty.to_string(),
-                6.0,
-                false,
-                NAVY,
-            );
-            draw_text_right(
-                cmds,
-                left_x + 206.0,
-                y - 9.0,
-                &ret_qty.to_string(),
-                6.0,
-                false,
-                NAVY,
-            );
-            draw_text_right(
-                cmds,
-                left_x + left_w - 5.0,
-                y - 9.0,
-                &solde.to_string(),
-                6.0,
-                true,
-                NAVY,
-            );
-            let consignment = match item.unit_deposit_xof {
-                Some(unit) => {
-                    let total = item
-                        .amount
-                        .unwrap_or_else(|| unit.saturating_mul(item.expected_quantity));
-                    format!(
-                        "{} · {} FCFA/u · total {} FCFA",
-                        item.status_label,
-                        amount(unit),
-                        amount(total)
-                    )
-                }
-                None => item.status_label.clone(),
-            };
-            let second_line = wrap_text(&consignment, 250.0, 5.0, false);
-            if let Some(text) = second_line.first() {
-                draw_text(cmds, left_x + 4.0, y - 18.0, text, 5.0, false, GRAY);
-            }
-            y -= row_height;
-        }
+        vec![
+            Col { label: "N°", x: MARGIN, w: 24.0, align_right: false, align_center: true },
+            Col { label: "DÉSIGNATION & FORMAT", x: MARGIN+24.0, w: 205.0, align_right: false, align_center: false },
+            Col { label: "CONDITIONNEMENT", x: MARGIN+229.0, w: 95.0, align_right: false, align_center: true },
+            Col { label: "QTÉ", x: MARGIN+324.0, w: 45.0, align_right: false, align_center: true },
+            Col { label: "P.U. (FCFA)", x: MARGIN+369.0, w: 72.0, align_right: true, align_center: false },
+            Col { label: "MONTANT TOTAL", x: MARGIN+441.0, w: CONTENT_W-441.0+MARGIN, align_right: true, align_center: false },
+        ]
     }
-    draw_text(
-        cmds,
-        left_x + 2.0,
-        y - 9.0,
-        "* Retour emballages sous 15 jours max · Montant retour hors total commande (tarif consigne après 15 j).",
-        5.0,
-        false,
-        GRAY,
-    );
-
-    let summary_top = top - 9.0;
-    let summary_h = (doc.summary_rows.len().max(1) as f64 * 14.5) + 6.0;
-    draw_rect_fill_stroke(
-        cmds,
-        right_x,
-        summary_top - summary_h,
-        right_w,
-        summary_h,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.5,
-    );
-    let mut sy = summary_top - 12.0;
-    for (index, row) in doc.summary_rows.iter().enumerate() {
-        let is_net = row.tone.as_deref() == Some("success");
-        let is_due = row.tone.as_deref() == Some("danger");
-        if is_net {
-            draw_rect_fill(cmds, right_x + 0.5, sy - 4.0, right_w - 1.0, 14.5, GREEN);
-        } else if is_due {
-            draw_rect_fill(
-                cmds,
-                right_x + 0.5,
-                sy - 4.0,
-                right_w - 1.0,
-                14.5,
-                (1.0, 0.93, 0.93),
-            );
-        } else if row.bold {
-            draw_rect_fill(cmds, right_x + 0.5, sy - 4.0, right_w - 1.0, 14.5, LIGHT);
-        }
-        let tone = if is_net {
-            (1.0, 1.0, 1.0)
-        } else if is_due {
-            (0.82, 0.08, 0.08)
-        } else if row.tone.as_deref() == Some("warning") {
-            ORANGE
-        } else {
-            NAVY
-        };
-        let label = wrap_text(&row.label, right_w - 92.0, 6.0, row.bold);
-        if let Some(text) = label.first() {
-            draw_text(cmds, right_x + 4.0, sy, text, 6.0, row.bold || is_net, tone);
-        }
-        draw_text_right(
-            cmds,
-            right_x + right_w - 5.0,
-            sy,
-            &row.value,
-            6.0,
-            row.bold || is_net,
-            tone,
-        );
-        sy -= 14.5;
-        if index + 1 < doc.summary_rows.len() {
-            draw_line(
-                cmds,
-                right_x + 3.0,
-                sy + 4.0,
-                right_x + right_w - 3.0,
-                sy + 4.0,
-                (0.88, 0.90, 0.93),
-                0.35,
-            );
-        }
-    }
-    top - (summary_h.max((top - y) + 16.0))
 }
 
-fn normalize_method(value: &str) -> String {
-    value.to_ascii_lowercase().replace([' ', '-'], "_")
+fn draw_table_header(cmds: &mut Vec<String>, top: f64, cols: &[Col]) {
+    let h = 22.0;
+    draw_rect_fill(cmds, MARGIN, top - h, CONTENT_W, h, NAVY);
+    for i in 1..cols.len() {
+        draw_line(cmds, cols[i].x, top - h, cols[i].x, top, (0.45, 0.50, 0.58), 0.4);
+    }
+    for c in cols {
+        let tx = if c.align_right { c.x + c.w - 4.0 } else if c.align_center { c.x + c.w / 2.0 } else { c.x + 4.0 };
+        let ty = top - 14.0;
+        if c.align_right { draw_text_right(cmds, c.x + c.w - 4.0, ty, c.label, 6.0, true, (1.0,1.0,1.0)); }
+        else if c.align_center { let tw = super::encoding_and_layout::measure_text_width(c.label, 6.0, true); draw_text(cmds, c.x + (c.w - tw)/2.0, ty, c.label, 6.0, true, (1.0,1.0,1.0)); }
+        else { draw_text(cmds, tx, ty, c.label, 6.0, true, (1.0,1.0,1.0)); }
+    }
 }
 
-fn draw_notes_block(cmds: &mut Vec<String>, top: f64, lines: &[String], continuation: bool) -> f64 {
-    let height = 22.0 + lines.len() as f64 * 8.0;
-    draw_rect_fill_stroke(
-        cmds,
-        MARGIN,
-        top - height,
-        CONTENT_W,
-        height,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.55,
-    );
-    draw_text(
-        cmds,
-        MARGIN + 7.0,
-        top - 10.0,
-        if continuation {
-            "OBSERVATIONS ET CONDITIONS (SUITE)"
-        } else {
-            "OBSERVATIONS ET CONDITIONS"
-        },
-        6.6,
-        true,
-        ORANGE,
-    );
-    draw_line(
-        cmds,
-        MARGIN + 6.0,
-        top - 14.0,
-        RIGHT - 6.0,
-        top - 14.0,
-        BORDER,
-        0.4,
-    );
-    for (index, line) in lines.iter().enumerate() {
-        draw_text(
-            cmds,
-            MARGIN + 7.0,
-            top - 22.0 - index as f64 * 8.0,
-            line,
-            5.8,
-            false,
-            NAVY,
-        );
+fn cell_text(doc: &DocumentPdfInput, line: Option<&DocumentPdfLine>, col_idx: usize) -> String {
+    let Some(l) = line else { return String::new(); };
+    if doc.doc_type.contains("RÉCEPTION") {
+        match col_idx {
+            1 => l.label.clone(),
+            2 => l.ordered_quantity.clone().unwrap_or_else(|| l.quantity.clone()),
+            3 => l.quantity.clone(),
+            4 => l.missing_quantity.clone().unwrap_or_else(|| "—".to_string()),
+            5 => {
+                let d = l.damaged_quantity.clone().unwrap_or_default();
+                let r = l.refused_quantity.clone().unwrap_or_default();
+                let mut parts = Vec::new();
+                if !d.is_empty() && d != "0" { parts.push(format!("End.: {d}")); }
+                if !r.is_empty() && r != "0" { parts.push(format!("Ref.: {r}")); }
+                if parts.is_empty() { "—".to_string() } else { parts.join(" ") }
+            }
+            _ => String::new(),
+        }
+    } else {
+        match col_idx {
+            1 => l.label.clone(),
+            2 => l.packaging_info.clone().or(l.sublabel.clone()).unwrap_or_default(),
+            3 => l.quantity.clone(),
+            4 => l.unit_price.map(amount).unwrap_or_default(),
+            5 => l.total.map(amount).unwrap_or_default(),
+            _ => String::new(),
+        }
     }
-    top - height
 }
 
-fn draw_payment_and_signatures(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput) {
-    let payment_y = top - 38.0;
-    draw_rect_fill_stroke(
-        cmds,
-        MARGIN,
-        payment_y,
-        CONTENT_W,
-        35.0,
-        (0.98, 0.98, 0.99),
-        BORDER,
-        0.6,
-    );
-    draw_text(
-        cmds,
-        MARGIN + 8.0,
-        top - 13.0,
-        "Mode de règlement :",
-        6.8,
-        true,
-        NAVY,
-    );
-    let method_names = [
-        ("cash", "Espèces"),
-        ("wave", "Wave"),
-        ("orange_money", "Orange Money"),
-        ("mtn_money", "MTN MoMo"),
-        ("moov_money", "Moov Money"),
-        ("other", "Autre"),
-    ];
-    let actual_codes = doc
-        .payments
-        .as_deref()
-        .unwrap_or(&[])
-        .iter()
-        .map(|p| normalize_method(&p.label))
-        .collect::<Vec<_>>();
-    let planned = doc
-        .planned_payment_channel
-        .as_deref()
-        .or(doc.planned_payment_method.as_deref())
-        .map(normalize_method)
-        .unwrap_or_default();
-    let known = [
-        "cash",
-        "espèces",
-        "especes",
-        "wave",
-        "orange_money",
-        "mtn_money",
-        "mtn_momo",
-        "moov_money",
-    ];
-    let mut x = MARGIN + 92.0;
-    for (code, label) in method_names {
-        let checked = if actual_codes.is_empty() {
-            match code {
-                "cash" => planned == "cash" || planned == "especes" || planned == "espèces",
-                "wave" => planned.contains("wave"),
-                "orange_money" => planned.contains("orange"),
-                "mtn_money" => planned.contains("mtn"),
-                "moov_money" => planned.contains("moov"),
-                "other" => !planned.is_empty() && !known.iter().any(|k| planned.contains(k)),
-                _ => false,
-            }
-        } else {
-            match code {
-                "cash" => actual_codes
-                    .iter()
-                    .any(|v| v.contains("cash") || v.contains("espèces") || v.contains("especes")),
-                "wave" => actual_codes.iter().any(|v| v.contains("wave")),
-                "orange_money" => actual_codes.iter().any(|v| v.contains("orange")),
-                "mtn_money" => actual_codes.iter().any(|v| v.contains("mtn")),
-                "moov_money" => actual_codes.iter().any(|v| v.contains("moov")),
-                "other" => actual_codes
-                    .iter()
-                    .any(|v| !known.iter().any(|k| v.contains(k))),
-                _ => false,
-            }
-        };
-        draw_checkbox(cmds, x, top - 12.0, checked, label);
-        x += match code {
-            "cash" => 58.0,
-            "wave" => 52.0,
-            "orange_money" => 78.0,
-            "mtn_money" => 68.0,
-            "moov_money" => 74.0,
-            _ => 46.0,
-        };
+fn draw_product_row(cmds: &mut Vec<String>, top: f64, idx: usize, doc: &DocumentPdfInput, line: Option<&DocumentPdfLine>, cols: &[Col]) {
+    let h = 20.0;
+    let bottom = top - h;
+    draw_rect_fill(cmds, MARGIN, bottom, CONTENT_W, h, if idx % 2 == 0 { (1.0,1.0,1.0) } else { LIGHT });
+    for i in 1..cols.len() { draw_line(cmds, cols[i].x, bottom, cols[i].x, top, BORDER, 0.4); }
+    draw_line(cmds, MARGIN, bottom, RIGHT, bottom, BORDER, 0.4);
+    // N°
+    let no = format!("{}", idx + 1);
+    let tw = super::encoding_and_layout::measure_text_width(&no, 6.5, false);
+    draw_text(cmds, cols[0].x + (cols[0].w - tw)/2.0, top - 13.0, &no, 6.5, false, GRAY);
+    for (ci, c) in cols.iter().enumerate().skip(1) {
+        let txt = cell_text(doc, line, ci);
+        if txt.is_empty() { continue; }
+        let wrapped = wrap_text(&txt, c.w - 6.0, 6.2, ci == 1);
+        let t = wrapped.first().cloned().unwrap_or_default();
+        if c.align_right { draw_text_right(cmds, c.x + c.w - 4.0, top - 13.0, &t, 6.2, ci == 5, NAVY); }
+        else if c.align_center { let tw = super::encoding_and_layout::measure_text_width(&t, 6.2, false); draw_text(cmds, c.x + (c.w - tw)/2.0, top - 13.0, &t, 6.2, false, NAVY); }
+        else { draw_text(cmds, c.x + 4.0, top - 13.0, &t, 6.2, ci == 1, NAVY); }
     }
+}
 
-    draw_text(
-        cmds,
-        MARGIN + 8.0,
-        top - 29.0,
-        "Réf. Transaction Mobile Money / Observation :",
-        6.3,
-        true,
-        NAVY,
-    );
-    let refs = doc
-        .external_references
-        .as_deref()
-        .filter(|r| !r.is_empty())
-        .map(|r| r.join(" ; "))
-        .unwrap_or_else(|| {
-            let pays = doc
-                .payments
-                .as_deref()
-                .unwrap_or(&[])
-                .iter()
-                .map(|p| p.label.as_str())
-                .collect::<Vec<_>>()
-                .join(" ; ");
-            if pays.is_empty() {
-                "—".to_string()
+fn draw_packaging_table(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput, max_h: f64) -> f64 {
+    let title = if doc.doc_type.contains("RÉCEPTION") {
+        "CONTRÔLE DES CASIERS VIDES REMIS"
+    } else if is_supplier_doc(doc) {
+        "CASIERS VIDES À REMETTRE AU FOURNISSEUR"
+    } else {
+        "SUIVI DES CASIERS & EMBALLAGES RÉUTILISABLES (CONSIGNES)"
+    };
+    let headers: Vec<&str> = if doc.doc_type.contains("RÉCEPTION") {
+        vec!["Type d'emballage", "Exigé", "Remis", "Écart"]
+    } else if is_supplier_doc(doc) {
+        vec!["Type d'emballage", "Requis", "Préparé", "Manquant"]
+    } else {
+        vec!["Type d'emballage", "Sortis", "Rendus", "Solde Dû"]
+    };
+    let table_w = (CONTENT_W - 10.0) * 0.52;
+    draw_text(cmds, MARGIN, top - 2.0, title, 7.2, true, ORANGE);
+    let header_top = top - 7.0;
+    let hh = 16.0;
+    draw_rect_fill(cmds, MARGIN, header_top - hh, table_w, hh, YELLOW_BG);
+    let cws = [table_w - 150.0, 50.0, 50.0, 50.0];
+    let mut cx = MARGIN;
+    for (i, h) in headers.iter().enumerate() {
+        let w = cws[i];
+        if i > 0 { draw_line(cmds, cx, header_top - hh, cx, header_top, BORDER, 0.4); }
+        let tx = if i == 0 { cx + 4.0 } else { cx + w/2.0 - super::encoding_and_layout::measure_text_width(h, 6.0, true)/2.0 };
+        draw_text(cmds, tx, header_top - 11.0, h, 6.0, true, YELLOW_TXT);
+        cx += w;
+    }
+    draw_line(cmds, MARGIN, header_top - hh, MARGIN + table_w, header_top - hh, BORDER, 0.5);
+
+    let lines = &doc.packaging_lines;
+    let min_rows = if is_supplier_doc(doc) { 3 } else { 4 };
+    let display_rows = lines.len().max(min_rows);
+    let rh = 16.0;
+    let mut y = header_top - hh;
+    for i in 0..display_rows {
+        if (header_top - (y - rh)) > max_h { break; }
+        let bottom = y - rh;
+        draw_rect_fill(cmds, MARGIN, bottom, table_w, rh, if i % 2 == 0 { (1.0,1.0,1.0) } else { LIGHT });
+        let mut cx = MARGIN;
+        for j in 0..4 { if j > 0 { draw_line(cmds, cx, bottom, cx, y, BORDER, 0.35); } cx += cws[j]; }
+        draw_line(cmds, MARGIN, bottom, MARGIN + table_w, bottom, BORDER, 0.35);
+        if let Some(l) = lines.get(i) {
+            let vals: Vec<String> = if doc.doc_type.contains("RÉCEPTION") {
+                let issued = l.issued_quantity.unwrap_or(0);
+                vec![l.label.clone(), l.expected_quantity.to_string(), issued.to_string(), (l.expected_quantity - issued).max(0).to_string()]
+            } else if is_supplier_doc(doc) {
+                let issued = l.issued_quantity.unwrap_or(0);
+                vec![l.label.clone(), l.expected_quantity.to_string(), issued.to_string(), (l.expected_quantity - issued).max(0).to_string()]
             } else {
-                pays
+                let issued = l.issued_quantity.unwrap_or(l.expected_quantity);
+                let returned = l.returned_quantity.unwrap_or(0);
+                vec![l.label.clone(), issued.to_string(), returned.to_string(), (issued - returned).max(0).to_string()]
+            };
+            for (j, v) in vals.iter().enumerate() {
+                let cw = cws[j];
+                let cell_x = MARGIN + cws[..j].iter().sum::<f64>();
+                if j == 0 { draw_text(cmds, cell_x + 4.0, y - 11.0, &wrap_text(v, cw-8.0, 6.0, false).first().cloned().unwrap_or_default(), 6.0, false, NAVY); }
+                else { let tw = super::encoding_and_layout::measure_text_width(v, 6.2, j==3); draw_text(cmds, cell_x + (cw-tw)/2.0, y - 11.0, v, 6.2, j==3, NAVY); }
             }
-        });
-    draw_text(
-        cmds,
-        MARGIN + 178.0,
-        top - 29.0,
-        &wrap_text(&refs, CONTENT_W - 186.0, 5.8, false)
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "—".to_string()),
-        5.8,
-        false,
-        GRAY,
-    );
-
-    let sig_top = payment_y - 8.0;
-    let sig_h = 52.0;
-    let sig_w = (CONTENT_W - 10.0) / 2.0;
-    draw_rect_fill_stroke(
-        cmds,
-        MARGIN,
-        sig_top - sig_h,
-        sig_w,
-        sig_h,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.65,
-    );
-    draw_rect_fill_stroke(
-        cmds,
-        MARGIN + sig_w + 10.0,
-        sig_top - sig_h,
-        sig_w,
-        sig_h,
-        (1.0, 1.0, 1.0),
-        BORDER,
-        0.65,
-    );
-    draw_text(
-        cmds,
-        MARGIN + 7.0,
-        sig_top - 12.0,
-        "Signature & Cachet du Sous-Dépôt :",
-        6.6,
-        true,
-        NAVY,
-    );
-    draw_text(
-        cmds,
-        MARGIN + sig_w + 17.0,
-        sig_top - 12.0,
-        "Signature du Client (Bon pour accord & réception) :",
-        6.2,
-        true,
-        NAVY,
-    );
-    let footer_y = sig_top - sig_h - 14.0;
-    draw_line(
-        cmds,
-        MARGIN,
-        footer_y + 7.0,
-        RIGHT,
-        footer_y + 7.0,
-        BORDER,
-        0.45,
-    );
-    draw_text(
-        cmds,
-        MARGIN + 52.0,
-        footer_y - 1.0,
-        "Merci pour votre confiance ! Veuillez vérifier vos quantités et emballages avant de quitter le dépôt.",
-        6.1,
-        false,
-        GRAY,
-    );
-}
-
-fn draw_receipt_closing(
-    pages: &mut Vec<Vec<String>>,
-    company: &AppSettingsDto,
-    logo: Option<&super::primitives::PdfJpegImage>,
-    mut top: f64,
-    doc: &DocumentPdfInput,
-) {
-    let note_lines = doc
-        .notes
-        .as_deref()
-        .unwrap_or("")
-        .lines()
-        .flat_map(|line| wrap_text(line, CONTENT_W - 16.0, 5.8, false))
-        .collect::<Vec<_>>();
-    let closing_height = 114.0;
-    let note_height = if note_lines.is_empty() {
-        0.0
-    } else {
-        22.0 + note_lines.len() as f64 * 8.0
-    };
-    if top - note_height - closing_height < MARGIN - 6.0 {
-        let mut page_y = 0.0;
-        start_page(pages, &mut page_y);
-        draw_brand_header(pages.last_mut().unwrap(), company, doc, logo, false);
-        top = PAGE_H - 58.0;
-    }
-
-    let mut index = 0usize;
-    while index < note_lines.len() {
-        let available_lines = ((top - MARGIN - closing_height - 22.0) / 8.0)
-            .floor()
-            .max(1.0) as usize;
-        let end = (index + available_lines).min(note_lines.len());
-        top = draw_notes_block(
-            pages.last_mut().unwrap(),
-            top,
-            &note_lines[index..end],
-            index > 0,
-        );
-        index = end;
-        if index < note_lines.len() {
-            let mut page_y = 0.0;
-            start_page(pages, &mut page_y);
-            draw_brand_header(pages.last_mut().unwrap(), company, doc, logo, false);
-            top = PAGE_H - 58.0;
+        } else if !is_supplier_doc(doc) {
+            // default rows like reference
+            let defaults = ["Casier 24 trous (33 cl)", "Casier 12 trous (65 cl)", "Casier 20 trous (50 cl)", "Bouteilles vides (unité)"];
+            if let Some(d) = defaults.get(i) {
+                draw_text(cmds, MARGIN + 4.0, y - 11.0, d, 6.0, false, GRAY);
+            }
         }
+        y = bottom;
     }
+    draw_rect_fill_stroke(cmds, MARGIN, y, table_w, header_top - y, (0.0,0.0,0.0), BORDER, 0.0); // no-op border fix; borders drawn per row
+    draw_line(cmds, MARGIN, header_top, MARGIN, y, BORDER, 0.5);
+    draw_line(cmds, MARGIN + table_w, header_top, MARGIN + table_w, y, BORDER, 0.5);
+    draw_line(cmds, MARGIN, header_top, MARGIN + table_w, header_top, BORDER, 0.5);
 
-    if top - closing_height < MARGIN - 6.0 {
-        let mut page_y = 0.0;
-        start_page(pages, &mut page_y);
-        draw_brand_header(pages.last_mut().unwrap(), company, doc, logo, false);
-        top = PAGE_H - 58.0;
+    if !is_supplier_doc(doc) {
+        draw_text(cmds, MARGIN, y - 9.0, "* Tout emballage non restitué à la livraison est facturé au tarif de consigne en vigueur.", 5.2, false, GRAY);
+        y -= 12.0;
     }
-    draw_payment_and_signatures(pages.last_mut().unwrap(), top - 4.0, doc);
+    y
 }
 
-fn draw_continuation_table_header(cmds: &mut Vec<String>, top: f64) {
-    draw_text(
-        cmds,
-        MARGIN,
-        top,
-        "DÉTAIL DES BOISSONS — SUITE",
-        8.0,
-        true,
-        ORANGE,
-    );
-    draw_line(cmds, MARGIN, top - 4.0, RIGHT, top - 4.0, BORDER, 0.6);
-    draw_products_header(cmds, top - 9.0);
+fn draw_finance_box(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput) -> f64 {
+    let box_w = (CONTENT_W - 10.0) * 0.48;
+    let box_x = RIGHT - box_w;
+    draw_text(cmds, box_x, top - 2.0, "DÉCOMPTE FINANCIER (EN FCFA)", 7.2, true, ORANGE);
+    let header_top = top - 7.0;
+    let mut y = header_top;
+    let row_h = 15.5;
+    let rows = &doc.summary_rows;
+    draw_rect_fill_stroke(cmds, box_x, header_top - row_h * rows.len().max(1) as f64, box_w, row_h * rows.len().max(1) as f64, (1.0,1.0,1.0), BORDER, 0.6);
+    for (i, r) in rows.iter().enumerate() {
+        let bottom = y - row_h;
+        let is_net = r.tone.as_deref() == Some("success") || r.label.to_lowercase().contains("net à payer");
+        let is_due = r.tone.as_deref() == Some("danger") || r.label.to_lowercase().contains("reste à payer");
+        if is_net { draw_rect_fill(cmds, box_x, bottom, box_w, row_h, GREEN); }
+        else if is_due { draw_rect_fill(cmds, box_x, bottom, box_w, row_h, RED_BG); }
+        draw_line(cmds, box_x, bottom, box_x + box_w, bottom, BORDER, 0.4);
+        let tc = if is_net { (1.0,1.0,1.0) } else if is_due { RED_TXT } else { NAVY };
+        draw_text(cmds, box_x + 6.0, y - 11.0, &r.label, 6.4, is_net || is_due, tc);
+        draw_text_right(cmds, box_x + box_w - 6.0, y - 11.0, &r.value, 6.4, is_net || is_due, tc);
+        y = bottom;
+    }
+    if rows.is_empty() { y -= row_h; }
+    y
+}
+
+fn draw_payment_block(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput) -> f64 {
+    let h = 34.0;
+    draw_rect_fill_stroke(cmds, MARGIN, top - h, CONTENT_W, h, (0.985, 0.985, 0.985), BORDER, 0.6);
+    draw_text(cmds, MARGIN + 8.0, top - 12.0, "Mode de règlement :", 7.0, true, ORANGE);
+    let checks = [("cash","Espèces"),("wave","Wave"),("orange","Orange Money"),("mtn","MTN MoMo"),("moov","Moov Money"),("other","Autre")];
+    let mut x = MARGIN + 95.0;
+    for (k, label) in checks { draw_checkbox(cmds, x, top - 12.5, method_checked(doc, k), label); x += match k { "cash"=>52.0, "wave"=>50.0, "orange"=>78.0, "mtn"=>66.0, "moov"=>66.0, _=>45.0 }; }
+    let refs = doc.external_references.as_deref().filter(|v| !v.is_empty()).map(|v| v.join(" ; ")).unwrap_or_else(|| "........................................................................................".to_string());
+    draw_text(cmds, MARGIN + 8.0, top - 27.0, "Réf. Transaction Mobile Money / Observation :", 6.2, true, NAVY);
+    let rl = wrap_text(&refs, CONTENT_W - 190.0, 5.8, false);
+    if let Some(l) = rl.first() { draw_text(cmds, MARGIN + 185.0, top - 27.0, l, 5.8, false, GRAY); }
+    top - h
+}
+
+fn draw_signatures(cmds: &mut Vec<String>, top: f64, doc: &DocumentPdfInput) -> f64 {
+    let h = 52.0;
+    let gap = 10.0;
+    let w = (CONTENT_W - gap) / 2.0;
+    let (left, right) = if doc.doc_type.contains("RÉCEPTION") {
+        ("Visa réceptionnaire dépôt :", "Signature livreur / fournisseur :")
+    } else if is_supplier_doc(doc) {
+        ("Signature du responsable du sous-dépôt :", "Signature / Visa du fournisseur :")
+    } else {
+        ("Signature & Cachet du Sous-Dépôt :", "Signature du Client (Bon pour accord & réception) :")
+    };
+    draw_rect_fill_stroke(cmds, MARGIN, top - h, w, h, (1.0,1.0,1.0), BORDER, 0.6);
+    draw_rect_fill_stroke(cmds, MARGIN + w + gap, top - h, w, h, (1.0,1.0,1.0), BORDER, 0.6);
+    draw_text(cmds, MARGIN + 8.0, top - 12.0, left, 6.8, true, NAVY);
+    draw_text(cmds, MARGIN + w + gap + 8.0, top - 12.0, right, 6.4, true, NAVY);
+    top - h
+}
+
+fn draw_footer(cmds: &mut Vec<String>, doc: &DocumentPdfInput) {
+    let y = 42.0;
+    draw_line(cmds, MARGIN, y + 8.0, RIGHT, y + 8.0, BORDER, 0.5);
+    let footer = if doc.doc_type.contains("RÉCEPTION") {
+        "Bon de réception fournisseur — la validation déclenche le mouvement de stock réel. L'impression ne rejoue pas la réception."
+    } else if is_supplier_doc(doc) {
+        "Bon de commande fournisseur — document d'approvisionnement. La réception physique fait foi pour l'entrée en stock."
+    } else {
+        "Merci pour votre confiance ! Veuillez vérifier vos quantités et emballages avant de quitter le dépôt."
+    };
+    let fl = wrap_text(footer, CONTENT_W, 6.0, false);
+    if let Some(l) = fl.first() {
+        let tw = super::encoding_and_layout::measure_text_width(l, 6.0, false);
+        draw_text(cmds, MARGIN + (CONTENT_W - tw)/2.0, y, l, 6.0, false, GRAY);
+    }
 }
 
 pub fn render_order_receipt_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> Vec<u8> {
+    render_commercial_document_pdf(company, doc)
+}
+
+pub fn render_commercial_document_pdf(company: &AppSettingsDto, doc: &DocumentPdfInput) -> Vec<u8> {
     let logo = doc.company_logo_jpeg.as_deref().and_then(decode_logo_jpeg);
     let mut pages: Vec<Vec<String>> = Vec::new();
     let mut y = PAGE_H - MARGIN;
     start_page(&mut pages, &mut y);
-    let cmds = pages.last_mut().expect("page initiale créée");
-    draw_brand_header(cmds, company, doc, logo.as_ref(), true);
-    draw_party_boxes(cmds, doc);
-    draw_products_header(cmds, 612.0);
-    y = 584.0;
 
-    let product_count = doc.lines.len();
-    if product_count <= 10 {
-        for index in 0..10 {
-            draw_product_row(pages.last_mut().unwrap(), y, index, doc.lines.get(index));
-            y -= 19.5;
-        }
-        let section_top = if doc.packaging_lines.len() > 6 {
+    draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), true);
+    let after_parties = draw_party_boxes(pages.last_mut().unwrap(), doc, 698.0);
+    let table_top = after_parties - 14.0;
+    draw_text(pages.last_mut().unwrap(), MARGIN, table_top + 2.0, if doc.doc_type.contains("RÉCEPTION") { "CONTRÔLE DES PRODUITS REÇUS" } else if is_supplier_doc(doc) { "PRODUITS COMMANDÉS" } else { "DÉTAIL DES BOISSONS COMMANDÉES" }, 7.5, true, ORANGE);
+
+    let cols = product_columns(doc);
+    let header_y = table_top - 4.0;
+    draw_table_header(pages.last_mut().unwrap(), header_y, &cols);
+    let mut row_y = header_y - 22.0;
+    let min_rows = if is_supplier_doc(doc) { 8usize } else { 10usize };
+    let total_rows = doc.lines.len().max(min_rows);
+
+    let mut i = 0usize;
+    while i < total_rows {
+        if row_y - 20.0 < 170.0 && i < total_rows {
+            draw_footer(pages.last_mut().unwrap(), doc);
             start_page(&mut pages, &mut y);
-            draw_brand_header(
-                pages.last_mut().unwrap(),
-                company,
-                doc,
-                logo.as_ref(),
-                false,
-            );
-            PAGE_H - 58.0
-        } else {
-            y - 5.0
-        };
-        let lower_top = draw_packaging_and_finance(pages.last_mut().unwrap(), section_top, doc);
-        draw_receipt_closing(&mut pages, company, logo.as_ref(), lower_top - 4.0, doc);
-    } else {
-        for index in 0..10 {
-            draw_product_row(pages.last_mut().unwrap(), y, index, doc.lines.get(index));
-            y -= 19.5;
+            draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), false);
+            let cont_top = PAGE_H - 58.0;
+            draw_text(pages.last_mut().unwrap(), MARGIN, cont_top, "SUITE DU TABLEAU", 7.5, true, ORANGE);
+            let hy = cont_top - 6.0;
+            draw_table_header(pages.last_mut().unwrap(), hy, &cols);
+            row_y = hy - 22.0;
         }
-        let mut next_index = 10usize;
-        while next_index < product_count {
-            start_page(&mut pages, &mut y);
-            draw_brand_header(
-                pages.last_mut().unwrap(),
-                company,
-                doc,
-                logo.as_ref(),
-                false,
-            );
-            draw_continuation_table_header(pages.last_mut().unwrap(), PAGE_H - 58.0);
-            y = PAGE_H - 95.0;
-            let end_index = (next_index + 20).min(product_count);
-            for index in next_index..end_index {
-                draw_product_row(pages.last_mut().unwrap(), y, index, doc.lines.get(index));
-                y -= 19.5;
-            }
-            next_index = end_index;
-            if next_index == product_count {
-                let section_top = if doc.packaging_lines.len() > 6 {
-                    start_page(&mut pages, &mut y);
-                    draw_brand_header(
-                        pages.last_mut().unwrap(),
-                        company,
-                        doc,
-                        logo.as_ref(),
-                        false,
-                    );
-                    PAGE_H - 58.0
-                } else {
-                    y - 5.0
-                };
-                let lower_top =
-                    draw_packaging_and_finance(pages.last_mut().unwrap(), section_top, doc);
-                draw_receipt_closing(&mut pages, company, logo.as_ref(), lower_top - 4.0, doc);
-            }
-        }
+        draw_product_row(pages.last_mut().unwrap(), row_y, i, doc, doc.lines.get(i), &cols);
+        row_y -= 20.0;
+        i += 1;
     }
+
+    // Bottom sections: packaging + finance
+    let bottom_needed = 220.0;
+    if row_y - bottom_needed < 50.0 {
+        draw_footer(pages.last_mut().unwrap(), doc);
+        start_page(&mut pages, &mut y);
+        draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), false);
+        row_y = PAGE_H - 58.0;
+    }
+    let section_top = row_y - 10.0;
+    let pack_bottom = draw_packaging_table(pages.last_mut().unwrap(), section_top, doc, 120.0);
+    let fin_bottom = draw_finance_box(pages.last_mut().unwrap(), section_top, doc);
+    let mut next_y = pack_bottom.min(fin_bottom) - 10.0;
+
+    if next_y - 40.0 < 70.0 {
+        draw_footer(pages.last_mut().unwrap(), doc);
+        start_page(&mut pages, &mut y);
+        draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), false);
+        next_y = PAGE_H - 58.0;
+    }
+    if !is_supplier_doc(doc) || !doc.payments.as_deref().unwrap_or(&[]).is_empty() || doc.planned_payment_method.is_some() || doc.planned_payment_channel.is_some() {
+        next_y = draw_payment_block(pages.last_mut().unwrap(), next_y, doc) - 8.0;
+    }
+    if let Some(notes) = doc.notes.as_deref().filter(|s| !s.trim().is_empty()) {
+        if next_y - 24.0 < 70.0 {
+            draw_footer(pages.last_mut().unwrap(), doc);
+            start_page(&mut pages, &mut y);
+            draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), false);
+            next_y = PAGE_H - 58.0;
+        }
+        draw_rect_fill_stroke(pages.last_mut().unwrap(), MARGIN, next_y - 20.0, CONTENT_W, 20.0, (1.0,1.0,1.0), BORDER, 0.5);
+        draw_text(pages.last_mut().unwrap(), MARGIN + 6.0, next_y - 13.0, &format!("Observations : {}", wrap_text(notes, CONTENT_W - 80.0, 6.0, false).first().cloned().unwrap_or_default()), 6.0, false, NAVY);
+        next_y -= 28.0;
+    }
+    if next_y - 60.0 < 55.0 {
+        draw_footer(pages.last_mut().unwrap(), doc);
+        start_page(&mut pages, &mut y);
+        draw_brand_header(pages.last_mut().unwrap(), company, doc, logo.as_ref(), false);
+        next_y = PAGE_H - 58.0;
+    }
+    let _ = draw_signatures(pages.last_mut().unwrap(), next_y, doc);
+    draw_footer(pages.last_mut().unwrap(), doc);
+
     assemble_pdf_bytes(&pages, logo.as_ref())
 }
