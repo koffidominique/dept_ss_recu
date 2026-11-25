@@ -326,6 +326,17 @@ export function buildSaleDraftFingerprint(params: {
   posCart: ReadonlyArray<CartItem>;
   paymentRows: ReadonlyArray<{ method_code: string; amount: number }>;
   receivedReturnables: ReadonlyArray<{ returnable_id: number; pieces: number }>;
+  /**
+   * Restitutions rattachées à une ligne du panier. Elles entrent dans la
+   * signature : deux paniers identiques mais dont les casiers sont rendus sur
+   * des lignes différentes ne sont PAS la même vente (la dette ne s'apure pas
+   * sur la même ligne), donc ils ne doivent pas partager une clé de requête.
+   */
+  lineReturnables?: ReadonlyArray<{
+    cartIndex: number;
+    returnable_id: number;
+    pieces: number;
+  }>;
 }): string {
   const linesSig = params.posCart
     .map(
@@ -341,6 +352,10 @@ export function buildSaleDraftFingerprint(params: {
     .filter((r) => r.pieces > 0)
     .map((r) => `${r.returnable_id}:${r.pieces}`)
     .join('|');
+  const lineRetSig = (params.lineReturnables ?? [])
+    .filter((r) => r.pieces > 0)
+    .map((r) => `${r.cartIndex}:${r.returnable_id}:${r.pieces}`)
+    .join('|');
   return [
     params.posClientId ?? 'anon',
     params.posPriceTier,
@@ -350,5 +365,6 @@ export function buildSaleDraftFingerprint(params: {
     linesSig,
     paySig,
     retSig,
+    lineRetSig,
   ].join('::');
 }

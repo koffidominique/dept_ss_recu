@@ -70,6 +70,12 @@ export function SalesPage() {
   const [receivedReturnables, setReceivedReturnables] = useState<
     Array<{ returnable_id: number; pieces: number }>
   >([]);
+  // Restitutions saisies sur une ligne précise du panier (champ « Emballage
+  // remis par le client »). Elles portent l'index du panier pour que le
+  // serveur rattache la dette à la bonne ligne de vente.
+  const [lineReturnables, setLineReturnables] = useState<
+    Array<{ cartIndex: number; returnable_id: number; pieces: number }>
+  >([]);
 
   const {
     posCart,
@@ -113,11 +119,16 @@ export function SalesPage() {
     [posCart, globalDiscount, paymentRows]
   );
 
-  const normalizedReceivedReturnables = useMemo(() => {
-    if (posClientId === null) return [];
+  const returnedPackaging = useMemo(() => {
+    if (posClientId === null) {
+      return { normalized: [], normalizedLineReturns: [] };
+    }
     const rows = computeAvailableReturnableRows(clientReturnables, posCart);
-    return computeReturnedPackagingSummary(rows, receivedReturnables).normalized;
-  }, [posClientId, clientReturnables, posCart, receivedReturnables]);
+    return computeReturnedPackagingSummary(rows, receivedReturnables, lineReturnables);
+  }, [posClientId, clientReturnables, posCart, receivedReturnables, lineReturnables]);
+
+  const normalizedReceivedReturnables = returnedPackaging.normalized;
+  const normalizedLineReturnables = returnedPackaging.normalizedLineReturns;
 
   const draftFingerprint = useMemo(
     () =>
@@ -130,6 +141,7 @@ export function SalesPage() {
         posCart,
         paymentRows,
         receivedReturnables: normalizedReceivedReturnables,
+        lineReturnables: normalizedLineReturnables,
       }),
     [
       posClientId,
@@ -140,6 +152,7 @@ export function SalesPage() {
       posCart,
       paymentRows,
       normalizedReceivedReturnables,
+      normalizedLineReturnables,
     ]
   );
 
@@ -157,6 +170,7 @@ export function SalesPage() {
     (nextClientId: number | null) => {
       setPosClientId(nextClientId);
       setReceivedReturnables([]);
+      setLineReturnables([]);
       setErrorMsg(null);
     },
     [setPosClientId]
@@ -492,6 +506,7 @@ export function SalesPage() {
           onClearCart={() => {
             clearCart();
             setReceivedReturnables([]);
+            setLineReturnables([]);
             setGlobalDiscount(0);
             setDueDate('');
             setPaymentRows([{ method_code: 'cash', amount: 0 }]);
@@ -518,6 +533,17 @@ export function SalesPage() {
             });
           }}
           onResetReceivedReturnables={() => setReceivedReturnables([])}
+          lineReturnables={lineReturnables}
+          onLineReturnableChange={(cartIndex, returnableId, pieces) => {
+            setLineReturnables((prev) => {
+              const next = prev.filter(
+                (r) => !(r.cartIndex === cartIndex && r.returnable_id === returnableId)
+              );
+              const safe = Number.isFinite(pieces) ? Math.max(0, Math.trunc(pieces)) : 0;
+              if (safe > 0) next.push({ cartIndex, returnable_id: returnableId, pieces: safe });
+              return next;
+            });
+          }}
         />
       </div>
 

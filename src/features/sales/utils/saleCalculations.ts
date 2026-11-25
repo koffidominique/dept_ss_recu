@@ -378,11 +378,29 @@ export function computeAvailableReturnableRows(
  * Calcule le montant valorisé des emballages retournés par le client (hors total commande)
  * en bornant chaque ligne à son plafond autorisé.
  */
+/**
+ * Ligne de restitution saisie sur UNE ligne du panier.
+ *
+ * Le casier est l'unité de saisie : rendre 2 casiers crédite aussi les 48
+ * bouteilles qu'ils contenaient, sans que l'opérateur ait à les compter. Le
+ * serveur applique la même règle, à partir du conditionnement.
+ */
+export interface PosLineReturnable {
+  /** Position de la ligne dans le panier : le serveur s'en sert pour rattacher
+   * la restitution à la bonne ligne de vente (`deposit_issues.sale_line_id`). */
+  cartIndex: number;
+  returnable_id: number;
+  pieces: number;
+}
+
 export function computeReturnedPackagingSummary(
   rows: readonly PosReturnableRow[],
-  received: ReadonlyArray<{ returnable_id: number; pieces: number }>
+  received: ReadonlyArray<{ returnable_id: number; pieces: number }>,
+  lineReturns: ReadonlyArray<PosLineReturnable> = []
 ): {
   normalized: Array<{ returnable_id: number; pieces: number }>;
+  /** Restitutions rattachées à une ligne, avec l'index du panier. */
+  normalizedLineReturns: Array<PosLineReturnable>;
   totalPieces: number;
   totalAmountFcfa: number;
 } {
@@ -400,6 +418,48 @@ export function computeReturnedPackagingSummary(
     }
   }
 
+  // Saisies par ligne : plafonnées séparément, puis regroupées par couple
+  // (index de panier, type d'emballage) — deux lignes peuvent rendre le même
+  // type d'emballage et restent deux dettes distinctes à apurer.
+  const lineAgg = new Map<string, PosLineReturnable>();
+  for (const item of lineReturns) {
+    if (!Number.isInteger(item.cartIndex) || item.cartIndex < 0) continue;
+    const raw = Number.isFinite(item.pieces) ? Math.trunc(item.pieces) : 0;
+    if (raw <= 0) continue;
+    // Un type d'emballage qui ne figure pas dans les lignes connues ne peut
+    // pas être rendu : l'ignorer vaut mieux que de créer une dette fantôme
+    // côté serveur.
+    const row = rowMap.get(item.returnable_id);
+    if (!row) continue;
+    // Le plafond par ligne est déjà borné à la saisie ; on ne borne ici qu'au
+    // total autorisé pour ce type, pour ne jamais surestimer un retour.
+    if (raw > row.max_returnable_pieces) continue;
+    const key = `${item.cartIndex}:${item.returnable_id}`;
+    const prev = lineAgg.get(key);
+    lineAgg.set(key, {
+      cartIndex: item.cartIndex,
+      returnable_id: item.returnable_id,
+      pieces: (prev?.pieces ?? 0) + raw,
+    });
+  }
+  const normalizedLineReturns = Array.from(lineAgg.values());
+
+  // Les saisies par ligne alimentent aussi l'agrégat par type : c'est ce que
+  // l'écran additionne pour annoncer la valorisation du retour.
+  const linePiecesByReturnable = new Map<number, number>();
+  for (const item of normalizedLineReturns) {
+    linePiecesByReturnable.set(
+      item.returnable_id,
+      (linePiecesByReturnable.get(item.returnable_id) ?? 0) + item.pieces
+    );
+  }
+  for (const [returnable_id, pieces] of linePiecesByReturnable.entries()) {
+    const row = rowMap.get(returnable_id);
+    if (!row) continue;
+    const next = Math.min(row.max_returnable_pieces, (agg.get(returnable_id) ?? 0) + pieces);
+    if (next > 0) agg.set(returnable_id, next);
+  }
+
   const normalized: Array<{ returnable_id: number; pieces: number }> = [];
   let totalPieces = 0;
   let totalAmountFcfa = 0;
@@ -412,5 +472,5 @@ export function computeReturnedPackagingSummary(
     totalAmountFcfa += pieces * row.deposit_value;
   }
 
-  return { normalized, totalPieces, totalAmountFcfa };
+  return { normalized, normalizedLineReturns, totalPieces, totalAmountFcfa };
 }

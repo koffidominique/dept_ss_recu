@@ -51,6 +51,9 @@ interface PosCartPanelProps {
   isLoadingClientReturnables?: boolean;
   receivedReturnables: Array<{ returnable_id: number; pieces: number }>;
   onReceivedReturnableChange: (returnableId: number, pieces: number) => void;
+  /** Restitutions saisies sur une ligne du panier. */
+  lineReturnables?: Array<{ cartIndex: number; returnable_id: number; pieces: number }>;
+  onLineReturnableChange?: (cartIndex: number, returnableId: number, pieces: number) => void;
   onResetReceivedReturnables?: () => void;
 }
 
@@ -85,6 +88,8 @@ export function PosCartPanel({
   isLoadingClientReturnables = false,
   receivedReturnables,
   onReceivedReturnableChange,
+  lineReturnables,
+  onLineReturnableChange,
   onResetReceivedReturnables,
 }: PosCartPanelProps) {
   const selectedClient = clients?.find((c) => c.id === posClientId);
@@ -408,10 +413,25 @@ export function PosCartPanel({
             </p>
           ) : (
             <AnimatePresence initial={false}>
-              {posCart.map((item) => {
+              {posCart.map((item, cartIndex) => {
                 const lineCalc = totals.lineResults[item.key];
                 const parsedMilli = parseQtyInputToMilliBigInt(item.quantity || '0');
                 const canDecrementOne = parsedMilli.ok && parsedMilli.milli > 1000n;
+                // Emballage remis sur CETTE ligne : seul un conditionnement qui
+                // émet un casier le propose. Un produit vendu à la bouteille n'a
+                // rien à rendre en casier, et le bloc global reste là pour lui.
+                const crateComponent = item.depositComponents?.find((c) => c.kind === 'crate');
+                const crateQuantity = Number.parseInt(item.quantity, 10);
+                const maxCrates = Number.isFinite(crateQuantity) ? Math.max(0, crateQuantity) : 0;
+                const crateReturn =
+                  lineReturnables?.find(
+                    (r) => r.cartIndex === cartIndex && r.returnable_id === crateComponent?.returnable_id
+                  )?.pieces ?? 0;
+                const setCrateReturn = (pieces: number) => {
+                  if (!crateComponent) return;
+                  const safe = Math.max(0, Math.min(maxCrates, Math.trunc(pieces) || 0));
+                  onLineReturnableChange?.(cartIndex, crateComponent.returnable_id, safe);
+                };
                 const adjustWholeStep = (delta: 1 | -1) => {
                   const cur = parseQtyInputToMilliBigInt(item.quantity || '0');
                   if (!cur.ok) {
@@ -516,6 +536,47 @@ export function PosCartPanel({
                             )}
                         </div>
                       </div>
+                      {crateComponent && maxCrates > 0 && (
+                        <div className="mt-2 rounded-lg border border-dashed border-[#1D4ED8]/40 dark:border-[#60A5FA]/40 bg-[#1D4ED8]/5 dark:bg-[#60A5FA]/10 p-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label
+                              htmlFor={`crate-return-${item.key}`}
+                              className="text-[11px] font-medium text-[#1D4ED8] dark:text-[#93C5FD]"
+                            >
+                              Emballage remis par le client
+                            </label>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                id={`crate-return-${item.key}`}
+                                type="number"
+                                min={0}
+                                max={maxCrates}
+                                step={1}
+                                inputMode="numeric"
+                                value={crateReturn}
+                                onChange={(e) => setCrateReturn(Number(e.target.value))}
+                                aria-label={`Emballage remis par le client — ${item.productName}`}
+                                className="h-8 w-16 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] px-2 text-right font-mono-num text-xs"
+                              />
+                              <span className="font-mono-num text-[11px] text-[#667085] dark:text-slate-400">
+                                / {maxCrates} casier{maxCrates > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-1 font-mono-num text-[10px] text-[#667085] dark:text-slate-400">
+                            {crateReturn > 0
+                              ? `${crateReturn} casier(s) + ${crateReturn * (crateComponent.pieces_per_pack ?? 0)} bouteille(s) rendus · ${formatFcfa(crateReturn * crateComponent.deposit_value * ((crateComponent.pieces_per_pack ?? 0) + 1))} hors total`
+                              : `aucun emballage rendu — dette totale de ${formatFcfa(maxCrates * crateComponent.deposit_value * ((crateComponent.pieces_per_pack ?? 0) + 1))}`}
+                          </div>
+                          {maxCrates - crateReturn > 0 && (
+                            <div className="mt-0.5 text-[10px] font-medium text-[#8A5A0B] dark:text-amber-300">
+                              Reste {maxCrates - crateReturn} casier(s) +{' '}
+                              {(maxCrates - crateReturn) * (crateComponent.pieces_per_pack ?? 0)}{' '}
+                              bouteille(s) à restituer sous 15 jours
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );

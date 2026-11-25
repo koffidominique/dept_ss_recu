@@ -102,6 +102,11 @@ interface UsePosMutationsOptions {
   paymentRows: Array<{ method_code: string; amount: number }>;
   totals: SaleCalculationResult;
   receivedReturnables: Array<{ returnable_id: number; pieces: number }>;
+  /**
+   * Restitutions saisies sur une ligne Precise du panier. Elles partent separement du
+   * retour global : le serveur en a besoin pour rattacher la dette a SA ligne de vente.
+   */
+  lineReturnables?: Array<{ cartIndex: number; returnable_id: number; pieces: number }>;
   onSaleSuccess: (sale: SaleDetail) => void;
   onSaleError: (message: string) => void;
   onQuickClientSuccess: (clientId: number) => void;
@@ -119,6 +124,7 @@ export function usePosMutations({
   paymentRows,
   totals,
   receivedReturnables,
+  lineReturnables = [],
   onSaleSuccess,
   onSaleError,
   onQuickClientSuccess,
@@ -132,14 +138,32 @@ export function usePosMutations({
         throw new Error(totals.errors[0] || 'Panier invalide : corrigez les quantités ou montants.');
       }
       const filteredPayments = paymentRows.filter((p) => p.amount > 0);
+      // Les deux saisies ne se doublonnent pas : une ligne de casier remise
+      // n'apparaît pas dans le bloc global (cf. SalesPage), et le serveur
+      // agrège de toute façon par type.
       const validReturnables =
         posClientId !== null
-          ? receivedReturnables
-              .filter((r) => Number.isFinite(r.pieces) && Math.trunc(r.pieces) > 0)
-              .map((r) => ({
-                returnable_id: r.returnable_id,
-                pieces: Math.trunc(r.pieces),
-              }))
+          ? [
+              ...receivedReturnables
+                .filter((r) => Number.isFinite(r.pieces) && Math.trunc(r.pieces) > 0)
+                .map((r) => ({
+                  returnable_id: r.returnable_id,
+                  pieces: Math.trunc(r.pieces),
+                })),
+              ...lineReturnables
+                .filter(
+                  (r) =>
+                    Number.isInteger(r.cartIndex) &&
+                    r.cartIndex >= 0 &&
+                    Number.isFinite(r.pieces) &&
+                    Math.trunc(r.pieces) > 0
+                )
+                .map((r) => ({
+                  returnable_id: r.returnable_id,
+                  pieces: Math.trunc(r.pieces),
+                  line_index: r.cartIndex,
+                })),
+            ]
           : [];
       return apiClient.createSale({
         request_key: requestKey,
